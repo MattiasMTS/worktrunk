@@ -206,73 +206,176 @@ fn handle_list() -> Result<(), GitError> {
     // Sort by most recent commit (descending)
     infos.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
 
+    // Calculate column widths for alignment
+    let widths = calculate_column_widths(&infos);
+
     // Display formatted output
-    for info in infos {
-        format_worktree_line(&info);
+    for info in &infos {
+        format_worktree_line(info, &widths);
     }
 
     Ok(())
 }
 
-fn format_worktree_line(info: &WorktreeInfo) {
+struct ColumnWidths {
+    branch: usize,
+    ahead_behind: usize,
+    working_diff: usize,
+    branch_diff: usize,
+    states: usize,
+}
+
+fn calculate_column_widths(infos: &[WorktreeInfo]) -> ColumnWidths {
+    let mut max_branch = 0;
+    let mut max_ahead_behind = 0;
+    let mut max_working_diff = 0;
+    let mut max_branch_diff = 0;
+    let mut max_states = 0;
+
+    for info in infos {
+        // Branch name
+        let branch_len = info.branch.as_deref().unwrap_or("(detached)").len();
+        max_branch = max_branch.max(branch_len);
+
+        // Ahead/behind
+        if !info.is_primary && (info.ahead > 0 || info.behind > 0) {
+            let ahead_behind_len = format!("↑{} ↓{}", info.ahead, info.behind).len();
+            max_ahead_behind = max_ahead_behind.max(ahead_behind_len);
+        }
+
+        // Working tree diff
+        let (wt_added, wt_deleted) = info.working_tree_diff;
+        if wt_added > 0 || wt_deleted > 0 {
+            let working_diff_len = format!("+{} -{}", wt_added, wt_deleted).len();
+            max_working_diff = max_working_diff.max(working_diff_len);
+        }
+
+        // Branch diff
+        if !info.is_primary {
+            let (br_added, br_deleted) = info.branch_diff;
+            if br_added > 0 || br_deleted > 0 {
+                let branch_diff_len = format!("(+{} -{})", br_added, br_deleted).len();
+                max_branch_diff = max_branch_diff.max(branch_diff_len);
+            }
+        }
+
+        // States
+        let states = format_states(info);
+        if !states.is_empty() {
+            max_states = max_states.max(states.len());
+        }
+    }
+
+    ColumnWidths {
+        branch: max_branch,
+        ahead_behind: max_ahead_behind,
+        working_diff: max_working_diff,
+        branch_diff: max_branch_diff,
+        states: max_states,
+    }
+}
+
+fn format_states(info: &WorktreeInfo) -> String {
+    let mut states = Vec::new();
+
+    // Don't show detached state if branch is None (already shown in branch column)
+    if info.detached && info.branch.is_some() {
+        states.push("(detached)".to_string());
+    }
+    if info.bare {
+        states.push("(bare)".to_string());
+    }
+    if let Some(ref reason) = info.locked {
+        if reason.is_empty() {
+            states.push("(locked)".to_string());
+        } else {
+            states.push(format!("(locked: {})", reason));
+        }
+    }
+    if let Some(ref reason) = info.prunable {
+        if reason.is_empty() {
+            states.push("(prunable)".to_string());
+        } else {
+            states.push(format!("(prunable: {})", reason));
+        }
+    }
+
+    states.join(" ")
+}
+
+fn format_worktree_line(info: &WorktreeInfo, widths: &ColumnWidths) {
     let primary_style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Cyan)));
 
     let branch_display = info.branch.as_deref().unwrap_or("(detached)");
     let short_head = &info.head[..8.min(info.head.len())];
 
-    // Build the line components
     let mut parts = Vec::new();
 
-    // Branch name and HEAD
-    parts.push(format!("{} {}", branch_display, short_head));
+    // Branch name (left-aligned)
+    parts.push(format!("{:width$}", branch_display, width = widths.branch));
 
-    // Ahead/behind (only for non-primary)
-    if !info.is_primary {
-        if info.ahead > 0 || info.behind > 0 {
-            parts.push(format!("↑{} ↓{}", info.ahead, info.behind));
-        }
-    }
+    // Short HEAD (fixed width)
+    parts.push(short_head.to_string());
 
-    // Working tree diff
-    let (wt_added, wt_deleted) = info.working_tree_diff;
-    if wt_added > 0 || wt_deleted > 0 {
-        parts.push(format!("+{} -{}", wt_added, wt_deleted));
-    }
-
-    // Branch diff (only for non-primary)
-    if !info.is_primary {
-        let (br_added, br_deleted) = info.branch_diff;
-        if br_added > 0 || br_deleted > 0 {
-            parts.push(format!("(+{} -{})", br_added, br_deleted));
-        }
-    }
-
-    // Worktree states
-    if info.detached {
-        parts.push("(detached)".to_string());
-    }
-    if info.bare {
-        parts.push("(bare)".to_string());
-    }
-    if let Some(ref reason) = info.locked {
-        if reason.is_empty() {
-            parts.push("(locked)".to_string());
+    // Ahead/behind (left-aligned in its column)
+    if widths.ahead_behind > 0 {
+        if !info.is_primary && (info.ahead > 0 || info.behind > 0) {
+            parts.push(format!(
+                "{:width$}",
+                format!("↑{} ↓{}", info.ahead, info.behind),
+                width = widths.ahead_behind
+            ));
         } else {
-            parts.push(format!("(locked: {})", reason));
-        }
-    }
-    if let Some(ref reason) = info.prunable {
-        if reason.is_empty() {
-            parts.push("(prunable)".to_string());
-        } else {
-            parts.push(format!("(prunable: {})", reason));
+            parts.push(" ".repeat(widths.ahead_behind));
         }
     }
 
-    // Path
+    // Working tree diff (left-aligned in its column)
+    if widths.working_diff > 0 {
+        let (wt_added, wt_deleted) = info.working_tree_diff;
+        if wt_added > 0 || wt_deleted > 0 {
+            parts.push(format!(
+                "{:width$}",
+                format!("+{} -{}", wt_added, wt_deleted),
+                width = widths.working_diff
+            ));
+        } else {
+            parts.push(" ".repeat(widths.working_diff));
+        }
+    }
+
+    // Branch diff (left-aligned in its column)
+    if widths.branch_diff > 0 {
+        if !info.is_primary {
+            let (br_added, br_deleted) = info.branch_diff;
+            if br_added > 0 || br_deleted > 0 {
+                parts.push(format!(
+                    "{:width$}",
+                    format!("(+{} -{})", br_added, br_deleted),
+                    width = widths.branch_diff
+                ));
+            } else {
+                parts.push(" ".repeat(widths.branch_diff));
+            }
+        } else {
+            parts.push(" ".repeat(widths.branch_diff));
+        }
+    }
+
+    // States (left-aligned in its column)
+    if widths.states > 0 {
+        let states = format_states(info);
+        if !states.is_empty() {
+            parts.push(format!("{:width$}", states, width = widths.states));
+        } else {
+            parts.push(" ".repeat(widths.states));
+        }
+    }
+
+    // Path (no padding needed, it's the last column)
     parts.push(info.path.display().to_string());
 
-    let line = parts.join(" ");
+    let line = parts.join("  ");
 
     if info.is_primary {
         println!(
