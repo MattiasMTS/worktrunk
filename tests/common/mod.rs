@@ -340,3 +340,45 @@ impl TestRepo {
         output.status.success()
     }
 }
+
+/// Create configured insta Settings for snapshot tests
+///
+/// This extracts the common settings configuration while allowing the
+/// `assert_cmd_snapshot!` macro to remain in test files for correct module path capture.
+pub fn setup_snapshot_settings(repo: &TestRepo) -> insta::Settings {
+    let mut settings = insta::Settings::clone_current();
+    settings.set_snapshot_path("../snapshots");
+
+    // Normalize paths
+    settings.add_filter(repo.root_path().to_str().unwrap(), "[REPO]");
+    for (name, path) in &repo.worktrees {
+        settings.add_filter(
+            path.to_str().unwrap(),
+            &format!("[WORKTREE_{}]", name.to_uppercase().replace('-', "_")),
+        );
+    }
+
+    // Normalize git SHAs and backslashes
+    settings.add_filter(r"\b[0-9a-f]{7,40}\b", "[SHA]");
+    settings.add_filter(r"\\", "/");
+
+    settings
+}
+
+/// Create a configured Command for snapshot testing
+///
+/// This extracts the common command setup while allowing the test file
+/// to call the macro with the correct module path for snapshot naming.
+pub fn make_snapshot_cmd(
+    repo: &TestRepo,
+    subcommand: &str,
+    args: &[&str],
+    cwd: Option<&Path>,
+) -> Command {
+    let mut cmd = Command::new(insta_cmd::get_cargo_bin("wt"));
+    repo.clean_cli_env(&mut cmd);
+    cmd.arg(subcommand)
+        .args(args)
+        .current_dir(cwd.unwrap_or(repo.root_path()));
+    cmd
+}

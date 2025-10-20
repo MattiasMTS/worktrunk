@@ -1,33 +1,12 @@
-use crate::common::TestRepo;
-use insta::Settings;
-use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
+use crate::common::{TestRepo, make_snapshot_cmd, setup_snapshot_settings};
+use insta_cmd::assert_cmd_snapshot;
 use std::process::Command;
 
 /// Helper to create snapshot with normalized paths
 fn snapshot_push(test_name: &str, repo: &TestRepo, args: &[&str], cwd: Option<&std::path::Path>) {
-    let mut settings = Settings::clone_current();
-    settings.set_snapshot_path("../snapshots");
-
-    // Normalize paths
-    settings.add_filter(repo.root_path().to_str().unwrap(), "[REPO]");
-    for (name, path) in &repo.worktrees {
-        settings.add_filter(
-            path.to_str().unwrap(),
-            format!("[WORKTREE_{}]", name.to_uppercase().replace('-', "_")),
-        );
-    }
-
-    // Normalize git SHAs
-    settings.add_filter(r"\b[0-9a-f]{7,40}\b", "[SHA]");
-    settings.add_filter(r"\\", "/");
-
+    let settings = setup_snapshot_settings(repo);
     settings.bind(|| {
-        let mut cmd = Command::new(get_cargo_bin("wt"));
-        repo.clean_cli_env(&mut cmd);
-        cmd.arg("push")
-            .args(args)
-            .current_dir(cwd.unwrap_or(repo.root_path()));
-
+        let mut cmd = make_snapshot_cmd(repo, "push", args, cwd);
         assert_cmd_snapshot!(test_name, cmd);
     });
 }
