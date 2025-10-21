@@ -265,17 +265,18 @@ pub fn handle_switch(
     repo.run_command(&args)
         .map_err(|e| GitError::CommandFailed(format!("Failed to create worktree: {}", e)))?;
 
-    if let Some(cmd) = execute {
-        execute_command_in_worktree(&worktree_path, cmd)?;
-    }
-
     // Canonicalize the path for cleaner display
     let canonical_path = worktree_path
         .canonicalize()
         .unwrap_or_else(|_| worktree_path.clone());
 
-    // Execute post-start commands from project config
+    // Execute post-start commands from project config (before -x command)
     execute_post_start_commands(&canonical_path, &repo, config, branch, repo_name)?;
+
+    // Execute -x command last (after setup is complete)
+    if let Some(cmd) = execute {
+        execute_command_in_worktree(&worktree_path, cmd)?;
+    }
 
     Ok(SwitchResult::CreatedWorktree {
         path: canonical_path,
@@ -443,7 +444,7 @@ fn prompt_for_approval(command: &str, project_id: &str) -> io::Result<bool> {
     eprintln!("    {}", command);
     eprintln!();
     eprintln!(
-        "{WARNING_EMOJI} {WARNING}WARNING: This will execute with FULL SHELL ACCESS in the new worktree.{WARNING:#}"
+        "{WARNING}WARNING: This will execute with FULL SHELL ACCESS in the new worktree.{WARNING:#}"
     );
     eprintln!("   The command can read/write files, access network, run arbitrary code.");
     eprintln!();
