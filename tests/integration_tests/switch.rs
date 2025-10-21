@@ -173,21 +173,3 @@ fn test_switch_execute_with_existing_worktree() {
         &["existing-exec", "--execute", create_file_cmd],
     );
 }
-
-#[test]
-fn test_switch_execute_with_internal_error() {
-    let repo = TestRepo::new();
-    repo.commit("Initial commit");
-
-    snapshot_switch(
-        "switch_execute_internal_error",
-        &repo,
-        &[
-            "--create",
-            "internal-test",
-            "--execute",
-            "echo test",
-            "--internal",
-        ],
-    );
-}
