@@ -20,7 +20,7 @@ info:
 success: true
 exit_code: 0
 ----- stdout -----
-Created new branch and worktree for 'feature-x' at [REPO]/../main.feature-x
+Created new branch and worktree for 'feature-x' at [REPO].feature-x
 Note: Use 'wt switch' (with shell integration) for automatic cd
 
 ----- stderr -----

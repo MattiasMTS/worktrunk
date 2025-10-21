@@ -134,7 +134,9 @@ pub fn handle_switch(
     // Check if worktree already exists for this branch
     match repo.worktree_for_branch(branch)? {
         Some(existing_path) if existing_path.exists() => {
-            return Ok(SwitchResult::ExistingWorktree(existing_path));
+            // Canonicalize the path for cleaner display
+            let canonical_existing_path = existing_path.canonicalize().unwrap_or(existing_path);
+            return Ok(SwitchResult::ExistingWorktree(canonical_existing_path));
         }
         Some(_) => {
             return Err(GitError::CommandFailed(format_error_with_bold(
@@ -173,8 +175,11 @@ pub fn handle_switch(
     repo.run_command(&args)
         .map_err(|e| GitError::CommandFailed(format!("Failed to create worktree: {}", e)))?;
 
+    // Canonicalize the path for cleaner display
+    let canonical_path = worktree_path.canonicalize().unwrap_or(worktree_path);
+
     Ok(SwitchResult::CreatedWorktree {
-        path: worktree_path,
+        path: canonical_path,
         created_branch: create,
     })
 }
@@ -209,8 +214,13 @@ pub fn handle_remove() -> Result<RemoveResult, GitError> {
             );
         }
 
+        // Canonicalize the path for cleaner display
+        let canonical_primary_path = primary_worktree_dir
+            .canonicalize()
+            .unwrap_or(primary_worktree_dir);
+
         Ok(RemoveResult::RemovedWorktree {
-            primary_path: primary_worktree_dir,
+            primary_path: canonical_primary_path,
         })
     } else {
         // In main repo but not on default branch: switch to default
