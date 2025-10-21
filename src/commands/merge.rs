@@ -1,6 +1,6 @@
 use worktrunk::config::WorktrunkConfig;
 use worktrunk::git::{GitError, Repository};
-use worktrunk::styling::format_error;
+use worktrunk::styling::{AnstyleStyle, ERROR, println};
 
 use super::worktree::handle_push;
 use super::worktree::handle_remove;
@@ -14,16 +14,19 @@ pub fn handle_merge(
     let repo = Repository::current();
 
     // Get current branch
-    let current_branch = repo
-        .current_branch()?
-        .ok_or_else(|| GitError::CommandFailed(format_error("Not on a branch (detached HEAD)")))?;
+    let current_branch = repo.current_branch()?.ok_or_else(|| {
+        GitError::CommandFailed(format!(
+            "❌ {ERROR}Not on a branch (detached HEAD){ERROR:#}"
+        ))
+    })?;
 
     // Get target branch (default to default branch if not provided)
     let target_branch = target.map_or_else(|| repo.default_branch(), |b| Ok(b.to_string()))?;
 
     // Check if already on target branch
     if current_branch == target_branch {
-        println!("Already on '{}', nothing to merge", target_branch);
+        let bold = AnstyleStyle::new().bold();
+        println!("Already on {bold}{target_branch}{bold:#}, nothing to merge");
         return Ok(());
     }
 
@@ -36,14 +39,15 @@ pub fn handle_merge(
     }
 
     // Rebase onto target
-    println!("Rebasing onto '{}'...", target_branch);
+    let bold = AnstyleStyle::new().bold();
+    println!("Rebasing onto {bold}{target_branch}{bold:#}...");
 
     repo.run_command(&["rebase", &target_branch]).map_err(|e| {
         GitError::CommandFailed(format!("Failed to rebase onto '{}': {}", target_branch, e))
     })?;
 
     // Fast-forward push to target branch (reuse handle_push logic)
-    println!("Fast-forwarding '{}' to current HEAD...", target_branch);
+    println!("Fast-forwarding {bold}{target_branch}{bold:#} to current HEAD...");
     handle_push(Some(&target_branch), false)?;
 
     // Finish worktree unless --keep was specified
@@ -68,7 +72,8 @@ pub fn handle_merge(
         let primary_repo = Repository::at(&primary_worktree_dir);
         let new_branch = primary_repo.current_branch()?;
         if new_branch.as_deref() != Some(&target_branch) {
-            println!("Switching to '{}'...", target_branch);
+            let bold = AnstyleStyle::new().bold();
+            println!("Switching to {bold}{target_branch}{bold:#}...");
             primary_repo
                 .run_command(&["switch", &target_branch])
                 .map_err(|e| {
@@ -79,10 +84,8 @@ pub fn handle_merge(
                 })?;
         }
     } else {
-        println!(
-            "Successfully merged to '{}' (worktree preserved)",
-            target_branch
-        );
+        let bold = AnstyleStyle::new().bold();
+        println!("Successfully merged to {bold}{target_branch}{bold:#} (worktree preserved)");
     }
 
     Ok(())
@@ -109,17 +112,15 @@ fn handle_squash(target_branch: &str) -> Result<(), GitError> {
 
     if commit_count == 0 && has_staged {
         // Just staged changes, no commits - would need to commit but this shouldn't happen in merge flow
-        return Err(GitError::CommandFailed(format_error(
-            "Staged changes without commits - please commit them first",
+        return Err(GitError::CommandFailed(format!(
+            "❌ {ERROR}Staged changes without commits - please commit them first{ERROR:#}"
         )));
     }
 
     if commit_count == 1 && !has_staged {
         // Single commit, no staged changes - nothing to do
-        println!(
-            "Only 1 commit since '{}' - no squashing needed",
-            target_branch
-        );
+        let bold = AnstyleStyle::new().bold();
+        println!("Only 1 commit since {bold}{target_branch}{bold:#} - no squashing needed");
         return Ok(());
     }
 

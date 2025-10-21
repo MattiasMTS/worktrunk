@@ -1,8 +1,6 @@
 use crate::display::{format_relative_time, shorten_path, truncate_at_word_boundary};
-use worktrunk::styling::{
-    StyledLine, addition_style, current_style, deletion_style, dim_style, neutral_style,
-    primary_style,
-};
+use anstyle::{AnsiColor, Color, Style};
+use worktrunk::styling::{ADDITION, CURRENT, DELETION, StyledLine};
 
 use super::layout::LayoutConfig;
 use super::{ListItem, WorktreeInfo};
@@ -43,68 +41,67 @@ pub fn format_all_states(info: &WorktreeInfo) -> String {
 pub fn format_header_line(layout: &LayoutConfig) {
     let widths = &layout.widths;
     let mut line = StyledLine::new();
-    let dim = dim_style();
 
     // Branch
     let header = format!("{:width$}", "Branch", width = widths.branch);
-    line.push_styled(header, dim);
+    line.push_styled(header, Style::new().dimmed());
     line.push_raw("  ");
 
     // Age (Time)
     if widths.time > 0 {
         let header = format!("{:width$}", "Age", width = widths.time);
-        line.push_styled(header, dim);
+        line.push_styled(header, Style::new().dimmed());
         line.push_raw("  ");
     }
 
     // Ahead/behind (commits)
     if widths.ahead_behind > 0 {
         let header = format!("{:width$}", "Cmts", width = widths.ahead_behind);
-        line.push_styled(header, dim);
+        line.push_styled(header, Style::new().dimmed());
         line.push_raw("  ");
     }
 
     // Branch diff (line diff in commits)
     if widths.branch_diff.total > 0 {
         let header = format!("{:width$}", "Cmt +/-", width = widths.branch_diff.total);
-        line.push_styled(header, dim);
+        line.push_styled(header, Style::new().dimmed());
         line.push_raw("  ");
     }
 
     // Working tree diff
     if widths.working_diff.total > 0 {
         let header = format!("{:width$}", "WT +/-", width = widths.working_diff.total);
-        line.push_styled(header, dim);
+        line.push_styled(header, Style::new().dimmed());
         line.push_raw("  ");
     }
 
     // Upstream
     if widths.upstream > 0 {
         let header = format!("{:width$}", "Remote", width = widths.upstream);
-        line.push_styled(header, dim);
+        line.push_styled(header, Style::new().dimmed());
         line.push_raw("  ");
     }
 
     // Commit (fixed width: 8 chars)
-    line.push_styled("Commit  ", dim);
+    line.push_styled("Commit  ", Style::new().dimmed());
     line.push_raw("  ");
 
     // Message
     if widths.message > 0 {
         let header = format!("{:width$}", "Message", width = widths.message);
-        line.push_styled(header, dim);
+        line.push_styled(header, Style::new().dimmed());
         line.push_raw("  ");
     }
 
     // States
     if widths.states > 0 {
         let header = format!("{:width$}", "State", width = widths.states);
-        line.push_styled(header, dim);
+        line.push_styled(header, Style::new().dimmed());
         line.push_raw("  ");
     }
 
     // Path
-    line.push_styled("Path", dim);
+    line.push_styled("Path", Style::new().dimmed());
 
     println!("{}", line.render());
 }
@@ -124,12 +121,6 @@ fn format_item_line(
     current_worktree_path: Option<&std::path::PathBuf>,
 ) {
     let widths = &layout.widths;
-    let primary = primary_style();
-    let current = current_style();
-    let green = addition_style();
-    let red = deletion_style();
-    let yellow = neutral_style();
-    let dim = dim_style();
 
     let short_head = &item.commit_head()[..8.min(item.commit_head().len())];
 
@@ -139,8 +130,8 @@ fn format_item_line(
             .map(|p| p == &info.worktree.path)
             .unwrap_or(false);
         match (is_current, item.is_primary()) {
-            (true, _) => Some(current),
-            (_, true) => Some(primary),
+            (true, _) => Some(CURRENT),
+            (_, true) => Some(Style::new().fg_color(Some(Color::Ansi(AnsiColor::Cyan)))),
             _ => None,
         }
     });
@@ -164,7 +155,7 @@ fn format_item_line(
             format_relative_time(item.timestamp()),
             width = widths.time
         );
-        line.push_styled(time_str, dim);
+        line.push_styled(time_str, Style::new().dimmed());
         line.push_raw("  ");
     }
 
@@ -176,7 +167,10 @@ fn format_item_line(
                 format!("↑{} ↓{}", item.ahead(), item.behind()),
                 width = widths.ahead_behind
             );
-            line.push_styled(ahead_behind_text, yellow);
+            line.push_styled(
+                ahead_behind_text,
+                Style::new().fg_color(Some(Color::Ansi(AnsiColor::Yellow))),
+            );
         } else {
             line.push_raw(" ".repeat(widths.ahead_behind));
         }
@@ -199,8 +193,8 @@ fn format_item_line(
                 let mut diff_segment = StyledLine::new();
                 // Split at the space between + and -
                 let split_pos = 1 + widths.branch_diff.added_digits;
-                diff_segment.push_styled(&formatted[..split_pos], green);
-                diff_segment.push_styled(&formatted[split_pos..], red);
+                diff_segment.push_styled(&formatted[..split_pos], ADDITION);
+                diff_segment.push_styled(&formatted[split_pos..], DELETION);
                 for segment in diff_segment.segments {
                     line.push(segment);
                 }
@@ -228,8 +222,8 @@ fn format_item_line(
                 let mut diff_segment = StyledLine::new();
                 // Split at the space between + and -
                 let split_pos = 1 + widths.working_diff.added_digits;
-                diff_segment.push_styled(&formatted[..split_pos], green);
-                diff_segment.push_styled(&formatted[split_pos..], red);
+                diff_segment.push_styled(&formatted[..split_pos], ADDITION);
+                diff_segment.push_styled(&formatted[split_pos..], DELETION);
                 for segment in diff_segment.segments {
                     line.push(segment);
                 }
@@ -246,11 +240,11 @@ fn format_item_line(
     if widths.upstream > 0 {
         if let Some((remote_name, upstream_ahead, upstream_behind)) = item.upstream_info() {
             let mut upstream_segment = StyledLine::new();
-            upstream_segment.push_styled(remote_name, dim);
+            upstream_segment.push_styled(remote_name, Style::new().dimmed());
             upstream_segment.push_raw(" ");
-            upstream_segment.push_styled(format!("↑{}", upstream_ahead), green);
+            upstream_segment.push_styled(format!("↑{}", upstream_ahead), ADDITION);
             upstream_segment.push_raw(" ");
-            upstream_segment.push_styled(format!("↓{}", upstream_behind), red);
+            upstream_segment.push_styled(format!("↓{}", upstream_behind), DELETION);
             upstream_segment.pad_to(widths.upstream);
             for segment in upstream_segment.segments {
                 line.push(segment);
@@ -265,7 +259,7 @@ fn format_item_line(
     if let Some(style) = text_style {
         line.push_styled(short_head, style);
     } else {
-        line.push_styled(short_head, dim);
+        line.push_styled(short_head, Style::new().dimmed());
     }
     line.push_raw("  ");
 
@@ -276,7 +270,7 @@ fn format_item_line(
             truncate_at_word_boundary(item.commit_message(), layout.max_message_len),
             width = widths.message
         );
-        line.push_styled(msg, dim);
+        line.push_styled(msg, Style::new().dimmed());
         line.push_raw("  ");
     }
 

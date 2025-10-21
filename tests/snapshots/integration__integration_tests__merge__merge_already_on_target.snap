@@ -5,6 +5,7 @@ info:
   args:
     - merge
   env:
+    CLICOLOR_FORCE: "1"
     GIT_AUTHOR_DATE: "2025-01-01T00:00:00Z"
     GIT_COMMITTER_DATE: "2025-01-01T00:00:00Z"
     GIT_CONFIG_GLOBAL: /dev/null
@@ -17,6 +18,6 @@ info:
 success: true
 exit_code: 0
 ----- stdout -----
-Already on 'main', nothing to merge
+Already on [1mmain[0m, nothing to merge
 
 ----- stderr -----

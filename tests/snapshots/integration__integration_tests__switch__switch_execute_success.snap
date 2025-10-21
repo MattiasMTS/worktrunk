@@ -23,7 +23,7 @@ success: true
 exit_code: 0
 ----- stdout -----
 test output
-Created new branch and worktree for 'exec-test' at [REPO].exec-test
+Created new branch and worktree for [1mexec-test[0m at [REPO].exec-test
 
 To enable automatic cd, run: wt configure-shell
 

@@ -1,171 +1,62 @@
 //! Consolidated styling module for terminal output.
 //!
-//! This module provides:
-//! - Color/style detection based on environment variables
-//! - Formatted message functions (error, warning, hint, etc.)
-//! - Styled string/line types for building complex output
+//! This module uses the anstyle ecosystem:
+//! - anstream for auto-detecting color support
+//! - anstyle for composable styling
+//! - Semantic style constants for domain-specific use
 
 use anstyle::{AnsiColor, Color, Style};
-use std::io::IsTerminal;
 use unicode_width::UnicodeWidthStr;
 
 // ============================================================================
-// Style Definitions (as constant functions to avoid repeated allocation)
+// Re-exports from anstream (auto-detecting output)
 // ============================================================================
 
-/// Get error style (red)
-pub fn error_style() -> Style {
-    Style::new().fg_color(Some(Color::Ansi(AnsiColor::Red)))
-}
+/// Auto-detecting println that respects NO_COLOR, CLICOLOR_FORCE, and terminal capabilities
+pub use anstream::println;
 
-/// Get warning style (yellow)
-pub fn warning_style() -> Style {
-    Style::new().fg_color(Some(Color::Ansi(AnsiColor::Yellow)))
-}
+/// Auto-detecting eprintln that respects NO_COLOR, CLICOLOR_FORCE, and terminal capabilities
+pub use anstream::eprintln;
 
-/// Get hint style (dimmed)
-pub fn hint_style() -> Style {
-    Style::new().dimmed()
-}
+/// Auto-detecting print that respects NO_COLOR, CLICOLOR_FORCE, and terminal capabilities
+pub use anstream::print;
 
-/// Get success style (green)
-pub fn success_style() -> Style {
-    Style::new().fg_color(Some(Color::Ansi(AnsiColor::Green)))
-}
-
-/// Get bold style
-pub fn bold_style() -> Style {
-    Style::new().bold()
-}
-
-/// Get dim style
-pub fn dim_style() -> Style {
-    Style::new().dimmed()
-}
-
-/// Get error bold style (red + bold)
-pub fn error_bold_style() -> Style {
-    Style::new()
-        .fg_color(Some(Color::Ansi(AnsiColor::Red)))
-        .bold()
-}
-
-/// Get primary style for worktrees (cyan)
-pub fn primary_style() -> Style {
-    Style::new().fg_color(Some(Color::Ansi(AnsiColor::Cyan)))
-}
-
-/// Get current style for worktrees (magenta + bold)
-pub fn current_style() -> Style {
-    Style::new()
-        .bold()
-        .fg_color(Some(Color::Ansi(AnsiColor::Magenta)))
-}
-
-/// Get addition style for diffs (green)
-pub fn addition_style() -> Style {
-    Style::new().fg_color(Some(Color::Ansi(AnsiColor::Green)))
-}
-
-/// Get deletion style for diffs (red)
-pub fn deletion_style() -> Style {
-    Style::new().fg_color(Some(Color::Ansi(AnsiColor::Red)))
-}
-
-/// Get neutral style for diffs (yellow)
-pub fn neutral_style() -> Style {
-    Style::new().fg_color(Some(Color::Ansi(AnsiColor::Yellow)))
-}
+/// Auto-detecting eprint that respects NO_COLOR, CLICOLOR_FORCE, and terminal capabilities
+pub use anstream::eprint;
 
 // ============================================================================
-// Color Detection
+// Re-exports from anstyle (for composition)
 // ============================================================================
 
-/// Determines if colored output should be used based on environment
-fn should_use_color_with_env(no_color: bool, force_color: bool, is_terminal: bool) -> bool {
-    if force_color {
-        return true;
-    }
-    if no_color {
-        return false;
-    }
-    is_terminal
-}
-
-/// Determines if colored output should be used
-pub fn should_use_color() -> bool {
-    should_use_color_with_env(
-        std::env::var("NO_COLOR").is_ok(),
-        std::env::var("CLICOLOR_FORCE").is_ok() || std::env::var("FORCE_COLOR").is_ok(),
-        std::io::stderr().is_terminal(),
-    )
-}
+/// Re-export Style for users who want to compose custom styles
+pub use anstyle::Style as AnstyleStyle;
 
 // ============================================================================
-// Formatted Message Functions
+// Semantic Style Constants
 // ============================================================================
 
-/// Format an error message with red color and ❌ emoji
-pub fn format_error(msg: &str) -> String {
-    if should_use_color() {
-        let style = error_style();
-        format!("{}❌ {}{}", style.render(), msg, style.render_reset())
-    } else {
-        format!("❌ {}", msg)
-    }
-}
+/// Error style (red) - use as `{ERROR}text{ERROR:#}`
+pub const ERROR: Style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Red)));
 
-/// Format a warning message with yellow color and 🟡 emoji
-pub fn format_warning(msg: &str) -> String {
-    if should_use_color() {
-        let style = warning_style();
-        format!("{}🟡 {}{}", style.render(), msg, style.render_reset())
-    } else {
-        format!("🟡 {}", msg)
-    }
-}
+/// Warning style (yellow) - use as `{WARNING}text{WARNING:#}`
+pub const WARNING: Style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Yellow)));
 
-/// Format a hint message with dim color and 💡 emoji
-pub fn format_hint(msg: &str) -> String {
-    if should_use_color() {
-        let style = hint_style();
-        format!("{}💡 {}{}", style.render(), msg, style.render_reset())
-    } else {
-        format!("💡 {}", msg)
-    }
-}
+/// Hint style (dimmed) - use as `{HINT}text{HINT:#}`
+pub const HINT: Style = Style::new().dimmed();
 
-/// Format text with bold styling
-pub fn bold(text: &str) -> String {
-    if should_use_color() {
-        let style = bold_style();
-        format!("{}{}{}", style.render(), text, style.render_reset())
-    } else {
-        text.to_string()
-    }
-}
+/// Success style (green) - use as `{SUCCESS}text{SUCCESS:#}`
+pub const SUCCESS: Style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Green)));
 
-/// Format an error message with bold emphasis on specific parts
-///
-/// Example: `format_error_with_bold("Branch '", "feature-x", "' already exists")`
-pub fn format_error_with_bold(prefix: &str, emphasized: &str, suffix: &str) -> String {
-    if should_use_color() {
-        let error = error_style();
-        let error_bold = error_bold_style();
-        format!(
-            "{}❌ {}{}{}{}{}{}",
-            error.render(),
-            prefix,
-            error_bold.render(),
-            emphasized,
-            error.render(), // Back to regular red
-            suffix,
-            error.render_reset()
-        )
-    } else {
-        format!("❌ {}{}{}", prefix, emphasized, suffix)
-    }
-}
+/// Current worktree style (magenta + bold)
+pub const CURRENT: Style = Style::new()
+    .bold()
+    .fg_color(Some(Color::Ansi(AnsiColor::Magenta)));
+
+/// Addition style for diffs (green)
+pub const ADDITION: Style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Green)));
+
+/// Deletion style for diffs (red)
+pub const DELETION: Style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Red)));
 
 // ============================================================================
 // Styled Output Types
@@ -261,25 +152,6 @@ impl StyledLine {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // Color detection tests
-    #[test]
-    fn test_should_use_color_force_color() {
-        assert!(should_use_color_with_env(false, true, false));
-        assert!(should_use_color_with_env(true, true, false));
-    }
-
-    #[test]
-    fn test_should_use_color_no_color() {
-        assert!(!should_use_color_with_env(true, false, true));
-        assert!(!should_use_color_with_env(true, false, false));
-    }
-
-    #[test]
-    fn test_should_use_color_terminal() {
-        assert!(should_use_color_with_env(false, false, true));
-        assert!(!should_use_color_with_env(false, false, false));
-    }
 
     // StyledString tests
     #[test]

@@ -1,8 +1,9 @@
+use anstyle::Style;
 use clap::{CommandFactory, Parser, Subcommand};
 use std::process;
 use worktrunk::config::WorktrunkConfig;
 use worktrunk::git::GitError;
-use worktrunk::styling::{dim_style, should_use_color};
+use worktrunk::styling::println;
 
 mod commands;
 mod display;
@@ -165,15 +166,9 @@ fn main() {
                         result.path.display()
                     );
                     // Indent each line of the config content with dim/gray color
-                    if should_use_color() {
-                        let style = dim_style();
-                        for line in result.config_line.lines() {
-                            println!("  {}{}{}", style.render(), line, style.render_reset());
-                        }
-                    } else {
-                        for line in result.config_line.lines() {
-                            println!("  {}", line);
-                        }
+                    for line in result.config_line.lines() {
+                        let dim = Style::new().dimmed();
+                        println!("  {dim}{line}{dim:#}");
                     }
                 }
             })

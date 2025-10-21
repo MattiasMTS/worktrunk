@@ -7,6 +7,7 @@ info:
     - main
     - "--keep"
   env:
+    CLICOLOR_FORCE: "1"
     GIT_AUTHOR_DATE: "2025-01-01T00:00:00Z"
     GIT_COMMITTER_DATE: "2025-01-01T00:00:00Z"
     GIT_CONFIG_GLOBAL: /dev/null
@@ -19,10 +20,10 @@ info:
 success: true
 exit_code: 0
 ----- stdout -----
-Rebasing onto 'main'...
-Fast-forwarding 'main' to current HEAD...
-Pushing 1 commit to 'main'
-Successfully pushed to 'main'
-Successfully merged to 'main' (worktree preserved)
+Rebasing onto [1mmain[0m...
+Fast-forwarding [1mmain[0m to current HEAD...
+Pushing 1 commit to [1mmain[0m
+Successfully pushed to [1mmain[0m
+Successfully merged to [1mmain[0m (worktree preserved)
 
 ----- stderr -----

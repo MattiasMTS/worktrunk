@@ -20,4 +20,4 @@ exit_code: 1
 ----- stdout -----
 
 ----- stderr -----
-[31m❌ Working tree has uncommitted changes. Commit or stash them first.[0m
+❌ [31mWorking tree has uncommitted changes. Commit or stash them first.[0m

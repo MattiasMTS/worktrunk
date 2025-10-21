@@ -1,10 +1,11 @@
 ---
-source: tests/integration_tests/finish.rs
+source: tests/integration_tests/remove.rs
 info:
   program: wt
   args:
-    - finish
+    - remove
   env:
+    CLICOLOR_FORCE: "1"
     GIT_AUTHOR_DATE: "2025-01-01T00:00:00Z"
     GIT_COMMITTER_DATE: "2025-01-01T00:00:00Z"
     GIT_CONFIG_GLOBAL: /dev/null
@@ -17,6 +18,6 @@ info:
 success: true
 exit_code: 0
 ----- stdout -----
-Switched to default branch 'main'
+Switched to default branch [1mmain[0m
 
 ----- stderr -----

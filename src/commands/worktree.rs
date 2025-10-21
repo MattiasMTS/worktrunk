@@ -71,7 +71,7 @@ use std::path::PathBuf;
 use worktrunk::config::{ProjectConfig, WorktrunkConfig};
 use worktrunk::git::{GitError, Repository};
 use worktrunk::shell::Shell;
-use worktrunk::styling::{format_error, format_error_with_bold, format_hint};
+use worktrunk::styling::{AnstyleStyle, ERROR, HINT, WARNING, eprintln, println};
 
 /// Generate hint message for shell integration setup
 ///
@@ -106,16 +106,15 @@ impl SwitchResult {
                 path,
                 created_branch,
             } => {
+                let bold = AnstyleStyle::new().bold();
                 let msg = if *created_branch {
                     format!(
-                        "Created new branch and worktree for '{}' at {}",
-                        branch,
+                        "Created new branch and worktree for {bold}{branch}{bold:#} at {}",
                         path.display()
                     )
                 } else {
                     format!(
-                        "Added worktree for existing branch '{}' at {}",
-                        branch,
+                        "Added worktree for existing branch {bold}{branch}{bold:#} at {}",
                         path.display()
                     )
                 };
@@ -135,10 +134,11 @@ impl SwitchResult {
                 path,
                 created_branch,
             } => {
+                let bold = AnstyleStyle::new().bold();
                 let msg = if *created_branch {
-                    format!("Created new branch and worktree for '{}'", branch)
+                    format!("Created new branch and worktree for {bold}{branch}{bold:#}")
                 } else {
-                    format!("Added worktree for existing branch '{}'", branch)
+                    format!("Added worktree for existing branch {bold}{branch}{bold:#}")
                 };
                 Some(format!(
                     "__WORKTRUNK_CD__{}\n{} at {}",
@@ -166,7 +166,8 @@ impl RemoveResult {
     pub fn format_user_output(&self) -> Option<String> {
         match self {
             RemoveResult::AlreadyOnDefault(branch) => {
-                Some(format!("Already on default branch '{}'", branch))
+                let bold = AnstyleStyle::new().bold();
+                Some(format!("Already on default branch {bold}{branch}{bold:#}"))
             }
             RemoveResult::RemovedWorktree { primary_path } => Some(format!(
                 "Moved to primary worktree and removed worktree\nPath: {}{}",
@@ -174,7 +175,8 @@ impl RemoveResult {
                 shell_integration_hint()
             )),
             RemoveResult::SwitchedToDefault(branch) => {
-                Some(format!("Switched to default branch '{}'", branch))
+                let bold = AnstyleStyle::new().bold();
+                Some(format!("Switched to default branch {bold}{branch}{bold:#}"))
             }
         }
     }
@@ -202,19 +204,15 @@ pub fn handle_switch(
 
     // Check for conflicting conditions
     if create && repo.branch_exists(branch)? {
-        return Err(GitError::CommandFailed(format_error_with_bold(
-            "Branch '",
-            branch,
-            "' already exists. Remove --create flag to switch to it.",
+        let error_bold = ERROR.bold();
+        return Err(GitError::CommandFailed(format!(
+            "❌ Branch '{error_bold}{branch}{error_bold:#}' already exists. Remove --create flag to switch to it."
         )));
     }
 
     // Check if base flag was provided without create flag
     if base.is_some() && !create {
-        eprintln!(
-            "{}",
-            worktrunk::styling::format_warning("--base flag is only used with --create, ignoring")
-        );
+        eprintln!("🟡 {WARNING}--base flag is only used with --create, ignoring{WARNING:#}");
     }
 
     // Check if worktree already exists for this branch
@@ -228,10 +226,9 @@ pub fn handle_switch(
             return Ok(SwitchResult::ExistingWorktree(canonical_existing_path));
         }
         Some(_) => {
-            return Err(GitError::CommandFailed(format_error_with_bold(
-                "Worktree directory missing for '",
-                branch,
-                "'. Run 'git worktree prune' to clean up.",
+            let error_bold = ERROR.bold();
+            return Err(GitError::CommandFailed(format!(
+                "❌ Worktree directory missing for '{error_bold}{branch}{error_bold:#}'. Run 'git worktree prune' to clean up."
             )));
         }
         None => {}
@@ -341,7 +338,7 @@ pub fn handle_remove() -> Result<RemoveResult, GitError> {
 
         // Remove the worktree
         if let Err(e) = repo.remove_worktree(&worktree_root) {
-            eprintln!("Warning: Failed to remove worktree: {}", e);
+            eprintln!("🟡 {WARNING}Failed to remove worktree: {e}{WARNING:#}");
             eprintln!(
                 "You may need to run 'git worktree remove {}' manually",
                 worktree_root.display()
@@ -405,10 +402,7 @@ fn check_worktree_conflicts(
         .collect();
 
     if !overlapping.is_empty() {
-        eprintln!(
-            "{}",
-            format_error("Cannot push: conflicting uncommitted changes in:")
-        );
+        eprintln!("❌ {ERROR}Cannot push: conflicting uncommitted changes in:{ERROR:#}");
         for file in &overlapping {
             eprintln!("  - {}", file);
         }
@@ -531,10 +525,12 @@ pub fn handle_push(target: Option<&str>, allow_merge_commits: bool) -> Result<()
 
     // Check if it's a fast-forward
     if !repo.is_ancestor(&target_branch, "HEAD")? {
-        let error_msg =
-            format_error_with_bold("Not a fast-forward from '", &target_branch, "' to HEAD");
-        let hint_msg = format_hint(
-            "The target branch has commits not in your current branch. Consider 'git pull' or 'git rebase'",
+        let error_bold = ERROR.bold();
+        let error_msg = format!(
+            "❌ Not a fast-forward from '{error_bold}{target_branch}{error_bold:#}' to HEAD"
+        );
+        let hint_msg = format!(
+            "💡 {HINT}The target branch has commits not in your current branch. Consider 'git pull' or 'git rebase'{HINT:#}"
         );
         return Err(GitError::CommandFailed(format!(
             "{}\n{}",
@@ -544,8 +540,8 @@ pub fn handle_push(target: Option<&str>, allow_merge_commits: bool) -> Result<()
 
     // Check for merge commits unless allowed
     if !allow_merge_commits && repo.has_merge_commits(&target_branch, "HEAD")? {
-        return Err(GitError::CommandFailed(format_error(
-            "Found merge commits in push range. Use --allow-merge-commits to push non-linear history.",
+        return Err(GitError::CommandFailed(format!(
+            "❌ {ERROR}Found merge commits in push range. Use --allow-merge-commits to push non-linear history.{ERROR:#}"
         )));
     }
 
@@ -567,10 +563,8 @@ pub fn handle_push(target: Option<&str>, allow_merge_commits: bool) -> Result<()
         } else {
             "commits"
         };
-        println!(
-            "Pushing {} {} to '{}'",
-            commit_count, commit_text, target_branch
-        );
+        let bold = AnstyleStyle::new().bold();
+        println!("Pushing {commit_count} {commit_text} to {bold}{target_branch}{bold:#}");
     }
 
     // Get git common dir for the push
@@ -581,6 +575,7 @@ pub fn handle_push(target: Option<&str>, allow_merge_commits: bool) -> Result<()
     repo.run_command(&["push", git_common_dir.to_str().unwrap(), &push_target])
         .map_err(|e| GitError::CommandFailed(format!("Push failed: {}", e)))?;
 
-    println!("Successfully pushed to '{}'", target_branch);
+    let bold = AnstyleStyle::new().bold();
+    println!("Successfully pushed to {bold}{target_branch}{bold:#}");
     Ok(())
 }

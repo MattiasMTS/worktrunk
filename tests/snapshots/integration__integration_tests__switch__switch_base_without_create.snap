@@ -23,4 +23,4 @@ exit_code: 0
 ----- stdout -----
 
 ----- stderr -----
-[33m🟡 --base flag is only used with --create, ignoring[0m
+🟡 [33m--base flag is only used with --create, ignoring[0m

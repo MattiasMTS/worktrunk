@@ -3,22 +3,21 @@
 //! This test verifies that header and data rows align properly,
 //! regardless of whether cells have ANSI styling applied.
 
-use worktrunk::styling::{StyledLine, dim_style, primary_style};
+use anstyle::{AnsiColor, Color, Style};
+use worktrunk::styling::StyledLine;
 
 #[test]
 fn test_header_data_alignment_with_and_without_styling() {
     // Simulate what happens in the actual rendering
-    let dim = dim_style();
-    let primary = primary_style();
 
     // Header (always styled with dim)
     let mut header = StyledLine::new();
     let branch_width = 6;
     let branch_header = format!("{:width$}", "Branch", width = branch_width);
-    header.push_styled(branch_header, dim);
+    header.push_styled(branch_header, Style::new().dimmed());
     header.push_raw("  "); // separator
     let age_header = format!("{:width$}", "Age", width = 14);
-    header.push_styled(age_header, dim);
+    header.push_styled(age_header, Style::new().dimmed());
 
     println!(
         "Header visual: |{}|",
@@ -28,10 +27,13 @@ fn test_header_data_alignment_with_and_without_styling() {
     // Data row 1: with styling (styled cell)
     let mut row1 = StyledLine::new();
     let branch1_text = format!("{:width$}", "main", width = branch_width);
-    row1.push_styled(branch1_text.clone(), primary); // Styled
+    row1.push_styled(
+        branch1_text.clone(),
+        Style::new().fg_color(Some(Color::Ansi(AnsiColor::Cyan))),
+    ); // Styled
     row1.push_raw("  "); // separator
     let time1_text = format!("{:width$}", "23 minutes ago", width = 14);
-    row1.push_styled(time1_text, dim);
+    row1.push_styled(time1_text, Style::new().dimmed());
 
     println!(
         "Row 1 styled visual: |{}|",
@@ -49,7 +51,7 @@ fn test_header_data_alignment_with_and_without_styling() {
     row2.push_raw(branch2_text.clone()); // NOT styled
     row2.push_raw("  "); // separator
     let time2_text = format!("{:width$}", "23 minutes ago", width = 14);
-    row2.push_styled(time2_text, dim);
+    row2.push_styled(time2_text, Style::new().dimmed());
 
     println!(
         "Row 2 unstyled visual: |{}|",

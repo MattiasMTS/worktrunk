@@ -6,6 +6,7 @@ mod spacing_test;
 
 use rayon::prelude::*;
 use worktrunk::git::{GitError, Repository};
+use worktrunk::styling::{WARNING, eprintln};
 
 use layout::calculate_responsive_layout;
 use render::{format_header_line, format_list_item_line};
@@ -321,7 +322,12 @@ pub fn handle_list(format: crate::OutputFormat, show_branches: bool) -> Result<(
         for branch in available_branches {
             match BranchInfo::from_branch(&branch, &repo, primary_branch) {
                 Ok(branch_info) => items.push(ListItem::Branch(branch_info)),
-                Err(e) => eprintln!("Warning: Failed to enrich branch '{}': {}", branch, e),
+                Err(e) => {
+                    let warning_bold = WARNING.bold();
+                    eprintln!(
+                        "🟡 Failed to enrich branch {warning_bold}{branch}{warning_bold:#}: {e}"
+                    );
+                }
             }
         }
     }

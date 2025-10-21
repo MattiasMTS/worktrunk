@@ -21,4 +21,4 @@ exit_code: 1
 ----- stdout -----
 
 ----- stderr -----
-[31m❌ Not on a branch (detached HEAD)[0m
+❌ [31mNot on a branch (detached HEAD)[0m

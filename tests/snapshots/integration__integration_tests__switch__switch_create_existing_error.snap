@@ -22,4 +22,4 @@ exit_code: 1
 ----- stdout -----
 
 ----- stderr -----
-[31m❌ Branch '[1m[31mfeature-y[31m' already exists. Remove --create flag to switch to it.[0m
+❌ Branch '[1m[31mfeature-y[0m' already exists. Remove --create flag to switch to it.

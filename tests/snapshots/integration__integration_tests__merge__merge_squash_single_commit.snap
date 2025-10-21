@@ -20,11 +20,11 @@ info:
 success: true
 exit_code: 0
 ----- stdout -----
-Only 1 commit since 'main' - no squashing needed
-Rebasing onto 'main'...
-Fast-forwarding 'main' to current HEAD...
-Pushing 1 commit to 'main'
-Successfully pushed to 'main'
+Only 1 commit since [1mmain[0m - no squashing needed
+Rebasing onto [1mmain[0m...
+Fast-forwarding [1mmain[0m to current HEAD...
+Pushing 1 commit to [1mmain[0m
+Successfully pushed to [1mmain[0m
 Cleaning up worktree...
 Moved to primary worktree and removed worktree
 Path: [REPO]

@@ -20,7 +20,7 @@ info:
 success: true
 exit_code: 0
 ----- stdout -----
-Created new branch and worktree for 'feature-x' at [REPO].feature-x
+Created new branch and worktree for [1mfeature-x[0m at [REPO].feature-x
 
 To enable automatic cd, run: wt configure-shell
 
