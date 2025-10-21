@@ -125,10 +125,8 @@ fn main() {
                         if let Some(output) = result.format_internal_output(&branch) {
                             println!("{}", output);
                         }
-                    } else {
-                        if let Some(output) = result.format_user_output(&branch) {
-                            println!("{}", output);
-                        }
+                    } else if let Some(output) = result.format_user_output(&branch) {
+                        println!("{}", output);
                     }
                 })
             }),
@@ -137,10 +135,8 @@ fn main() {
                 if let Some(output) = result.format_internal_output() {
                     println!("{}", output);
                 }
-            } else {
-                if let Some(output) = result.format_user_output() {
-                    println!("{}", output);
-                }
+            } else if let Some(output) = result.format_user_output() {
+                println!("{}", output);
             }
         }),
         Commands::Push {

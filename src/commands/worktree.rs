@@ -1,5 +1,4 @@
 use std::path::PathBuf;
-use std::process;
 use worktrunk::config::WorktrunkConfig;
 use worktrunk::git::{GitError, Repository};
 use worktrunk::styling::{format_error, format_error_with_bold, format_hint};
@@ -201,15 +200,9 @@ pub fn handle_remove() -> Result<RemoveResult, GitError> {
         let worktree_root = repo.worktree_root()?;
         let primary_worktree_dir = repo.repo_root()?;
 
-        // Schedule worktree removal (synchronous for now, could be async later)
-        let remove_result = process::Command::new("git")
-            .args(["worktree", "remove", worktree_root.to_str().unwrap()])
-            .output()
-            .map_err(|e| GitError::CommandFailed(e.to_string()))?;
-
-        if !remove_result.status.success() {
-            let stderr = String::from_utf8_lossy(&remove_result.stderr);
-            eprintln!("Warning: Failed to remove worktree: {}", stderr);
+        // Remove the worktree
+        if let Err(e) = repo.remove_worktree(&worktree_root) {
+            eprintln!("Warning: Failed to remove worktree: {}", e);
             eprintln!(
                 "You may need to run 'git worktree remove {}' manually",
                 worktree_root.display()
@@ -311,19 +304,9 @@ pub fn handle_push(target: Option<&str>, allow_merge_commits: bool) -> Result<()
     }
 
     // Configure receive.denyCurrentBranch if needed
-    // TODO: These git config commands don't use repo.run_command() because they don't check
-    // status.success() and may rely on exit codes for missing keys. Should be refactored.
-    let deny_config_output = process::Command::new("git")
-        .args(["config", "receive.denyCurrentBranch"])
-        .output()
-        .map_err(|e| GitError::CommandFailed(e.to_string()))?;
-
-    let current_config = String::from_utf8_lossy(&deny_config_output.stdout);
-    if current_config.trim() != "updateInstead" {
-        process::Command::new("git")
-            .args(["config", "receive.denyCurrentBranch", "updateInstead"])
-            .output()
-            .map_err(|e| GitError::CommandFailed(e.to_string()))?;
+    let current_config = repo.get_config("receive.denyCurrentBranch")?;
+    if current_config.as_deref() != Some("updateInstead") {
+        repo.set_config("receive.denyCurrentBranch", "updateInstead")?;
     }
 
     // Check for conflicting changes in target worktree

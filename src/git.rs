@@ -205,13 +205,7 @@ impl Repository {
 
     /// Check if base is an ancestor of head (i.e., would be a fast-forward).
     pub fn is_ancestor(&self, base: &str, head: &str) -> Result<bool, GitError> {
-        let output = std::process::Command::new("git")
-            .args(["merge-base", "--is-ancestor", base, head])
-            .current_dir(&self.path)
-            .output()
-            .map_err(|e| GitError::CommandFailed(e.to_string()))?;
-
-        Ok(output.status.success())
+        self.run_command_check(&["merge-base", "--is-ancestor", base, head])
     }
 
     /// Count commits between base and head.
@@ -365,14 +359,9 @@ impl Repository {
 
     /// Check if there are staged changes.
     pub fn has_staged_changes(&self) -> Result<bool, GitError> {
-        let output = std::process::Command::new("git")
-            .args(["diff", "--cached", "--quiet", "--exit-code"])
-            .current_dir(&self.path)
-            .output()
-            .map_err(|e| GitError::CommandFailed(e.to_string()))?;
-
         // exit code 0 = no changes, 1 = has changes
-        Ok(!output.status.success())
+        let no_changes = self.run_command_check(&["diff", "--cached", "--quiet", "--exit-code"])?;
+        Ok(!no_changes)
     }
 
     /// List all worktrees for this repository.
@@ -405,6 +394,29 @@ impl Repository {
             .into_iter()
             .filter(|branch| !branches_with_worktrees.contains(branch))
             .collect())
+    }
+
+    /// Get a git config value. Returns None if the key doesn't exist.
+    pub fn get_config(&self, key: &str) -> Result<Option<String>, GitError> {
+        match self.run_command(&["config", key]) {
+            Ok(value) => Ok(Some(value.trim().to_string())),
+            Err(_) => Ok(None), // Config key doesn't exist
+        }
+    }
+
+    /// Set a git config value.
+    pub fn set_config(&self, key: &str, value: &str) -> Result<(), GitError> {
+        self.run_command(&["config", key, value])?;
+        Ok(())
+    }
+
+    /// Remove a worktree at the specified path.
+    pub fn remove_worktree(&self, path: &std::path::Path) -> Result<(), GitError> {
+        let path_str = path
+            .to_str()
+            .ok_or_else(|| GitError::CommandFailed("Invalid UTF-8 in worktree path".to_string()))?;
+        self.run_command(&["worktree", "remove", path_str])?;
+        Ok(())
     }
 
     // Private helper methods for default_branch()
@@ -453,6 +465,31 @@ impl Repository {
         }
 
         Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+    }
+
+    /// Run a git command and return whether it succeeded (exit code 0).
+    ///
+    /// This is useful for commands that use exit codes for boolean results,
+    /// like `git merge-base --is-ancestor` or `git diff --quiet`.
+    ///
+    /// # Examples
+    /// ```no_run
+    /// use worktrunk::git::Repository;
+    ///
+    /// let repo = Repository::current();
+    /// let is_clean = repo.run_command_check(&["diff", "--quiet", "--exit-code"])?;
+    /// # Ok::<(), worktrunk::git::GitError>(())
+    /// ```
+    pub fn run_command_check(&self, args: &[&str]) -> Result<bool, GitError> {
+        let mut cmd = Command::new("git");
+        cmd.args(args);
+        cmd.current_dir(&self.path);
+
+        let output = cmd
+            .output()
+            .map_err(|e| GitError::CommandFailed(e.to_string()))?;
+
+        Ok(output.status.success())
     }
 }
 
