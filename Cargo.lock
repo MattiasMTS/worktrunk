@@ -2021,6 +2021,7 @@ dependencies = [
  "insta",
  "insta-cmd",
  "rayon",
+ "regex",
  "rstest",
  "serde",
  "serde_json",

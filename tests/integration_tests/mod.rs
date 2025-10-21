@@ -1,3 +1,5 @@
+pub mod column_alignment;
+pub mod column_alignment_verification;
 pub mod completion;
 pub mod completion_validation;
 pub mod configure_shell;

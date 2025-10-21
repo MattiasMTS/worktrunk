@@ -24,13 +24,31 @@ fn try_allocate(remaining: &mut usize, ideal_width: usize, spacing: usize) -> us
     ideal_width
 }
 
+/// Width information for diff columns (e.g., "+128 -147")
+#[derive(Clone, Copy)]
+pub struct DiffWidths {
+    pub total: usize,
+    pub added_digits: usize,
+    pub deleted_digits: usize,
+}
+
+impl DiffWidths {
+    pub fn zero() -> Self {
+        Self {
+            total: 0,
+            added_digits: 0,
+            deleted_digits: 0,
+        }
+    }
+}
+
 pub struct ColumnWidths {
     pub branch: usize,
     pub time: usize,
     pub message: usize,
     pub ahead_behind: usize,
-    pub working_diff: usize,
-    pub branch_diff: usize,
+    pub working_diff: DiffWidths,
+    pub branch_diff: DiffWidths,
     pub upstream: usize,
     pub states: usize,
 }
@@ -47,10 +65,14 @@ pub fn calculate_column_widths(items: &[ListItem]) -> ColumnWidths {
     let mut max_time = "Age".width();
     let mut max_message = "Message".width();
     let mut max_ahead_behind = "Cmts".width();
-    let mut max_working_diff = "WT +/-".width();
-    let mut max_branch_diff = "Cmt +/-".width();
     let mut max_upstream = "Remote".width();
     let mut max_states = "State".width();
+
+    // Track diff component widths separately
+    let mut max_wt_added_digits = 0;
+    let mut max_wt_deleted_digits = 0;
+    let mut max_br_added_digits = 0;
+    let mut max_br_deleted_digits = 0;
 
     for item in items {
         // Branch name
@@ -70,20 +92,20 @@ pub fn calculate_column_widths(items: &[ListItem]) -> ColumnWidths {
             max_ahead_behind = max_ahead_behind.max(ahead_behind_len);
         }
 
-        // Working tree diff (worktrees only)
+        // Working tree diff (worktrees only) - track digits separately
         if let Some((wt_added, wt_deleted)) = item.working_tree_diff()
             && (wt_added > 0 || wt_deleted > 0)
         {
-            let working_diff_len = format!("+{} -{}", wt_added, wt_deleted).width();
-            max_working_diff = max_working_diff.max(working_diff_len);
+            max_wt_added_digits = max_wt_added_digits.max(wt_added.to_string().len());
+            max_wt_deleted_digits = max_wt_deleted_digits.max(wt_deleted.to_string().len());
         }
 
-        // Branch diff (only for non-primary items)
+        // Branch diff (only for non-primary items) - track digits separately
         if !item.is_primary() {
             let (br_added, br_deleted) = item.branch_diff();
             if br_added > 0 || br_deleted > 0 {
-                let branch_diff_len = format!("+{} -{}", br_added, br_deleted).width();
-                max_branch_diff = max_branch_diff.max(branch_diff_len);
+                max_br_added_digits = max_br_added_digits.max(br_added.to_string().len());
+                max_br_deleted_digits = max_br_deleted_digits.max(br_deleted.to_string().len());
             }
         }
 
@@ -103,13 +125,38 @@ pub fn calculate_column_widths(items: &[ListItem]) -> ColumnWidths {
         }
     }
 
+    // Calculate diff widths: "+{added} -{deleted}"
+    // Format: "+" + digits + " " + "-" + digits
+    let working_diff_total = if max_wt_added_digits > 0 || max_wt_deleted_digits > 0 {
+        1 + max_wt_added_digits + 1 + 1 + max_wt_deleted_digits
+    } else {
+        0
+    };
+    let branch_diff_total = if max_br_added_digits > 0 || max_br_deleted_digits > 0 {
+        1 + max_br_added_digits + 1 + 1 + max_br_deleted_digits
+    } else {
+        0
+    };
+
+    // Ensure headers fit
+    let working_diff_total = working_diff_total.max("WT +/-".width());
+    let branch_diff_total = branch_diff_total.max("Cmt +/-".width());
+
     ColumnWidths {
         branch: max_branch,
         time: max_time,
         message: max_message,
         ahead_behind: max_ahead_behind,
-        working_diff: max_working_diff,
-        branch_diff: max_branch_diff,
+        working_diff: DiffWidths {
+            total: working_diff_total,
+            added_digits: max_wt_added_digits,
+            deleted_digits: max_wt_deleted_digits,
+        },
+        branch_diff: DiffWidths {
+            total: branch_diff_total,
+            added_digits: max_br_added_digits,
+            deleted_digits: max_br_deleted_digits,
+        },
         upstream: max_upstream,
         states: max_states,
     }
@@ -223,8 +270,8 @@ pub fn calculate_responsive_layout(items: &[ListItem]) -> LayoutConfig {
         time: 0,
         message: 0,
         ahead_behind: 0,
-        working_diff: 0,
-        branch_diff: 0,
+        working_diff: DiffWidths::zero(),
+        branch_diff: DiffWidths::zero(),
         upstream: 0,
         states: 0,
     };
@@ -259,12 +306,19 @@ pub fn calculate_responsive_layout(items: &[ListItem]) -> LayoutConfig {
 
     // Working diff column (only if dense and fits)
     if working_diff_is_dense {
-        widths.working_diff = try_allocate(&mut remaining, ideal_widths.working_diff, spacing);
+        let allocated_width =
+            try_allocate(&mut remaining, ideal_widths.working_diff.total, spacing);
+        if allocated_width > 0 {
+            widths.working_diff = ideal_widths.working_diff;
+        }
     }
 
     // Branch diff column (only if dense and fits)
     if branch_diff_is_dense {
-        widths.branch_diff = try_allocate(&mut remaining, ideal_widths.branch_diff, spacing);
+        let allocated_width = try_allocate(&mut remaining, ideal_widths.branch_diff.total, spacing);
+        if allocated_width > 0 {
+            widths.branch_diff = ideal_widths.branch_diff;
+        }
     }
 
     // Upstream column (only if dense and fits)
@@ -277,10 +331,22 @@ pub fn calculate_responsive_layout(items: &[ListItem]) -> LayoutConfig {
         widths.states = try_allocate(&mut remaining, ideal_widths.states, spacing);
     }
 
+    // Expand message column with any leftover space (up to 100 chars total)
+    let final_max_message_len = if widths.message > 0 && remaining > 0 {
+        let max_expansion = 100_usize.saturating_sub(max_message_len);
+        let expansion = remaining.saturating_sub(spacing).min(max_expansion);
+        let new_len = max_message_len + expansion;
+        let allocated_len = new_len.min(ideal_widths.message);
+        widths.message = allocated_len;
+        allocated_len // Return the actual allocated width, not new_len
+    } else {
+        max_message_len
+    };
+
     LayoutConfig {
         widths,
         common_prefix,
-        max_message_len,
+        max_message_len: final_max_message_len,
     }
 }
 
@@ -322,10 +388,14 @@ mod tests {
         assert_eq!(widths.ahead_behind, 5, "↑3 ↓2 should have width 5");
 
         // "+100 -50" has width 8
-        assert_eq!(widths.working_diff, 8, "+100 -50 should have width 8");
+        assert_eq!(widths.working_diff.total, 8, "+100 -50 should have width 8");
+        assert_eq!(widths.working_diff.added_digits, 3, "100 has 3 digits");
+        assert_eq!(widths.working_diff.deleted_digits, 2, "50 has 2 digits");
 
         // "+200 -30" has width 8
-        assert_eq!(widths.branch_diff, 8, "+200 -30 should have width 8");
+        assert_eq!(widths.branch_diff.total, 8, "+200 -30 should have width 8");
+        assert_eq!(widths.branch_diff.added_digits, 3, "200 has 3 digits");
+        assert_eq!(widths.branch_diff.deleted_digits, 2, "30 has 2 digits");
 
         // "origin ↑4 ↓0" has visual width 12 (not more due to Unicode arrows)
         assert_eq!(widths.upstream, 12, "origin ↑4 ↓0 should have width 12");

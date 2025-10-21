@@ -65,15 +65,15 @@ pub fn format_header_line(layout: &LayoutConfig) {
     }
 
     // Branch diff (line diff in commits)
-    if widths.branch_diff > 0 {
-        let header = format!("{:width$}", "Cmt +/-", width = widths.branch_diff);
+    if widths.branch_diff.total > 0 {
+        let header = format!("{:width$}", "Cmt +/-", width = widths.branch_diff.total);
         line.push_styled(header, dim);
         line.push_raw("  ");
     }
 
     // Working tree diff
-    if widths.working_diff > 0 {
-        let header = format!("{:width$}", "WT +/-", width = widths.working_diff);
+    if widths.working_diff.total > 0 {
+        let header = format!("{:width$}", "WT +/-", width = widths.working_diff.total);
         line.push_styled(header, dim);
         line.push_raw("  ");
     }
@@ -184,44 +184,60 @@ fn format_item_line(
     }
 
     // Branch diff (line diff in commits)
-    if widths.branch_diff > 0 {
+    if widths.branch_diff.total > 0 {
         if !item.is_primary() {
             let (br_added, br_deleted) = item.branch_diff();
             if br_added > 0 || br_deleted > 0 {
+                // Right-align numbers within their fields: "+{num:width$} -{num:width$}"
+                let formatted = format!(
+                    "+{:width_add$} -{:width_del$}",
+                    br_added,
+                    br_deleted,
+                    width_add = widths.branch_diff.added_digits,
+                    width_del = widths.branch_diff.deleted_digits
+                );
                 let mut diff_segment = StyledLine::new();
-                diff_segment.push_styled(format!("+{}", br_added), green);
-                diff_segment.push_raw(" ");
-                diff_segment.push_styled(format!("-{}", br_deleted), red);
-                diff_segment.pad_to(widths.branch_diff);
+                // Split at the space between + and -
+                let split_pos = 1 + widths.branch_diff.added_digits;
+                diff_segment.push_styled(&formatted[..split_pos], green);
+                diff_segment.push_styled(&formatted[split_pos..], red);
                 for segment in diff_segment.segments {
                     line.push(segment);
                 }
             } else {
-                line.push_raw(" ".repeat(widths.branch_diff));
+                line.push_raw(" ".repeat(widths.branch_diff.total));
             }
         } else {
-            line.push_raw(" ".repeat(widths.branch_diff));
+            line.push_raw(" ".repeat(widths.branch_diff.total));
         }
         line.push_raw("  ");
     }
 
     // Working tree diff (worktrees only)
-    if widths.working_diff > 0 {
+    if widths.working_diff.total > 0 {
         if let Some((wt_added, wt_deleted)) = item.working_tree_diff() {
             if wt_added > 0 || wt_deleted > 0 {
+                // Right-align numbers within their fields: "+{num:width$} -{num:width$}"
+                let formatted = format!(
+                    "+{:width_add$} -{:width_del$}",
+                    wt_added,
+                    wt_deleted,
+                    width_add = widths.working_diff.added_digits,
+                    width_del = widths.working_diff.deleted_digits
+                );
                 let mut diff_segment = StyledLine::new();
-                diff_segment.push_styled(format!("+{}", wt_added), green);
-                diff_segment.push_raw(" ");
-                diff_segment.push_styled(format!("-{}", wt_deleted), red);
-                diff_segment.pad_to(widths.working_diff);
+                // Split at the space between + and -
+                let split_pos = 1 + widths.working_diff.added_digits;
+                diff_segment.push_styled(&formatted[..split_pos], green);
+                diff_segment.push_styled(&formatted[split_pos..], red);
                 for segment in diff_segment.segments {
                     line.push(segment);
                 }
             } else {
-                line.push_raw(" ".repeat(widths.working_diff));
+                line.push_raw(" ".repeat(widths.working_diff.total));
             }
         } else {
-            line.push_raw(" ".repeat(widths.working_diff));
+            line.push_raw(" ".repeat(widths.working_diff.total));
         }
         line.push_raw("  ");
     }
@@ -334,8 +350,16 @@ mod tests {
                 time: 13,
                 message: 12,
                 ahead_behind: 5,
-                working_diff: 8,
-                branch_diff: 8,
+                working_diff: crate::commands::list::layout::DiffWidths {
+                    total: 8,
+                    added_digits: 3,
+                    deleted_digits: 2,
+                },
+                branch_diff: crate::commands::list::layout::DiffWidths {
+                    total: 8,
+                    added_digits: 3,
+                    deleted_digits: 2,
+                },
                 upstream: 12,
                 states: 18,
             },
@@ -358,13 +382,13 @@ mod tests {
         header.push_raw(format!(
             "{:width$}",
             "Cmt +/-",
-            width = layout.widths.branch_diff
+            width = layout.widths.branch_diff.total
         ));
         header.push_raw("  ");
         header.push_raw(format!(
             "{:width$}",
             "WT +/-",
-            width = layout.widths.working_diff
+            width = layout.widths.working_diff.total
         ));
         header.push_raw("  ");
         header.push_raw(format!(
@@ -406,7 +430,7 @@ mod tests {
         // Branch diff
         let mut branch_diff_segment = StyledLine::new();
         branch_diff_segment.push_raw("+200 -30");
-        branch_diff_segment.pad_to(layout.widths.branch_diff);
+        branch_diff_segment.pad_to(layout.widths.branch_diff.total);
         for seg in branch_diff_segment.segments {
             data.push(seg);
         }
@@ -414,7 +438,7 @@ mod tests {
         // Working diff
         let mut working_diff_segment = StyledLine::new();
         working_diff_segment.push_raw("+100 -50");
-        working_diff_segment.pad_to(layout.widths.working_diff);
+        working_diff_segment.pad_to(layout.widths.working_diff.total);
         for seg in working_diff_segment.segments {
             data.push(seg);
         }
