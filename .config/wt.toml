@@ -1,0 +1,15 @@
+# Post-start commands for worktree setup
+# These run after creating a new worktree
+#
+# Available template variables:
+#   {repo}      - Repository name (e.g., "worktrunk.project-config")
+#   {branch}    - Branch name with slashes replaced by dashes
+#   {worktree}  - Path to the new worktree
+#   {repo_root} - Path to the main repository root
+post-start-commands = [
+    # Seed target/ from base worktree using CoW (copy-on-write)
+    # Each worktree gets its own target/ (avoids incremental build corruption)
+    # but seeded from base to warm-start builds (low disk usage)
+    # rsync --reflink=auto works on both macOS and Linux
+    "[ -d {repo_root}/target ] && [ ! -e {worktree}/target ] && rsync -a --reflink=auto {repo_root}/target/ {worktree}/target/ && echo '✓ CoW seeded target/'"
+]

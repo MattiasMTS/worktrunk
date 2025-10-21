@@ -134,16 +134,54 @@ impl WorktrunkConfig {
     /// assert_eq!(path, "../myproject.feature-foo");
     /// ```
     pub fn format_path(&self, repo: &str, branch: &str) -> String {
-        // Sanitize branch name by replacing path separators to prevent directory traversal
-        let safe_branch = branch.replace(['/', '\\'], "-");
-        self.worktree_path
-            .replace("{repo}", repo)
-            .replace("{branch}", &safe_branch)
+        expand_template(
+            &self.worktree_path,
+            repo,
+            branch,
+            &std::collections::HashMap::new(),
+        )
     }
 }
 
 fn get_config_path() -> Option<PathBuf> {
     ProjectDirs::from("", "", "worktrunk").map(|dirs| dirs.config_dir().join("config.toml"))
+}
+
+/// Expand template variables in a string
+///
+/// All templates support:
+/// - `{repo}` - Repository name
+/// - `{branch}` - Branch name (sanitized: slashes → dashes)
+///
+/// Additional variables can be provided via the `extra` parameter.
+///
+/// # Examples
+/// ```
+/// use worktrunk::config::expand_template;
+/// use std::collections::HashMap;
+///
+/// let result = expand_template("path/{repo}/{branch}", "myrepo", "feature/foo", &HashMap::new());
+/// assert_eq!(result, "path/myrepo/feature-foo");
+/// ```
+pub fn expand_template(
+    template: &str,
+    repo: &str,
+    branch: &str,
+    extra: &std::collections::HashMap<&str, &str>,
+) -> String {
+    // Sanitize branch name by replacing path separators
+    let safe_branch = branch.replace(['/', '\\'], "-");
+
+    let mut result = template
+        .replace("{repo}", repo)
+        .replace("{branch}", &safe_branch);
+
+    // Apply any extra variables
+    for (key, value) in extra {
+        result = result.replace(&format!("{{{}}}", key), value);
+    }
+
+    result
 }
 
 impl ProjectConfig {
@@ -436,5 +474,41 @@ mod tests {
             )
             .ok();
         assert_eq!(config.approved_commands.len(), count_before);
+    }
+
+    #[test]
+    fn test_expand_template_basic() {
+        use std::collections::HashMap;
+
+        let result = expand_template("../{repo}.{branch}", "myrepo", "feature-x", &HashMap::new());
+        assert_eq!(result, "../myrepo.feature-x");
+    }
+
+    #[test]
+    fn test_expand_template_sanitizes_branch() {
+        use std::collections::HashMap;
+
+        let result = expand_template("{repo}/{branch}", "myrepo", "feature/foo", &HashMap::new());
+        assert_eq!(result, "myrepo/feature-foo");
+
+        let result = expand_template("{branch}", "myrepo", "feat\\bar", &HashMap::new());
+        assert_eq!(result, "feat-bar");
+    }
+
+    #[test]
+    fn test_expand_template_with_extra_vars() {
+        use std::collections::HashMap;
+
+        let mut extra = HashMap::new();
+        extra.insert("worktree", "/path/to/worktree");
+        extra.insert("repo_root", "/path/to/repo");
+
+        let result = expand_template(
+            "{repo_root}/target -> {worktree}/target",
+            "myrepo",
+            "main",
+            &extra,
+        );
+        assert_eq!(result, "/path/to/repo/target -> /path/to/worktree/target");
     }
 }

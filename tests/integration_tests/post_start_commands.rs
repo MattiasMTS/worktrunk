@@ -61,15 +61,12 @@ fn test_post_start_commands_with_approval() {
     fs::create_dir_all(&user_config_dir).ok();
     fs::write(
         user_config_dir.join("config.toml"),
-        format!(
-            r#"worktree-path = "../{{repo}}.{{branch}}"
+        r#"worktree-path = "../{repo}.{branch}"
 
 [[approved-commands]]
-project = "{}"
+project = "main"
 command = "echo 'Setup complete'"
 "#,
-            repo.root_path().file_name().unwrap().to_str().unwrap()
-        ),
     )
     .ok();
 
@@ -119,15 +116,12 @@ fn test_post_start_commands_failing_command() {
     fs::create_dir_all(&config_dir).ok();
     fs::write(
         config_dir.join("config.toml"),
-        format!(
-            r#"worktree-path = "../{{repo}}.{{branch}}"
+        r#"worktree-path = "../{repo}.{branch}"
 
 [[approved-commands]]
-project = "{}"
+project = "main"
 command = "exit 1"
 "#,
-            repo.root_path().file_name().unwrap().to_str().unwrap()
-        ),
     )
     .ok();
 
@@ -161,20 +155,16 @@ fn test_post_start_commands_multiple_commands() {
     fs::create_dir_all(&config_dir).ok();
     fs::write(
         config_dir.join("config.toml"),
-        format!(
-            r#"worktree-path = "../{{repo}}.{{branch}}"
+        r#"worktree-path = "../{repo}.{branch}"
 
 [[approved-commands]]
-project = "{}"
+project = "main"
 command = "echo 'First'"
 
 [[approved-commands]]
-project = "{}"
+project = "main"
 command = "echo 'Second'"
 "#,
-            repo.root_path().file_name().unwrap().to_str().unwrap(),
-            repo.root_path().file_name().unwrap().to_str().unwrap()
-        ),
     )
     .ok();
 
@@ -183,5 +173,125 @@ command = "echo 'Second'"
         "post_start_multiple_commands",
         &repo,
         &["--create", "feature"],
+    );
+}
+
+#[test]
+fn test_post_start_commands_template_expansion() {
+    let repo = TestRepo::new();
+    repo.commit("Initial commit");
+
+    // Create project config with template variables
+    let config_dir = repo.root_path().join(".config");
+    fs::create_dir_all(&config_dir).expect("Failed to create .config dir");
+    fs::write(
+        config_dir.join("wt.toml"),
+        r#"post-start-commands = [
+    "echo 'Repo: {repo}' > info.txt",
+    "echo 'Branch: {branch}' >> info.txt",
+    "echo 'Worktree: {worktree}' >> info.txt",
+    "echo 'Root: {repo_root}' >> info.txt"
+]"#,
+    )
+    .expect("Failed to write config");
+
+    repo.commit("Add config with templates");
+
+    // Pre-approve all commands
+    let home_dir = std::env::var("HOME").unwrap();
+    let user_config_dir =
+        std::path::Path::new(&home_dir).join("Library/Application Support/worktrunk");
+    fs::create_dir_all(&user_config_dir).ok();
+    let repo_name = "main";
+    fs::write(
+        user_config_dir.join("config.toml"),
+        r#"worktree-path = "../{repo}.{branch}"
+
+[[approved-commands]]
+project = "main"
+command = "echo 'Repo: {repo}' > info.txt"
+
+[[approved-commands]]
+project = "main"
+command = "echo 'Branch: {branch}' >> info.txt"
+
+[[approved-commands]]
+project = "main"
+command = "echo 'Worktree: {worktree}' >> info.txt"
+
+[[approved-commands]]
+project = "main"
+command = "echo 'Root: {repo_root}' >> info.txt"
+"#,
+    )
+    .ok();
+
+    // Commands should execute with expanded templates
+    snapshot_switch(
+        "post_start_template_expansion",
+        &repo,
+        &["--create", "feature/test"],
+    );
+
+    // Verify template expansion actually worked by checking the output file
+    // The worktree path should be ../main.feature-test (slashes replaced with dashes)
+    let worktree_path = repo
+        .root_path()
+        .parent()
+        .unwrap()
+        .join(format!("{}.feature-test", repo_name));
+    let info_file = worktree_path.join("info.txt");
+
+    assert!(
+        info_file.exists(),
+        "info.txt should have been created in the worktree"
+    );
+
+    let contents = fs::read_to_string(&info_file).expect("Failed to read info.txt");
+
+    // Verify that template variables were actually expanded, not left as literals
+    assert!(
+        contents.contains(&format!("Repo: {}", repo_name)),
+        "Should contain expanded repo name, got: {}",
+        contents
+    );
+    assert!(
+        contents.contains("Branch: feature-test"),
+        "Should contain expanded branch name (sanitized), got: {}",
+        contents
+    );
+    assert!(
+        contents.contains(&format!(
+            "Worktree: {}",
+            worktree_path.canonicalize().unwrap().display()
+        )),
+        "Should contain expanded worktree path, got: {}",
+        contents
+    );
+    assert!(
+        contents.contains(&format!(
+            "Root: {}",
+            repo.root_path().canonicalize().unwrap().display()
+        )),
+        "Should contain expanded repo root path, got: {}",
+        contents
+    );
+
+    // Make sure they're NOT the literal template strings
+    assert!(
+        !contents.contains("{repo}"),
+        "Should not contain literal {{repo}} placeholder"
+    );
+    assert!(
+        !contents.contains("{branch}"),
+        "Should not contain literal {{branch}} placeholder"
+    );
+    assert!(
+        !contents.contains("{worktree}"),
+        "Should not contain literal {{worktree}} placeholder"
+    );
+    assert!(
+        !contents.contains("{repo_root}"),
+        "Should not contain literal {{repo_root}} placeholder"
     );
 }

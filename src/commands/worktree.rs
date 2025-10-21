@@ -66,9 +66,10 @@
 //!
 //! See also: DEMO.md for detailed architecture explanation.
 
+use std::collections::HashMap;
 use std::io::{self, Write};
 use std::path::PathBuf;
-use worktrunk::config::{ProjectConfig, WorktrunkConfig};
+use worktrunk::config::{ProjectConfig, WorktrunkConfig, expand_template};
 use worktrunk::git::{GitError, Repository};
 use worktrunk::shell::Shell;
 use worktrunk::styling::{AnstyleStyle, ERROR, HINT, WARNING, eprintln, println};
@@ -170,9 +171,8 @@ impl RemoveResult {
                 Some(format!("Already on default branch {bold}{branch}{bold:#}"))
             }
             RemoveResult::RemovedWorktree { primary_path } => Some(format!(
-                "Moved to primary worktree and removed worktree\nPath: {}{}",
-                primary_path.display(),
-                shell_integration_hint()
+                "Moved to primary worktree and removed worktree\nPath: {}\n\nTo enable automatic cd, run: wt configure-shell",
+                primary_path.display()
             )),
             RemoveResult::SwitchedToDefault(branch) => {
                 let bold = AnstyleStyle::new().bold();
@@ -271,7 +271,7 @@ pub fn handle_switch(
         .unwrap_or_else(|_| worktree_path.clone());
 
     // Execute post-start commands from project config
-    execute_post_start_commands(&canonical_path, &repo, config)?;
+    execute_post_start_commands(&canonical_path, &repo, config, branch, repo_name)?;
 
     Ok(SwitchResult::CreatedWorktree {
         path: canonical_path,
@@ -407,6 +407,27 @@ fn check_worktree_conflicts(
     Ok(())
 }
 
+/// Replace template variables in a command string
+///
+/// Supported variables:
+/// - `{repo}` - Repository name
+/// - `{branch}` - Branch name (sanitized)
+/// - `{worktree}` - Path to the new worktree
+/// - `{repo_root}` - Path to the main repository root
+fn expand_command_template(
+    command: &str,
+    repo_name: &str,
+    branch: &str,
+    worktree_path: &std::path::Path,
+    repo_root: &std::path::Path,
+) -> String {
+    let mut extra = HashMap::new();
+    extra.insert("worktree", worktree_path.to_str().unwrap_or(""));
+    extra.insert("repo_root", repo_root.to_str().unwrap_or(""));
+
+    expand_template(command, repo_name, branch, &extra)
+}
+
 /// Prompt the user to approve a command for execution
 fn prompt_for_approval(command: &str, project_id: &str) -> io::Result<bool> {
     eprintln!();
@@ -432,6 +453,8 @@ fn execute_post_start_commands(
     worktree_path: &std::path::Path,
     repo: &Repository,
     config: &WorktrunkConfig,
+    branch: &str,
+    repo_name: &str,
 ) -> Result<(), GitError> {
     // Load project config
     let repo_root = repo.repo_root()?;
@@ -498,8 +521,12 @@ fn execute_post_start_commands(
         };
 
         if approved {
-            eprintln!("Executing: {}", command);
-            if let Err(e) = execute_command_in_worktree(worktree_path, command) {
+            // Expand template variables in the command
+            let expanded_command =
+                expand_command_template(command, repo_name, branch, worktree_path, &repo_root);
+
+            eprintln!("Executing: {}", expanded_command);
+            if let Err(e) = execute_command_in_worktree(worktree_path, &expanded_command) {
                 eprintln!("Warning: Command failed: {}", e);
                 // Continue with other commands even if one fails
             }
