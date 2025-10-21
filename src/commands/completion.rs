@@ -28,6 +28,35 @@ enum CompletionContext {
     Unknown,
 }
 
+/// Check if a positional argument should be completed
+/// Returns true if we're still completing the first positional arg
+/// Returns false if the positional arg has been provided and we've moved past it
+fn should_complete_positional_arg(args: &[String], start_index: usize) -> bool {
+    let mut i = start_index;
+
+    while i < args.len() {
+        let arg = &args[i];
+
+        if arg == "--base" || arg == "-b" {
+            // Skip flag and its value
+            i += 2;
+        } else if arg.starts_with("--") || (arg.starts_with('-') && arg.len() > 1) {
+            // Skip other flags
+            i += 1;
+        } else if !arg.is_empty() {
+            // Found a positional argument
+            // Only continue completing if it's at the last position
+            return i >= args.len() - 1;
+        } else {
+            // Empty string (cursor position)
+            i += 1;
+        }
+    }
+
+    // No positional arg found yet - should complete
+    true
+}
+
 fn parse_completion_context(args: &[String]) -> CompletionContext {
     // args format: ["wt", "switch", "partial"]
     // or: ["wt", "switch", "--create", "new", "--base", "partial"]
@@ -47,12 +76,26 @@ fn parse_completion_context(args: &[String]) -> CompletionContext {
         }
     }
 
-    // Otherwise, complete based on the subcommand's positional argument
-    match subcommand.as_str() {
+    // Special handling for switch --create: don't complete new branch names
+    if subcommand == "switch" {
+        let has_create = args.iter().any(|arg| arg == "--create" || arg == "-c");
+        if has_create {
+            return CompletionContext::Unknown;
+        }
+    }
+
+    // For commands with positional branch arguments, check if we should complete
+    let context = match subcommand.as_str() {
         "switch" => CompletionContext::SwitchBranch,
         "push" => CompletionContext::PushTarget,
         "merge" => CompletionContext::MergeTarget,
-        _ => CompletionContext::Unknown,
+        _ => return CompletionContext::Unknown,
+    };
+
+    if should_complete_positional_arg(args, 2) {
+        context
+    } else {
+        CompletionContext::Unknown
     }
 }
 
@@ -73,9 +116,8 @@ pub fn handle_complete(args: Vec<String>) -> Result<(), GitError> {
 
     match context {
         CompletionContext::SwitchBranch => {
-            // Complete with available branches (excluding those with worktrees)
-            let branches =
-                get_branches_for_completion(|| Repository::current().available_branches());
+            // Complete with all branches
+            let branches = get_branches_for_completion(|| Repository::current().all_branches());
             for branch in branches {
                 println!("{}", branch);
             }

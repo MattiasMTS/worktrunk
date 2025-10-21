@@ -38,7 +38,7 @@ fn test_complete_switch_shows_branches() {
 }
 
 #[test]
-fn test_complete_switch_excludes_branches_with_worktrees() {
+fn test_complete_switch_shows_all_branches_including_worktrees() {
     let mut temp = TestRepo::new();
     temp.commit("initial");
 
@@ -64,8 +64,8 @@ fn test_complete_switch_excludes_branches_with_worktrees() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let branches: Vec<&str> = stdout.lines().collect();
 
-    // Should NOT include feature/new (has worktree)
-    assert!(!branches.iter().any(|b| b.contains("feature/new")));
+    // Should include feature/new (even though it has worktree - can switch to it)
+    assert!(branches.iter().any(|b| b.contains("feature/new")));
     // Should include hotfix/bug (no worktree)
     assert!(branches.iter().any(|b| b.contains("hotfix/bug")));
 }
@@ -275,16 +275,15 @@ fn test_complete_with_partial_prefix() {
 }
 
 #[test]
-fn test_complete_switch_no_available_branches() {
+fn test_complete_switch_shows_all_branches_even_with_worktrees() {
     let mut temp = TestRepo::new();
     temp.commit("initial");
 
-    // Create two branches, both with worktrees - this should result in no available branches
+    // Create two branches, both with worktrees
     temp.add_worktree("feature-worktree", "feature/new");
     temp.add_worktree("hotfix-worktree", "hotfix/bug");
 
-    // From the main worktree, test completion - should return empty since both non-main branches have worktrees
-    // and we're currently in the main worktree
+    // From the main worktree, test completion - should show all branches
     let mut cmd = Command::cargo_bin("wt").unwrap();
     let output = cmd
         .current_dir(temp.root_path())
@@ -295,10 +294,9 @@ fn test_complete_switch_no_available_branches() {
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
 
-    // Should not include branches that have worktrees
-    assert!(!stdout.contains("feature/new"));
-    assert!(!stdout.contains("hotfix/bug"));
-    // May include main if it doesn't have a worktree
+    // Should include branches even if they have worktrees (can switch to them)
+    assert!(stdout.contains("feature/new"));
+    assert!(stdout.contains("hotfix/bug"));
 }
 
 #[test]
@@ -526,5 +524,193 @@ fn test_complete_finish_command_returns_empty() {
     // Should succeed but return no completions
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
+    assert_eq!(stdout.trim(), "");
+}
+
+#[test]
+fn test_complete_switch_stops_after_branch_provided() {
+    let temp = TestRepo::new();
+    temp.commit("initial");
+
+    // Create branches
+    StdCommand::new("git")
+        .args(["branch", "feature/one"])
+        .current_dir(temp.root_path())
+        .output()
+        .unwrap();
+
+    StdCommand::new("git")
+        .args(["branch", "feature/two"])
+        .current_dir(temp.root_path())
+        .output()
+        .unwrap();
+
+    // Test completion after branch is already provided
+    let mut cmd = Command::cargo_bin("wt").unwrap();
+    let output = cmd
+        .current_dir(temp.root_path())
+        .args(["complete", "wt", "switch", "feature/one", ""])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Should return no completions (branch already provided)
+    assert_eq!(stdout.trim(), "");
+}
+
+#[test]
+fn test_complete_switch_with_create_flag_no_completion() {
+    let temp = TestRepo::new();
+    temp.commit("initial");
+
+    // Create branches
+    StdCommand::new("git")
+        .args(["branch", "feature/existing"])
+        .current_dir(temp.root_path())
+        .output()
+        .unwrap();
+
+    // Test completion with --create flag (should not complete branch names)
+    let mut cmd = Command::cargo_bin("wt").unwrap();
+    let output = cmd
+        .current_dir(temp.root_path())
+        .args(["complete", "wt", "switch", "--create", ""])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Should return no completions (creating new branch, not completing existing)
+    assert_eq!(stdout.trim(), "");
+}
+
+#[test]
+fn test_complete_switch_with_create_short_flag_no_completion() {
+    let temp = TestRepo::new();
+    temp.commit("initial");
+
+    // Create branches
+    StdCommand::new("git")
+        .args(["branch", "feature/existing"])
+        .current_dir(temp.root_path())
+        .output()
+        .unwrap();
+
+    // Test completion with -c flag (should not complete branch names)
+    let mut cmd = Command::cargo_bin("wt").unwrap();
+    let output = cmd
+        .current_dir(temp.root_path())
+        .args(["complete", "wt", "switch", "-c", ""])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Should return no completions (creating new branch)
+    assert_eq!(stdout.trim(), "");
+}
+
+#[test]
+fn test_complete_switch_base_flag_after_branch() {
+    let temp = TestRepo::new();
+    temp.commit("initial");
+
+    // Create branches
+    StdCommand::new("git")
+        .args(["branch", "develop"])
+        .current_dir(temp.root_path())
+        .output()
+        .unwrap();
+
+    // Test completion for --base even after --create and branch name
+    let mut cmd = Command::cargo_bin("wt").unwrap();
+    let output = cmd
+        .current_dir(temp.root_path())
+        .args([
+            "complete",
+            "wt",
+            "switch",
+            "--create",
+            "new-feature",
+            "--base",
+            "",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Should complete base flag value with branches
+    assert!(stdout.contains("develop"));
+}
+
+#[test]
+fn test_complete_push_stops_after_branch_provided() {
+    let temp = TestRepo::new();
+    temp.commit("initial");
+
+    // Create branches
+    StdCommand::new("git")
+        .args(["branch", "feature/one"])
+        .current_dir(temp.root_path())
+        .output()
+        .unwrap();
+
+    StdCommand::new("git")
+        .args(["branch", "feature/two"])
+        .current_dir(temp.root_path())
+        .output()
+        .unwrap();
+
+    // Test completion after branch is already provided
+    let mut cmd = Command::cargo_bin("wt").unwrap();
+    let output = cmd
+        .current_dir(temp.root_path())
+        .args(["complete", "wt", "push", "feature/one", ""])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Should return no completions (branch already provided)
+    assert_eq!(stdout.trim(), "");
+}
+
+#[test]
+fn test_complete_merge_stops_after_branch_provided() {
+    let temp = TestRepo::new();
+    temp.commit("initial");
+
+    // Create branches
+    StdCommand::new("git")
+        .args(["branch", "feature/one"])
+        .current_dir(temp.root_path())
+        .output()
+        .unwrap();
+
+    StdCommand::new("git")
+        .args(["branch", "feature/two"])
+        .current_dir(temp.root_path())
+        .output()
+        .unwrap();
+
+    // Test completion after branch is already provided
+    let mut cmd = Command::cargo_bin("wt").unwrap();
+    let output = cmd
+        .current_dir(temp.root_path())
+        .args(["complete", "wt", "merge", "feature/one", ""])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Should return no completions (branch already provided)
     assert_eq!(stdout.trim(), "");
 }
