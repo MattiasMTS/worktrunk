@@ -12,7 +12,7 @@ fn strip_ansi_codes(s: &str) -> String {
 /// Represents the start position of each column in a table row
 #[derive(Debug, Clone)]
 struct ColumnPositions {
-    branch: usize,
+    _branch: usize,
     age: Option<usize>,
     cmts: Option<usize>,
     cmt_diff: Option<usize>,
@@ -28,7 +28,7 @@ impl ColumnPositions {
     /// Parse column positions from a header line (without ANSI codes)
     fn from_header(header: &str) -> Self {
         let mut positions = ColumnPositions {
-            branch: 0,
+            _branch: 0,
             age: None,
             cmts: None,
             cmt_diff: None,
@@ -74,7 +74,7 @@ impl ColumnPositions {
 
     /// Verify that a data row's content starts at the same positions
     /// Returns Ok(()) if aligned, or Err with misalignment details
-    fn verify_row_alignment(&self, row: &str, row_num: usize) -> Result<(), String> {
+    fn _verify_row_alignment(&self, row: &str, row_num: usize) -> Result<(), String> {
         let _visual_width = row.width();
         let mut errors = Vec::new();
 
@@ -284,40 +284,39 @@ fn verify_table_alignment(output: &str) -> Result<(), String> {
                     // Find where the actual path content starts (typically "./")
                     if let Some(path_start) =
                         row[*expected_pos..].find("./").map(|p| expected_pos + p)
+                        && path_start != *expected_pos
                     {
-                        if path_start != *expected_pos {
-                            errors.push(format!(
-                                "Row {}: Path column content starts at position {} but header says it should be at {}. Misalignment: {} characters.\n  Row text: '{}'\n  At position {}: '{}'\n  Actual path: '{}'",
-                                row_num,
-                                path_start,
-                                expected_pos,
-                                path_start - expected_pos,
-                                row,
-                                expected_pos,
-                                &row[*expected_pos..(*expected_pos + 20).min(row.len())].replace(' ', "·"),
-                                &row[path_start..]
-                            ));
-                        }
+                        errors.push(format!(
+                            "Row {}: Path column content starts at position {} but header says it should be at {}. Misalignment: {} characters.\n  Row text: '{}'\n  At position {}: '{}'\n  Actual path: '{}'",
+                            row_num,
+                            path_start,
+                            expected_pos,
+                            path_start - expected_pos,
+                            row,
+                            expected_pos,
+                            &row[*expected_pos..(*expected_pos + 20).min(row.len())].replace(' ', "·"),
+                            &row[path_start..]
+                        ));
                     }
                 }
 
                 // For all columns, check that content starts at a consistent position
-                if let Some(actual_start) = actual_content_pos {
-                    if actual_start != *expected_pos {
-                        // Only report if this is actual content, not just padding
-                        let content_at_pos = boundaries
-                            .iter()
-                            .find(|b| b.start == actual_start)
-                            .map(|b| &b.content);
+                if let Some(actual_start) = actual_content_pos
+                    && actual_start != *expected_pos
+                {
+                    // Only report if this is actual content, not just padding
+                    let content_at_pos = boundaries
+                        .iter()
+                        .find(|b| b.start == actual_start)
+                        .map(|b| &b.content);
 
-                        if let Some(content) = content_at_pos {
-                            if !content.is_empty() && content.trim() != "" {
-                                println!(
-                                    "  ⚠️  Column '{}': content starts at {} instead of {} (content: '{}')",
-                                    col_name, actual_start, expected_pos, content
-                                );
-                            }
-                        }
+                    if let Some(content) = content_at_pos
+                        && !content.is_empty() && content.trim() != ""
+                    {
+                        println!(
+                            "  ⚠️  Column '{}': content starts at {} instead of {} (content: '{}')",
+                            col_name, actual_start, expected_pos, content
+                        );
                     }
                 }
             }
@@ -333,11 +332,11 @@ fn verify_table_alignment(output: &str) -> Result<(), String> {
         let first_row_boundary_starts: Vec<usize> =
             all_row_boundaries[0].iter().map(|b| b.start).collect();
 
-        for (row_idx, boundaries) in all_row_boundaries.iter().enumerate().skip(1) {
+        for (_row_idx, boundaries) in all_row_boundaries.iter().enumerate().skip(1) {
             let this_row_starts: Vec<usize> = boundaries.iter().map(|b| b.start).collect();
 
             // Check that boundaries align (allowing for sparse columns)
-            for (col_idx, &expected_start) in first_row_boundary_starts.iter().enumerate() {
+            for &expected_start in first_row_boundary_starts.iter() {
                 // Find if this row has a boundary at or near this position
                 let matching_boundary = this_row_starts.iter().find(|&&s| s == expected_start);
 
