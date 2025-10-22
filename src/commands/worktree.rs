@@ -57,10 +57,14 @@
 //!
 //! # Implementation Details
 //!
-//! Result types (`SwitchResult`, `RemoveResult`) provide two formatting methods:
+//! Result types (`SwitchResult`, `RemoveResult`) are pure data structures that only contain
+//! operation results. All presentation logic is handled by the `output` module:
 //!
-//! - `format_user_output()`: Returns human-friendly messages (no directives)
-//! - `format_internal_output()`: Returns directive protocol + messages
+//! - `output::handle_switch_output()`: Formats and outputs switch operation results
+//! - `output::handle_remove_output()`: Formats and outputs remove operation results
+//!
+//! These handlers automatically select the appropriate mode (user-friendly or directive protocol)
+//! based on the `internal` flag
 //!
 //! ## Directive Protocol
 //!
@@ -101,26 +105,11 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 use worktrunk::config::{ProjectConfig, WorktrunkConfig, expand_template};
 use worktrunk::git::{GitError, Repository};
-use worktrunk::shell::Shell;
 use worktrunk::styling::{
     AnstyleStyle, ERROR, ERROR_EMOJI, HINT, HINT_EMOJI, WARNING, WARNING_EMOJI, eprintln, println,
 };
 
-/// Generate hint message for shell integration setup
-///
-/// Returns a hint message based on whether shell integration is configured:
-/// - If configured but not active: provides exact source command
-/// - If not configured: suggests running configure-shell
-pub fn shell_integration_hint() -> String {
-    if let Some(config_path) = Shell::is_integration_configured() {
-        format!(
-            "\n\nShell integration configured. Restart your shell or run: source {}",
-            config_path.display()
-        )
-    } else {
-        "\n\nTo enable automatic cd, run: wt configure-shell".to_string()
-    }
-}
+use crate::output::execute_command_in_worktree;
 
 /// Result of a worktree switch operation
 pub enum SwitchResult {
@@ -138,38 +127,6 @@ impl SwitchResult {
             SwitchResult::CreatedWorktree { path, .. } => path,
         }
     }
-
-    /// Format a user-friendly message for this result
-    pub fn format_message(&self, branch: &str) -> String {
-        use anstyle::{AnsiColor, Color};
-        let green = AnstyleStyle::new().fg_color(Some(Color::Ansi(AnsiColor::Green)));
-        let green_bold = green.bold();
-
-        match self {
-            SwitchResult::ExistingWorktree(_) => {
-                format!(
-                    "✅ {green}Switched to worktree for {green_bold}{branch}{green_bold:#}{green:#}"
-                )
-            }
-            SwitchResult::CreatedWorktree {
-                path,
-                created_branch,
-            } => {
-                let dim = AnstyleStyle::new().dimmed();
-                if *created_branch {
-                    format!(
-                        "✅ {green}Created new worktree for {green_bold}{branch}{green_bold:#}{green:#}\n  {dim}Path: {}{dim:#}",
-                        path.display()
-                    )
-                } else {
-                    format!(
-                        "✅ {green}Added worktree for {green_bold}{branch}{green_bold:#}{green:#}\n  {dim}Path: {}{dim:#}",
-                        path.display()
-                    )
-                }
-            }
-        }
-    }
 }
 
 /// Result of a worktree remove operation
@@ -180,60 +137,6 @@ pub enum RemoveResult {
     RemovedWorktree { primary_path: PathBuf },
     /// Switched to default branch in main repo
     SwitchedToDefault(String),
-}
-
-impl RemoveResult {
-    /// Format the result for display (non-internal mode)
-    pub fn format_user_output(&self) -> Option<String> {
-        use anstyle::{AnsiColor, Color};
-
-        match self {
-            RemoveResult::AlreadyOnDefault(branch) => {
-                let green = AnstyleStyle::new().fg_color(Some(Color::Ansi(AnsiColor::Green)));
-                let green_bold = green.bold();
-                Some(format!(
-                    "✅ {green}Already on default branch {green_bold}{branch}{green_bold:#}{green:#}"
-                ))
-            }
-            RemoveResult::RemovedWorktree { primary_path } => {
-                let green = AnstyleStyle::new().fg_color(Some(Color::Ansi(AnsiColor::Green)));
-                let dim = AnstyleStyle::new().dimmed();
-                Some(format!(
-                    "✅ {green}Removed worktree and returned to primary{green:#}\n  {dim}Path: {}{dim:#}\n\nTo enable automatic cd, run: wt configure-shell",
-                    primary_path.display()
-                ))
-            }
-            RemoveResult::SwitchedToDefault(branch) => {
-                let green = AnstyleStyle::new().fg_color(Some(Color::Ansi(AnsiColor::Green)));
-                let green_bold = green.bold();
-                Some(format!(
-                    "✅ {green}Switched to default branch {green_bold}{branch}{green_bold:#}{green:#}"
-                ))
-            }
-        }
-    }
-
-    /// Format the result for shell integration (internal mode)
-    ///
-    /// Directives are NUL-terminated for consistency with switch command.
-    pub fn format_internal_output(&self) -> Option<String> {
-        use anstyle::{AnsiColor, Color};
-
-        match self {
-            RemoveResult::AlreadyOnDefault(_) => None,
-            RemoveResult::RemovedWorktree { primary_path } => {
-                let green = AnstyleStyle::new().fg_color(Some(Color::Ansi(AnsiColor::Green)));
-                let mut result = format!("__WORKTRUNK_CD__{}", primary_path.display());
-                result.push('\0');
-                result.push_str(&format!(
-                    "✅ {green}Removed worktree and returned to primary{green:#}"
-                ));
-                result.push('\0');
-                Some(result)
-            }
-            RemoveResult::SwitchedToDefault(_) => None,
-        }
-    }
 }
 
 pub fn handle_switch(
@@ -321,49 +224,6 @@ pub fn handle_switch(
         path: canonical_path,
         created_branch: create,
     })
-}
-
-/// Execute a command in the specified worktree directory
-///
-/// # Security
-///
-/// This function executes arbitrary shell commands provided by the user via the -x flag.
-/// The command is passed directly to sh -c (or cmd /C on Windows) without sanitization.
-/// This is intentional - the user is executing their own commands in their own environment.
-///
-/// # Trust Model
-///
-/// - Commands originate from the user's CLI invocation (`wt switch -x "command"`)
-/// - Commands may contain newlines
-/// - The threat model assumes the user trusts their own command input
-pub fn execute_command_in_worktree(
-    worktree_path: &std::path::Path,
-    command: &str,
-) -> Result<(), GitError> {
-    #[cfg(target_os = "windows")]
-    let (shell, shell_arg) = ("cmd", "/C");
-    #[cfg(not(target_os = "windows"))]
-    let (shell, shell_arg) = ("sh", "-c");
-
-    let status = std::process::Command::new(shell)
-        .arg(shell_arg)
-        .arg(command)
-        .current_dir(worktree_path)
-        .stdin(std::process::Stdio::inherit())
-        .stdout(std::process::Stdio::inherit())
-        .stderr(std::process::Stdio::inherit())
-        .status()
-        .map_err(|e| GitError::CommandFailed(format!("Failed to execute command: {}", e)))?;
-
-    if !status.success() {
-        return Err(GitError::CommandFailed(format!(
-            "Command '{}' failed with exit code {}",
-            command,
-            status.code().unwrap_or(-1)
-        )));
-    }
-
-    Ok(())
 }
 
 pub fn handle_remove() -> Result<RemoveResult, GitError> {

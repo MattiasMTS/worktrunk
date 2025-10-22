@@ -5,6 +5,7 @@ use worktrunk::styling::{AnstyleStyle, ERROR, ERROR_EMOJI, HINT, HINT_EMOJI, epr
 
 use super::worktree::handle_push;
 use super::worktree::handle_remove;
+use crate::output::handle_remove_output;
 
 pub fn handle_merge(
     target: Option<&str>,
@@ -69,13 +70,7 @@ pub fn handle_merge(
         let result = handle_remove()?;
 
         // Display output based on mode
-        if internal {
-            if let Some(output) = result.format_internal_output() {
-                println!("{}", output);
-            }
-        } else if let Some(output) = result.format_user_output() {
-            println!("{}", output);
-        }
+        handle_remove_output(&result, internal)?;
 
         // Check if we need to switch to target branch
         let primary_repo = Repository::at(&primary_worktree_dir);

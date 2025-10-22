@@ -1,6 +1,5 @@
 use anstyle::Style;
 use clap::{CommandFactory, Parser, Subcommand};
-use std::io::Write;
 use std::process;
 use worktrunk::config::WorktrunkConfig;
 use worktrunk::git::GitError;
@@ -9,12 +8,13 @@ use worktrunk::styling::println;
 mod commands;
 mod display;
 mod llm;
+mod output;
 
 use commands::{
-    ConfigAction, Shell, execute_command_in_worktree, handle_complete, handle_completion,
-    handle_configure_shell, handle_init, handle_list, handle_merge, handle_push, handle_remove,
-    handle_switch, shell_integration_hint,
+    ConfigAction, Shell, handle_complete, handle_completion, handle_configure_shell, handle_init,
+    handle_list, handle_merge, handle_push, handle_remove, handle_switch,
 };
+use output::{handle_remove_output, handle_switch_output};
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
 pub enum OutputFormat {
@@ -219,52 +219,12 @@ fn main() {
             .map_err(|e| GitError::CommandFailed(format!("Failed to load config: {}", e)))
             .and_then(|config| {
                 handle_switch(&branch, create, base.as_deref(), force, &config).and_then(|result| {
-                    if internal {
-                        // Internal mode: output directives for shell wrapper
-                        use std::io::Write;
-                        let mut stdout = std::io::stdout();
-
-                        // Write CD directive
-                        let _ = write!(stdout, "__WORKTRUNK_CD__{}\0", result.path().display());
-
-                        // Write message
-                        let _ = write!(stdout, "{}\0", result.format_message(&branch));
-
-                        // If execute flag present, write EXEC directive
-                        if let Some(cmd) = execute.as_deref() {
-                            let _ = write!(stdout, "__WORKTRUNK_EXEC__{}\0", cmd);
-                        }
-
-                        // Final newline for readability in logs
-                        let _ = stdout.write_all(b"\n");
-                        Ok(())
-                    } else {
-                        // Non-internal mode: print message and execute command
-                        println!("{}", result.format_message(&branch));
-
-                        if let Some(cmd) = execute.as_deref() {
-                            // Execute command after showing message
-                            println!();
-                            execute_command_in_worktree(result.path(), cmd)?;
-                        } else {
-                            // Show shell integration hint if no command to execute
-                            println!("{}", shell_integration_hint());
-                        }
-                        Ok(())
-                    }
+                    handle_switch_output(&result, &branch, execute.as_deref(), internal)
                 })
             }),
-        Commands::Remove { internal } => handle_remove().map(|result| {
-            if internal {
-                if let Some(output) = result.format_internal_output() {
-                    // Use write! to preserve NUL bytes
-                    let _ = std::io::stdout().write_all(output.as_bytes());
-                    let _ = std::io::stdout().write_all(b"\n");
-                }
-            } else if let Some(output) = result.format_user_output() {
-                println!("{}", output);
-            }
-        }),
+        Commands::Remove { internal } => {
+            handle_remove().and_then(|result| handle_remove_output(&result, internal))
+        }
         Commands::Push {
             target,
             allow_merge_commits,
