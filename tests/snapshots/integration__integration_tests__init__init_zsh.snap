@@ -171,6 +171,7 @@ _arguments "${_arguments_options[@]}" : \
 '--create[Create a new branch]' \
 '-f[Skip confirmation prompt]' \
 '--force[Skip confirmation prompt]' \
+'--no-config-commands[Skip executing post-start commands from project config]' \
 '-h[Print help]' \
 '--help[Print help]' \
 ':branch -- Branch name or worktree path:_default' \

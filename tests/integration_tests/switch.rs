@@ -1,11 +1,25 @@
 use crate::common::{TestRepo, make_snapshot_cmd, setup_snapshot_settings};
 use insta_cmd::assert_cmd_snapshot;
+use std::path::Path;
 
 /// Helper to create snapshot with normalized paths and SHAs
 fn snapshot_switch(test_name: &str, repo: &TestRepo, args: &[&str]) {
+    snapshot_switch_with_home(test_name, repo, args, None);
+}
+
+/// Helper that also allows setting a custom HOME directory
+fn snapshot_switch_with_home(
+    test_name: &str,
+    repo: &TestRepo,
+    args: &[&str],
+    temp_home: Option<&Path>,
+) {
     let settings = setup_snapshot_settings(repo);
     settings.bind(|| {
         let mut cmd = make_snapshot_cmd(repo, "switch", args, None);
+        if let Some(home) = temp_home {
+            cmd.env("HOME", home);
+        }
         assert_cmd_snapshot!(test_name, cmd);
     });
 }
@@ -212,5 +226,132 @@ fn test_switch_execute_multiline() {
         "switch_execute_multiline",
         &repo,
         &["--create", "multiline-test", "--execute", multiline_cmd],
+    );
+}
+
+#[test]
+fn test_switch_no_config_commands_execute_still_runs() {
+    let repo = TestRepo::new();
+    repo.commit("Initial commit");
+
+    snapshot_switch(
+        "switch_no_config_commands_execute_still_runs",
+        &repo,
+        &[
+            "--create",
+            "no-config-commands-test",
+            "--execute",
+            "echo 'execute command runs'",
+            "--no-config-commands",
+        ],
+    );
+}
+
+#[test]
+fn test_switch_no_config_commands_skips_post_start_commands() {
+    use std::fs;
+    use tempfile::TempDir;
+
+    let temp_home = TempDir::new().unwrap();
+    let repo = TestRepo::new();
+    repo.commit("Initial commit");
+
+    // Create project config with a command that would create a file
+    let config_dir = repo.root_path().join(".config");
+    fs::create_dir_all(&config_dir).expect("Failed to create .config dir");
+
+    #[cfg(target_os = "windows")]
+    let create_file_cmd = "echo marker > marker.txt";
+    #[cfg(not(target_os = "windows"))]
+    let create_file_cmd = "echo 'marker' > marker.txt";
+
+    fs::write(
+        config_dir.join("wt.toml"),
+        format!(r#"post-start-commands = ["{}"]"#, create_file_cmd),
+    )
+    .expect("Failed to write config");
+
+    repo.commit("Add config");
+
+    // Pre-approve the command
+    let user_config_dir = temp_home
+        .path()
+        .join("Library/Application Support/worktrunk");
+    fs::create_dir_all(&user_config_dir).expect("Failed to create user config dir");
+    fs::write(
+        user_config_dir.join("config.toml"),
+        format!(
+            r#"worktree-path = "../{{repo}}.{{branch}}"
+
+[[approved-commands]]
+project = "main"
+command = "{}"
+"#,
+            create_file_cmd
+        ),
+    )
+    .expect("Failed to write user config");
+
+    // With --no-config-commands, the post-start command should be skipped
+    snapshot_switch_with_home(
+        "switch_no_config_commands_skips_post_start",
+        &repo,
+        &["--create", "no-post-start", "--no-config-commands"],
+        Some(temp_home.path()),
+    );
+}
+
+#[test]
+fn test_switch_no_config_commands_with_existing_worktree() {
+    let mut repo = TestRepo::new();
+    repo.commit("Initial commit");
+
+    // Create a worktree first
+    repo.add_worktree("existing-no-config-commands", "existing-no-config-commands");
+
+    // With --no-config-commands, the --execute command should still run
+    snapshot_switch(
+        "switch_no_config_commands_existing",
+        &repo,
+        &[
+            "existing-no-config-commands",
+            "--execute",
+            "echo 'execute still runs'",
+            "--no-config-commands",
+        ],
+    );
+}
+
+#[test]
+fn test_switch_no_config_commands_with_force() {
+    use std::fs;
+    use tempfile::TempDir;
+
+    let temp_home = TempDir::new().unwrap();
+    let repo = TestRepo::new();
+    repo.commit("Initial commit");
+
+    // Create project config with a command
+    let config_dir = repo.root_path().join(".config");
+    fs::create_dir_all(&config_dir).expect("Failed to create .config dir");
+    fs::write(
+        config_dir.join("wt.toml"),
+        r#"post-start-commands = ["echo 'test'"]"#,
+    )
+    .expect("Failed to write config");
+
+    repo.commit("Add config");
+
+    // With --no-config-commands, even --force shouldn't execute config commands
+    snapshot_switch_with_home(
+        "switch_no_config_commands_with_force",
+        &repo,
+        &[
+            "--create",
+            "force-no-config-commands",
+            "--force",
+            "--no-config-commands",
+        ],
+        Some(temp_home.path()),
     );
 }

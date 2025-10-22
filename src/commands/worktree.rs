@@ -145,6 +145,7 @@ pub fn handle_switch(
     create: bool,
     base: Option<&str>,
     force: bool,
+    no_config_commands: bool,
     config: &WorktrunkConfig,
 ) -> Result<SwitchResult, GitError> {
     let repo = Repository::current();
@@ -219,10 +220,14 @@ pub fn handle_switch(
         .unwrap_or_else(|_| worktree_path.clone());
 
     // Execute post-create commands (sequential, blocking)
-    execute_post_create_commands(&canonical_path, &repo, config, branch, repo_name, force)?;
+    if !no_config_commands {
+        execute_post_create_commands(&canonical_path, &repo, config, branch, repo_name, force)?;
+    }
 
     // Spawn post-start commands (parallel, background)
-    spawn_post_start_commands(&canonical_path, &repo, config, branch, repo_name, force)?;
+    if !no_config_commands {
+        spawn_post_start_commands(&canonical_path, &repo, config, branch, repo_name, force)?;
+    }
 
     Ok(SwitchResult::CreatedWorktree {
         path: canonical_path,

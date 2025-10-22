@@ -1,0 +1,29 @@
+---
+source: tests/integration_tests/switch.rs
+info:
+  program: wt
+  args:
+    - switch
+    - existing-no-config-commands
+    - "--execute"
+    - "echo 'execute still runs'"
+    - "--no-config-commands"
+  env:
+    CLICOLOR_FORCE: "1"
+    GIT_AUTHOR_DATE: "2025-01-01T00:00:00Z"
+    GIT_COMMITTER_DATE: "2025-01-01T00:00:00Z"
+    GIT_CONFIG_GLOBAL: /dev/null
+    GIT_CONFIG_SYSTEM: /dev/null
+    GIT_EDITOR: ""
+    LANG: C
+    LC_ALL: C
+    SOURCE_DATE_EPOCH: "1704067200"
+---
+success: true
+exit_code: 0
+----- stdout -----
+✅ [32mSwitched to worktree for [1m[32mexisting-no-config-commands[0m[0m
+
+execute still runs
+
+----- stderr -----

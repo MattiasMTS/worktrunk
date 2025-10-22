@@ -93,6 +93,10 @@ enum Commands {
         #[arg(short = 'f', long)]
         force: bool,
 
+        /// Skip executing post-start commands from project config
+        #[arg(long)]
+        no_config_commands: bool,
+
         /// Use internal mode (outputs directives for shell wrapper)
         #[arg(long, hide = true)]
         internal: bool,
@@ -214,11 +218,20 @@ fn main() {
             base,
             execute,
             force,
+            no_config_commands,
             internal,
         } => WorktrunkConfig::load()
             .map_err(|e| GitError::CommandFailed(format!("Failed to load config: {}", e)))
             .and_then(|config| {
-                handle_switch(&branch, create, base.as_deref(), force, &config).and_then(|result| {
+                handle_switch(
+                    &branch,
+                    create,
+                    base.as_deref(),
+                    force,
+                    no_config_commands,
+                    &config,
+                )
+                .and_then(|result| {
                     handle_switch_output(&result, &branch, execute.as_deref(), internal)
                 })
             }),
