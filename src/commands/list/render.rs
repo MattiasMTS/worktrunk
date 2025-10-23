@@ -48,31 +48,22 @@ fn format_diff_column(
 pub fn format_all_states(info: &WorktreeInfo) -> String {
     let mut states = Vec::new();
 
-    // Worktree state (merge/rebase/etc)
-    if let Some(ref state) = info.worktree_state {
+    if let Some(state) = info.worktree_state.as_ref() {
         states.push(format!("[{}]", state));
     }
 
-    // Don't show detached state if branch is None (already shown in branch column)
     if info.worktree.detached && info.worktree.branch.is_some() {
         states.push("(detached)".to_string());
     }
     if info.worktree.bare {
         states.push("(bare)".to_string());
     }
-    if let Some(ref reason) = info.worktree.locked {
-        if reason.is_empty() {
-            states.push("(locked)".to_string());
-        } else {
-            states.push(format!("(locked: {})", reason));
-        }
+
+    if let Some(state) = optional_reason_state("locked", info.worktree.locked.as_deref()) {
+        states.push(state);
     }
-    if let Some(ref reason) = info.worktree.prunable {
-        if reason.is_empty() {
-            states.push("(prunable)".to_string());
-        } else {
-            states.push(format!("(prunable: {})", reason));
-        }
+    if let Some(state) = optional_reason_state("prunable", info.worktree.prunable.as_deref()) {
+        states.push(state);
     }
 
     states.join(" ")
@@ -80,70 +71,43 @@ pub fn format_all_states(info: &WorktreeInfo) -> String {
 
 pub fn format_header_line(layout: &LayoutConfig) {
     let widths = &layout.widths;
+    let dim = Style::new().dimmed();
     let mut line = StyledLine::new();
 
-    // Branch
-    let header = format!("{:width$}", "Branch", width = widths.branch);
-    line.push_styled(header, Style::new().dimmed());
-    line.push_raw("  ");
-
-    // Age (Time)
-    if widths.time > 0 {
-        let header = format!("{:width$}", "Age", width = widths.time);
-        line.push_styled(header, Style::new().dimmed());
-        line.push_raw("  ");
-    }
-
-    // Ahead/behind (commits)
-    if widths.ahead_behind > 0 {
-        let header = format!("{:width$}", "Cmts", width = widths.ahead_behind);
-        line.push_styled(header, Style::new().dimmed());
-        line.push_raw("  ");
-    }
-
-    // Branch diff (line diff in commits)
-    if widths.branch_diff.total > 0 {
-        let header = format!("{:width$}", "Cmt +/-", width = widths.branch_diff.total);
-        line.push_styled(header, Style::new().dimmed());
-        line.push_raw("  ");
-    }
-
-    // Working tree diff
-    if widths.working_diff.total > 0 {
-        let header = format!("{:width$}", "WT +/-", width = widths.working_diff.total);
-        line.push_styled(header, Style::new().dimmed());
-        line.push_raw("  ");
-    }
-
-    // Upstream
-    if widths.upstream > 0 {
-        let header = format!("{:width$}", "Remote", width = widths.upstream);
-        line.push_styled(header, Style::new().dimmed());
-        line.push_raw("  ");
-    }
-
-    // Commit (fixed width: 8 chars)
-    line.push_styled("Commit  ", Style::new().dimmed());
-    line.push_raw("  ");
-
-    // Message
-    if widths.message > 0 {
-        let header = format!("{:width$}", "Message", width = widths.message);
-        line.push_styled(header, Style::new().dimmed());
-        line.push_raw("  ");
-    }
-
-    // States
-    if widths.states > 0 {
-        let header = format!("{:width$}", "State", width = widths.states);
-        line.push_styled(header, Style::new().dimmed());
-        line.push_raw("  ");
-    }
-
-    // Path
-    line.push_styled("Path", Style::new().dimmed());
+    push_header(&mut line, "Branch", widths.branch, dim);
+    push_optional_header(&mut line, "Age", widths.time, dim);
+    push_optional_header(&mut line, "Cmts", widths.ahead_behind, dim);
+    push_optional_header(&mut line, "Cmt +/-", widths.branch_diff.total, dim);
+    push_optional_header(&mut line, "WT +/-", widths.working_diff.total, dim);
+    push_optional_header(&mut line, "Remote", widths.upstream, dim);
+    push_header(&mut line, "Commit", 8, dim);
+    push_optional_header(&mut line, "Message", widths.message, dim);
+    push_optional_header(&mut line, "State", widths.states, dim);
+    line.push_styled("Path", dim);
 
     println!("{}", line.render());
+}
+
+fn optional_reason_state(label: &str, reason: Option<&str>) -> Option<String> {
+    reason.map(|value| {
+        if value.is_empty() {
+            format!("({label})")
+        } else {
+            format!("({label}: {value})")
+        }
+    })
+}
+
+fn push_header(line: &mut StyledLine, label: &str, width: usize, dim: Style) {
+    let header = format!("{:width$}", label, width = width);
+    line.push_styled(header, dim);
+    line.push_raw("  ");
+}
+
+fn push_optional_header(line: &mut StyledLine, label: &str, width: usize, dim: Style) {
+    if width > 0 {
+        push_header(line, label, width, dim);
+    }
 }
 
 /// Render a list item (worktree or branch) as a formatted line
