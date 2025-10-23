@@ -145,6 +145,10 @@ enum Commands {
         #[arg(short, long)]
         keep: bool,
 
+        /// Custom instruction for commit message generation
+        #[arg(short = 'm', long)]
+        message: Option<String>,
+
         /// Use internal mode (outputs directives for shell wrapper)
         #[arg(long, hide = true)]
         internal: bool,
@@ -262,8 +266,15 @@ fn main() {
             target,
             squash,
             keep,
+            message,
             internal,
-        } => handle_merge(target.as_deref(), squash, keep, internal),
+        } => handle_merge(
+            target.as_deref(),
+            squash,
+            keep,
+            message.as_deref(),
+            internal,
+        ),
         Commands::Completion { shell } => {
             let mut cli_cmd = Cli::command();
             handle_completion(shell, &mut cli_cmd);

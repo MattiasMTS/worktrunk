@@ -1,6 +1,134 @@
 use std::process;
 use worktrunk::config::LlmConfig;
+use worktrunk::git::{GitError, Repository};
 use worktrunk::styling::{WARNING, WARNING_EMOJI, eprintln};
+
+pub fn generate_commit_message(
+    custom_instruction: Option<&str>,
+    llm_config: &LlmConfig,
+) -> Result<String, GitError> {
+    // Try LLM generation if configured
+    if let Some(ref command) = llm_config.command {
+        if let Ok(llm_message) =
+            try_generate_commit_message(custom_instruction, command, &llm_config.args)
+        {
+            return Ok(llm_message);
+        }
+        // If LLM fails, fall through to deterministic approach
+        eprintln!(
+            "{WARNING_EMOJI} {WARNING}LLM generation failed, using deterministic message{WARNING:#}"
+        );
+    }
+
+    // Fallback: simple deterministic commit message
+    Ok("WIP: Auto-commit before merge".to_string())
+}
+
+fn try_generate_commit_message(
+    custom_instruction: Option<&str>,
+    command: &str,
+    args: &[String],
+) -> Result<String, Box<dyn std::error::Error>> {
+    let repo = Repository::current();
+
+    // Get staged diff
+    let diff_output = repo.run_command(&["--no-pager", "diff", "--staged"])?;
+
+    // Get current branch
+    let current_branch = repo.current_branch()?.unwrap_or_else(|| "HEAD".to_string());
+
+    // Get recent commit messages for style reference
+    let recent_commits = repo
+        .run_command(&["log", "--pretty=format:%s", "-n", "5", "--no-merges"])
+        .ok()
+        .and_then(|output| {
+            if output.trim().is_empty() {
+                None
+            } else {
+                Some(output.lines().map(String::from).collect::<Vec<_>>())
+            }
+        });
+
+    // Build the prompt following the Fish function format exactly
+    let user_instruction = custom_instruction
+        .unwrap_or("Write a concise, clear git commit message based on the provided diff.");
+
+    let mut prompt = String::new();
+
+    // Format section
+    prompt.push_str("Format\n");
+    prompt.push_str("- First line: <50 chars, present tense, describes WHAT and WHY (not HOW).\n");
+    prompt.push_str("- Blank line after first line.\n");
+    prompt.push_str("- Optional details with proper line breaks explaining context. Commits with more substantial changes should have more details.\n");
+    prompt.push_str(
+        "- Return ONLY the formatted message without quotes, code blocks, or preamble.\n",
+    );
+    prompt.push('\n');
+
+    // Style section
+    prompt.push_str("Style\n");
+    prompt.push_str(
+        "- Do not give normative statements or otherwise speculate on why the change was made.\n",
+    );
+    prompt.push_str("- Broadly match the style of the previous commit messages.\n");
+    prompt.push_str("  - For example, if they're in conventional commit format, use conventional commits; if they're not, don't use conventional commits.\n");
+    prompt.push('\n');
+
+    // Context description
+    prompt.push_str("The context contains:\n");
+    prompt.push_str("- <git-diff> with the staged changes. This is the ONLY content you should base your message on.\n");
+    prompt.push_str("- <git-info> with branch name and recent commit message titles for style reference ONLY. DO NOT use their content to inform your message.\n");
+    prompt.push('\n');
+    prompt.push_str("---\n");
+    prompt.push_str("The following is the context for your task:\n");
+    prompt.push_str("---\n");
+
+    // Git diff section
+    prompt.push_str("<git-diff>\n```\n");
+    prompt.push_str(&diff_output);
+    prompt.push_str("\n```\n</git-diff>\n\n");
+
+    // Git info section
+    prompt.push_str("<git-info>\n");
+    prompt.push_str(&format!(
+        "  <current-branch>{}</current-branch>\n",
+        current_branch
+    ));
+
+    if let Some(commits) = recent_commits {
+        prompt.push_str("  <previous-commit-message-titles>\n");
+        for commit in commits {
+            prompt.push_str(&format!(
+                "    <previous-commit-message-title>{}</previous-commit-message-title>\n",
+                commit
+            ));
+        }
+        prompt.push_str("  </previous-commit-message-titles>\n");
+    }
+
+    prompt.push_str("</git-info>\n\n");
+
+    // Execute LLM command
+    let output = process::Command::new(command)
+        .args(args)
+        .arg("--system")
+        .arg(user_instruction)
+        .arg(&prompt)
+        .output()?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("LLM command failed: {}", stderr).into());
+    }
+
+    let message = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+
+    if message.is_empty() {
+        return Err("LLM returned empty message".into());
+    }
+
+    Ok(message)
+}
 
 pub fn generate_squash_message(
     target_branch: &str,

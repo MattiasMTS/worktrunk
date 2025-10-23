@@ -290,12 +290,20 @@ _wt() {
             return 0
             ;;
         wt__merge)
-            opts="-s -k -h --squash --keep --help [TARGET]"
+            opts="-s -k -m -h --squash --keep --message --help [TARGET]"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
+                --message)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                -m)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
                 *)
                     COMPREPLY=()
                     ;;

@@ -11,6 +11,7 @@ pub fn handle_merge(
     target: Option<&str>,
     squash: bool,
     keep: bool,
+    message: Option<&str>,
     internal: bool,
 ) -> Result<(), GitError> {
     let repo = Repository::current();
@@ -36,8 +37,14 @@ pub fn handle_merge(
         return Ok(());
     }
 
-    // Check for uncommitted changes
-    repo.ensure_clean_working_tree()?;
+    // Load config for LLM integration
+    let config = WorktrunkConfig::load()
+        .map_err(|e| GitError::CommandFailed(format!("Failed to load config: {}", e)))?;
+
+    // Auto-commit uncommitted changes if they exist
+    if repo.is_dirty()? {
+        handle_commit_changes(message, &config.llm)?;
+    }
 
     // Track operations for summary
     let mut squashed_count: Option<usize> = None;
@@ -111,6 +118,42 @@ fn print_merge_summary(
     let green = AnstyleStyle::new().fg_color(Some(Color::Ansi(AnsiColor::Green)));
 
     println!("✅ {green}Merge complete{green:#}");
+}
+
+/// Commit uncommitted changes with LLM-generated message
+fn handle_commit_changes(
+    custom_instruction: Option<&str>,
+    llm_config: &worktrunk::config::LlmConfig,
+) -> Result<(), GitError> {
+    let repo = Repository::current();
+
+    let cyan = AnstyleStyle::new().fg_color(Some(Color::Ansi(AnsiColor::Cyan)));
+    println!("🔄 {cyan}Committing uncommitted changes...{cyan:#}");
+
+    // Stage all tracked changes (excludes untracked files)
+    repo.run_command(&["add", "-u"])
+        .map_err(|e| GitError::CommandFailed(format!("Failed to stage changes: {}", e)))?;
+
+    // Check if there are staged changes after staging
+    if !repo.has_staged_changes()? {
+        // No staged changes means only untracked files exist
+        eprintln!("{ERROR_EMOJI} {ERROR}Working tree has untracked files{ERROR:#}");
+        eprintln!();
+        eprintln!("{HINT_EMOJI} {HINT}Add them with 'git add' and try again{HINT:#}");
+        return Err(GitError::CommandFailed(String::new()));
+    }
+
+    // Generate commit message
+    let commit_message = crate::llm::generate_commit_message(custom_instruction, llm_config)?;
+
+    // Commit
+    repo.run_command(&["commit", "-m", &commit_message])
+        .map_err(|e| GitError::CommandFailed(format!("Failed to commit: {}", e)))?;
+
+    let green = AnstyleStyle::new().fg_color(Some(Color::Ansi(AnsiColor::Green)));
+    println!("✅ {green}Committed changes{green:#}");
+
+    Ok(())
 }
 
 fn handle_squash(target_branch: &str) -> Result<Option<usize>, GitError> {

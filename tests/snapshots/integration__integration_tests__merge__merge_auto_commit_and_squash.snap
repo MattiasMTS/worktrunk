@@ -1,0 +1,49 @@
+---
+source: tests/integration_tests/merge.rs
+info:
+  program: wt
+  args:
+    - merge
+    - main
+    - "--squash"
+  env:
+    CLICOLOR_FORCE: "1"
+    GIT_AUTHOR_DATE: "2025-01-01T00:00:00Z"
+    GIT_COMMITTER_DATE: "2025-01-01T00:00:00Z"
+    GIT_CONFIG_GLOBAL: /dev/null
+    GIT_CONFIG_SYSTEM: /dev/null
+    GIT_EDITOR: ""
+    LANG: C
+    LC_ALL: C
+    SOURCE_DATE_EPOCH: "1704067200"
+    WORKTRUNK_LLM__ARGS: "fix: update file 1 content"
+    WORKTRUNK_LLM__COMMAND: echo
+---
+success: true
+exit_code: 0
+----- stdout -----
+🔄 [36mCommitting uncommitted changes...[0m
+✅ [32mCommitted changes[0m
+🔄 [36mSquashing 3 commits into one...[0m
+✅ [32mSquashed 3 commits into one[0m
+🔄 [36mRebasing onto [1m[36mmain[0m...[0m
+🔄 [36mPushing 1 commit to [1m[36mmain[0m @ [SHA][0m
+
+* [33maaf1370[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mfeature[m[33m)[m Squash commits from main
+
+ file1.txt | 1 [32m+[m
+ file2.txt | 1 [32m+[m
+ 2 files changed, 2 insertions(+)
+
+✅ [32mPushed to [1m[32mmain[0m (1 commit, 2 files, [32m+2[0m)  [0m
+🔄 [36mCleaning up worktree...[0m
+✅ [32mRemoved worktree and returned to primary[0m
+  [2mPath: [REPO][0m
+
+To enable automatic cd, run: wt configure-shell
+
+✅ [32mMerge complete[0m
+
+----- stderr -----
+🟡 [33mLLM generation failed, using deterministic message[0m
+🟡 [33mLLM generation failed, using deterministic message[0m

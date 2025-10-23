@@ -217,6 +217,8 @@ _arguments "${_arguments_options[@]}" : \
 ;;
 (merge)
 _arguments "${_arguments_options[@]}" : \
+'-m+[Custom instruction for commit message generation]:MESSAGE:_default' \
+'--message=[Custom instruction for commit message generation]:MESSAGE:_default' \
 '-s[Squash all commits into one before merging]' \
 '--squash[Squash all commits into one before merging]' \
 '-k[Keep worktree after merging (don'\''t remove)]' \

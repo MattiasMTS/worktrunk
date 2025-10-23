@@ -175,6 +175,7 @@ complete -c wt -n "__fish_wt_using_subcommand switch" -s h -l help -d 'Print hel
 complete -c wt -n "__fish_wt_using_subcommand remove" -s h -l help -d 'Print help'
 complete -c wt -n "__fish_wt_using_subcommand push" -l allow-merge-commits -d 'Allow pushing merge commits (non-linear history)'
 complete -c wt -n "__fish_wt_using_subcommand push" -s h -l help -d 'Print help'
+complete -c wt -n "__fish_wt_using_subcommand merge" -s m -l message -d 'Custom instruction for commit message generation' -r
 complete -c wt -n "__fish_wt_using_subcommand merge" -s s -l squash -d 'Squash all commits into one before merging'
 complete -c wt -n "__fish_wt_using_subcommand merge" -s k -l keep -d 'Keep worktree after merging (don\'t remove)'
 complete -c wt -n "__fish_wt_using_subcommand merge" -s h -l help -d 'Print help'
