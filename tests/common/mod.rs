@@ -400,3 +400,34 @@ pub fn make_snapshot_cmd(
         .current_dir(cwd.unwrap_or(repo.root_path()));
     cmd
 }
+
+/// Resolve the actual git directory path from a worktree path
+///
+/// In worktrees, `.git` is a file containing `gitdir: /path/to/git/dir`,
+/// not a directory. This helper reads that file and returns the actual
+/// git directory path.
+///
+/// # Arguments
+/// * `worktree_path` - Path to the worktree root
+///
+/// # Returns
+/// The resolved git directory path
+pub fn resolve_git_dir(worktree_path: &Path) -> PathBuf {
+    let git_path = worktree_path.join(".git");
+
+    if git_path.is_file() {
+        // Read the gitdir path from the file
+        let content = std::fs::read_to_string(&git_path).expect("Failed to read .git file");
+
+        // Format is "gitdir: /path/to/git/dir"
+        let gitdir_path = content
+            .trim()
+            .strip_prefix("gitdir: ")
+            .expect("Invalid .git file format");
+
+        PathBuf::from(gitdir_path)
+    } else {
+        // Not a worktree, .git is already a directory
+        git_path
+    }
+}
