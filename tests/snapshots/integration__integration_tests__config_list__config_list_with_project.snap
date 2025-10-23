@@ -12,7 +12,7 @@ info:
     GIT_CONFIG_GLOBAL: /dev/null
     GIT_CONFIG_SYSTEM: /dev/null
     GIT_EDITOR: ""
-    HOME: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmp8ZWNvA
+    HOME: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpcA2FvP
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1704067200"
@@ -21,16 +21,16 @@ success: true
 exit_code: 0
 ----- stdout -----
 Global Config: [1m[TEMP_HOME]/.config/worktrunk/config.toml[0m
-  worktree-path = [32m"../{main-worktree}.{branch}"[0m
-  
-  [1m[36m[[approved-commands]][0m
-  project = [32m"test-project"[0m
-  command = [32m"npm install"[0m
+[40m [0m worktree-path = [32m"../{main-worktree}.{branch}"[0m
+[40m [0m 
+[40m [0m [1m[36m[[approved-commands]][0m
+[40m [0m project = [32m"test-project"[0m
+[40m [0m command = [32m"npm install"[0m
 
 Project Config: [1m[REPO]/.config/wt.toml[0m
-  post-create-command = [32m"npm install"[0m
-  
-  [1m[36m[post-start-command][0m
-  server = [32m"npm run dev"[0m
+[40m [0m post-create-command = [32m"npm install"[0m
+[40m [0m 
+[40m [0m [1m[36m[post-start-command][0m
+[40m [0m server = [32m"npm run dev"[0m
 
 ----- stderr -----

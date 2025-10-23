@@ -12,7 +12,7 @@ info:
     GIT_CONFIG_GLOBAL: /dev/null
     GIT_CONFIG_SYSTEM: /dev/null
     GIT_EDITOR: ""
-    HOME: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpOhSuMo
+    HOME: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpJLGPUB
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1704067200"
@@ -21,7 +21,7 @@ success: true
 exit_code: 0
 ----- stdout -----
 Global Config: [1m[TEMP_HOME]/.config/worktrunk/config.toml[0m
-  worktree-path = [32m"../{main-worktree}.{branch}"[0m
+[40m [0m worktree-path = [32m"../{main-worktree}.{branch}"[0m
 
 Project Config: [1m[REPO]/.config/wt.toml[0m
   💡 [2mNot found[0m

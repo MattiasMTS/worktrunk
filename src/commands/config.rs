@@ -92,7 +92,7 @@ fn display_global_config() -> Result<(), GitError> {
     }
 
     // Display TOML with syntax highlighting
-    print!("{}", format_toml(&contents, "  "));
+    print!("{}", format_toml(&contents, " "));
 
     Ok(())
 }
@@ -130,7 +130,7 @@ fn display_project_config() -> Result<(), GitError> {
     }
 
     // Display TOML with syntax highlighting
-    print!("{}", format_toml(&contents, "  "));
+    print!("{}", format_toml(&contents, " "));
 
     Ok(())
 }

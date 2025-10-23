@@ -6,7 +6,7 @@ info:
     - config
     - list
   env:
-    HOME: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpxHds55
+    HOME: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpfgWomq
 ---
 success: true
 exit_code: 0

@@ -165,6 +165,9 @@ impl StyledLine {
 
 /// Formats TOML content with syntax highlighting using synoptic
 pub fn format_toml(content: &str, indent: &str) -> String {
+    // Gutter style: subtle background for visual separation
+    let gutter = Style::new().bg_color(Some(Color::Ansi(AnsiColor::Black)));
+
     // Get TOML highlighter from synoptic's built-in rules (tab_width = 4)
     let mut highlighter = match from_extension("toml", 4) {
         Some(h) => h,
@@ -173,7 +176,7 @@ pub fn format_toml(content: &str, indent: &str) -> String {
             let dim = Style::new().dimmed();
             let mut output = String::new();
             for line in content.lines() {
-                output.push_str(&format!("{indent}{dim}{line}{dim:#}\n"));
+                output.push_str(&format!("{gutter} {gutter:#}{indent}{dim}{line}{dim:#}\n"));
             }
             return output;
         }
@@ -187,7 +190,9 @@ pub fn format_toml(content: &str, indent: &str) -> String {
 
     // Render each line with appropriate styling
     for (y, line) in lines.iter().enumerate() {
-        // Add indentation first
+        // Add gutter first
+        output.push_str(&format!("{gutter} {gutter:#}"));
+        // Add indentation
         output.push_str(indent);
 
         // Render each token with appropriate styling
@@ -265,7 +270,7 @@ project = "github.com/user/repo"
 command = "npm install"
 "#;
 
-        let output = format_toml(toml_content, "  ");
+        let output = format_toml(toml_content, " ");
 
         // Check that output contains ANSI escape codes
         assert!(
@@ -291,12 +296,16 @@ command = "npm install"
             "Should contain cyan or bold for tables"
         );
 
-        // Check indentation is preserved
+        // Check that gutter background is present (Black background = 40)
         assert!(
-            output
-                .lines()
-                .all(|line| line.starts_with("  ") || line.is_empty()),
-            "All lines should be indented"
+            output.contains("\x1b[40m"),
+            "Should contain gutter background color (Black = 40)"
+        );
+
+        // Check that lines have content (not just gutter)
+        assert!(
+            output.lines().any(|line| line.len() > 20),
+            "Should have lines with actual content beyond gutter and indent"
         );
     }
 
