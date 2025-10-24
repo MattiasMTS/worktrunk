@@ -163,6 +163,66 @@ println!("✅ Created {bold}{branch}{bold:#}\n  {dim}Path: {}{dim:#}", path.disp
 | Config values | Normal | **Dim** |
 | Metadata | Dim | **Dim** |
 
+### Indentation Policy
+
+**Core Principle: No manual indentation for secondary information.**
+
+Styling (bold, dim, color) already provides visual hierarchy. Manual indentation adds cognitive load without adding clarity.
+
+**Rules:**
+
+1. **Secondary paths, metadata**: No indent, use dimmed styling only
+   ```rust
+   // Good - dimming provides hierarchy
+   println!("✅ Created {bold}{branch}{bold:#}");
+   println!("{dim}Path: {}{dim:#}", path.display());
+
+   // Bad - unnecessary indent
+   println!("✅ Created {bold}{branch}{bold:#}");
+   println!("  {dim}Path: {}{dim:#}", path.display());
+   ```
+
+2. **File lists (bullets)**: No indent, bullet provides visual separation
+   ```rust
+   // Good - bullet is enough
+   for file in &files {
+       eprintln!("{dim}•{dim:#} {}", file);
+   }
+
+   // Bad - redundant indent
+   for file in &files {
+       eprintln!("  {dim}•{dim:#} {}", file);
+   }
+   ```
+
+3. **Log file paths**: No indent, dimming is sufficient
+   ```rust
+   // Good
+   eprintln!("{dim}Logs: {}{dim:#}", path);
+
+   // Bad
+   eprintln!("  {dim}Logs: {}{dim:#}", path);
+   ```
+
+4. **Quoted content (commands, config)**: Use `format_with_gutter()` instead of manual indents
+   ```rust
+   // Good - gutter provides visual separation
+   print!("{}", format_with_gutter(&command));
+
+   // Bad - manual indentation
+   for line in command.lines() {
+       println!("  {}", line);
+   }
+   ```
+
+**Exception:** Nested hierarchies where structural relationships must be clear (not yet encountered in this codebase).
+
+**Rationale:**
+- Styling already creates visual hierarchy
+- Indentation is redundant cognitive load
+- Simpler output is easier to scan
+- Follows git's own output conventions
+
 ### Color Detection
 
 Colors automatically adjust based on environment:

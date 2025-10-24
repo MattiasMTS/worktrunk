@@ -33,7 +33,7 @@ exit_code: 0
 ✅ [32mPushed to [1m[32mmain[0m (2 commits, 1 file, [32m+1[0m)  [0m
 🔄 [36mCleaning up worktree...[0m
 ✅ [32mRemoved worktree, returned to primary
-  [2mPath: [REPO][0m[0m
+[2mPath: [REPO][0m[0m
 
 ✅ [32mMerge complete
 

@@ -2,6 +2,7 @@ use std::fs::{self, OpenOptions};
 use std::io::{self, BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use worktrunk::shell::Shell;
+use worktrunk::styling::format_with_gutter;
 
 pub struct ConfigureResult {
     pub shell: Shell,
@@ -354,15 +355,12 @@ fn prompt_for_confirmation(results: &[ConfigureResult]) -> Result<bool, String> 
         let shell = result.shell;
         let path = result.path.display();
         eprintln!(
-            "  {} {bold}{shell}{bold:#} {bold}{path}{bold:#}",
+            "{} {bold}{shell}{bold:#} {bold}{path}{bold:#}",
             result.action.description(),
         );
 
-        // Show the config line that will be added with dim styling
-        for line in result.config_line.lines() {
-            let dim = Style::new().dimmed();
-            eprintln!("    {dim}{line}{dim:#}");
-        }
+        // Show the config line that will be added with gutter
+        eprint!("{}", format_with_gutter(&result.config_line));
     }
 
     eprintln!();

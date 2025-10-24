@@ -14,7 +14,7 @@ info:
     GIT_CONFIG_GLOBAL: /dev/null
     GIT_CONFIG_SYSTEM: /dev/null
     GIT_EDITOR: ""
-    HOME: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmp0kaR0I
+    HOME: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmp0Zu3xW
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1704067200"
@@ -23,7 +23,7 @@ success: true
 exit_code: 0
 ----- stdout -----
 Created [1mfish[0m [TEMP_HOME]/.config/fish/conf.d/wt.fish
-  [2mif type -q wt; wt init fish | source; end[0m
+[40m [0m if type -q wt; wt init fish | source; end
 
 ✅ [32mConfigured 1 shell[0m
 

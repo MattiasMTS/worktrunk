@@ -16,7 +16,7 @@ info:
     GIT_CONFIG_GLOBAL: /dev/null
     GIT_CONFIG_SYSTEM: /dev/null
     GIT_EDITOR: ""
-    HOME: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmp0BNQxd
+    HOME: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpOKerBG
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1704067200"
@@ -25,7 +25,7 @@ success: true
 exit_code: 0
 ----- stdout -----
 Created [1mfish[0m [TEMP_HOME]/.config/fish/conf.d/worktree.fish
-  [2mif type -q worktree; worktree init fish | source; end[0m
+[40m [0m if type -q worktree; worktree init fish | source; end
 
 ✅ [32mConfigured 1 shell[0m
 

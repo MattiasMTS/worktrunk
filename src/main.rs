@@ -269,6 +269,7 @@ fn main() {
 
                     // Show what was done
                     for result in &results {
+                        use worktrunk::styling::format_with_gutter;
                         let bold = Style::new().bold();
                         let shell = result.shell;
                         let path = result.path.display();
@@ -276,11 +277,8 @@ fn main() {
                             "{} {bold}{shell}{bold:#} {path}",
                             result.action.description(),
                         );
-                        // Indent each line of the config content with dim/gray color
-                        for line in result.config_line.lines() {
-                            let dim = Style::new().dimmed();
-                            println!("  {dim}{line}{dim:#}");
-                        }
+                        // Show config line with gutter
+                        print!("{}", format_with_gutter(&result.config_line));
                     }
 
                     // Success summary

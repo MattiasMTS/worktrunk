@@ -314,7 +314,7 @@ fn check_worktree_conflicts(
         eprintln!();
         let dim = AnstyleStyle::new().dimmed();
         for file in &overlapping {
-            eprintln!("  {dim}•{dim:#} {}", file);
+            eprintln!("{dim}•{dim:#} {}", file);
         }
         eprintln!();
         eprintln!(
@@ -446,7 +446,7 @@ fn spawn_post_start_commands(
                 } else {
                     log_path.display().to_string()
                 };
-                eprintln!("  {dim}→ Logs: {}{dim:#}", display_path);
+                eprintln!("{dim}Logs: {}{dim:#}", display_path);
             }
             Err(e) => {
                 eprintln!("{WARNING_EMOJI} {WARNING}Failed to spawn '{name}': {e}{WARNING:#}");

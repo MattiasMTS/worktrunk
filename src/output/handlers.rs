@@ -19,12 +19,12 @@ fn format_switch_message_plain(result: &SwitchResult, branch: &str) -> String {
             let dim = AnstyleStyle::new().dimmed();
             if *created_branch {
                 format!(
-                    "Created new worktree for {bold}{branch}{bold:#}\n  {dim}Path: {}{dim:#}",
+                    "Created new worktree for {bold}{branch}{bold:#}\n{dim}Path: {}{dim:#}",
                     path.display()
                 )
             } else {
                 format!(
-                    "Added worktree for {bold}{branch}{bold:#}\n  {dim}Path: {}{dim:#}",
+                    "Added worktree for {bold}{branch}{bold:#}\n{dim}Path: {}{dim:#}",
                     path.display()
                 )
             }
@@ -43,7 +43,7 @@ fn format_remove_message_plain(result: &RemoveResult) -> String {
         }
         RemoveResult::RemovedWorktree { primary_path } => {
             format!(
-                "Removed worktree, returned to primary\n  {dim}Path: {}{dim:#}",
+                "Removed worktree, returned to primary\n{dim}Path: {}{dim:#}",
                 primary_path.display()
             )
         }
