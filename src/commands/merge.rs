@@ -1,4 +1,3 @@
-use anstyle::{AnsiColor, Color};
 use worktrunk::config::{ProjectConfig, WorktrunkConfig};
 use worktrunk::git::{GitError, Repository};
 use worktrunk::styling::{
@@ -323,9 +322,8 @@ fn run_pre_merge_checks(
     for prepared in commands {
         if !internal {
             use std::io::Write;
-            let cyan = AnstyleStyle::new().fg_color(Some(Color::Ansi(AnsiColor::Cyan)));
             println!(
-                "🔄 {cyan}Running pre-merge check '{name}'...{cyan:#}",
+                "🔄 {CYAN}Running pre-merge check '{name}'...{CYAN:#}",
                 name = prepared.name
             );
             let _ = std::io::stdout().flush();
