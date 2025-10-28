@@ -1,7 +1,7 @@
 use worktrunk::config::{ProjectConfig, WorktrunkConfig};
 use worktrunk::git::{GitError, Repository};
 use worktrunk::styling::{
-    AnstyleStyle, CYAN, CYAN_BOLD, ERROR, ERROR_EMOJI, GREEN, GREEN_BOLD, HINT, HINT_EMOJI,
+    AnstyleStyle, CYAN, CYAN_BOLD, ERROR, ERROR_EMOJI, GREEN, GREEN_BOLD, HINT, HINT_EMOJI, eprint,
     eprintln, format_with_gutter, println,
 };
 
@@ -359,11 +359,13 @@ fn run_pre_merge_checks(
         },
     )?;
     for prepared in commands {
-        crate::output::progress(format!(
-            "🔄 {CYAN}Running pre-merge check '{name}'...{CYAN:#}",
+        use std::io::Write;
+        eprintln!(
+            "🔄 {CYAN}Running pre-merge check '{name}':{CYAN:#}",
             name = prepared.name
-        ))
-        .map_err(|e| GitError::CommandFailed(e.to_string()))?;
+        );
+        eprint!("{}", format_with_gutter(&prepared.expanded, "")); // Gutter at column 0
+        let _ = std::io::stderr().flush();
 
         if let Err(e) = execute_command_in_worktree(worktree_path, &prepared.expanded) {
             eprintln!();
