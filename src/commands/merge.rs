@@ -368,6 +368,10 @@ fn run_pre_merge_checks(
                 error: e.to_string(),
             });
         }
+
+        // Flush both streams to ensure command output appears before next progress message
+        let _ = std::io::stdout().flush();
+        let _ = std::io::stderr().flush();
     }
 
     Ok(())
