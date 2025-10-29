@@ -774,3 +774,132 @@ command = "echo 'line1\nline2\nline3' | grep line2 > filtered.txt"
     let contents = fs::read_to_string(&filtered_file).expect("Failed to read filtered.txt");
     assert_snapshot!(contents, @"line2");
 }
+
+#[test]
+fn test_post_start_multiline_commands_with_newlines() {
+    let repo = TestRepo::new();
+    repo.commit("Initial commit");
+
+    // Create command with actual newlines (using TOML triple-quoted string)
+    let config_dir = repo.root_path().join(".config");
+    fs::create_dir_all(&config_dir).expect("Failed to create .config dir");
+    fs::write(
+        config_dir.join("wt.toml"),
+        r#"post-start-command = """
+echo 'first line' > multiline.txt
+echo 'second line' >> multiline.txt
+echo 'third line' >> multiline.txt
+"""
+"#,
+    )
+    .expect("Failed to write config");
+
+    repo.commit("Add multiline command with actual newlines");
+
+    // Pre-approve the command
+    let multiline_cmd = "echo 'first line' > multiline.txt
+echo 'second line' >> multiline.txt
+echo 'third line' >> multiline.txt
+";
+    fs::write(
+        repo.test_config_path(),
+        format!(
+            r#"worktree-path = "../{{main-worktree}}.{{branch}}"
+
+[[approved-commands]]
+project = "test-repo"
+command = """
+{}"""
+"#,
+            multiline_cmd
+        ),
+    )
+    .expect("Failed to write user config");
+
+    snapshot_switch(
+        "post_start_multiline_with_newlines",
+        &repo,
+        &["--create", "feature"],
+    );
+
+    // Wait for background command
+    thread::sleep(SLEEP_FAST_COMMAND);
+
+    // Verify the multiline command worked correctly
+    let worktree_path = repo.root_path().parent().unwrap().join("test-repo.feature");
+    let output_file = worktree_path.join("multiline.txt");
+    assert!(
+        output_file.exists(),
+        "Multiline command should create output file"
+    );
+
+    let contents = fs::read_to_string(&output_file).expect("Failed to read multiline.txt");
+    assert_snapshot!(contents, @r"
+    first line
+    second line
+    third line
+    ");
+}
+
+#[test]
+fn test_post_create_multiline_with_control_structures() {
+    let repo = TestRepo::new();
+    repo.commit("Initial commit");
+
+    // Test multiline command with if-else control structure
+    let config_dir = repo.root_path().join(".config");
+    fs::create_dir_all(&config_dir).expect("Failed to create .config dir");
+    fs::write(
+        config_dir.join("wt.toml"),
+        r#"post-create-command = """
+if [ ! -f test.txt ]; then
+  echo 'File does not exist' > result.txt
+else
+  echo 'File exists' > result.txt
+fi
+"""
+"#,
+    )
+    .expect("Failed to write config");
+
+    repo.commit("Add multiline control structure");
+
+    // Pre-approve the command
+    let multiline_cmd = "if [ ! -f test.txt ]; then
+  echo 'File does not exist' > result.txt
+else
+  echo 'File exists' > result.txt
+fi
+";
+    fs::write(
+        repo.test_config_path(),
+        format!(
+            r#"worktree-path = "../{{main-worktree}}.{{branch}}"
+
+[[approved-commands]]
+project = "test-repo"
+command = """
+{}"""
+"#,
+            multiline_cmd
+        ),
+    )
+    .expect("Failed to write user config");
+
+    snapshot_switch(
+        "post_create_multiline_control_structure",
+        &repo,
+        &["--create", "feature"],
+    );
+
+    // Verify the command executed correctly
+    let worktree_path = repo.root_path().parent().unwrap().join("test-repo.feature");
+    let result_file = worktree_path.join("result.txt");
+    assert!(
+        result_file.exists(),
+        "Control structure command should create result file"
+    );
+
+    let contents = fs::read_to_string(&result_file).expect("Failed to read result.txt");
+    assert_snapshot!(contents, @"File does not exist");
+}

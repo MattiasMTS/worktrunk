@@ -137,7 +137,9 @@ pub(crate) fn execute_streaming(
     use std::process::Command;
 
     let command_to_run = if redirect_stdout_to_stderr {
-        format!("{{ {}; }} 1>&2", command)
+        // Use newline instead of semicolon before closing brace to support
+        // multi-line commands with control structures (if/fi, for/done, etc.)
+        format!("{{ {}\n}} 1>&2", command)
     } else {
         command.to_string()
     };
