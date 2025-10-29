@@ -21,7 +21,7 @@ echo '✓ CoW seeded target/'
 # Post-merge commands
 # These run in the main worktree after successful merge and push
 # Available template variables: {repo}, {branch}, {worktree}, {repo_root}, {target}
-post-merge-command = "/tmp/streaming-test.sh"
+post-merge-command = "cargo install --path ."
 
 # Pre-merge commands
 # These run sequentially before merging to main
