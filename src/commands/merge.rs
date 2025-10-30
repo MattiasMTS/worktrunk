@@ -244,14 +244,9 @@ fn commit_with_generated_message(
         .to_string();
 
     use worktrunk::styling::{GREEN, SUCCESS_EMOJI};
-    let success_msg = match stats_parts.is_empty() {
-        true => format!("{SUCCESS_EMOJI} {GREEN}Committed changes @ {commit_hash}{GREEN:#}"),
-        false => format!(
-            "{SUCCESS_EMOJI} {GREEN}Committed changes ({}) @ {commit_hash}{GREEN:#}",
-            stats_parts.join(", ")
-        ),
-    };
-    crate::output::success(success_msg)?;
+    crate::output::success(format!(
+        "{SUCCESS_EMOJI} {GREEN}Committed changes @ {commit_hash}{GREEN:#}"
+    ))?;
 
     Ok(())
 }
@@ -266,10 +261,7 @@ fn handle_commit_changes(
     repo.run_command(&["add", "-A"])
         .git_context("Failed to stage changes")?;
 
-    commit_with_generated_message(
-        "Committing uncommitted changes...",
-        commit_generation_config,
-    )
+    commit_with_generated_message("Committing changes...", commit_generation_config)
 }
 
 fn handle_squash(
@@ -299,7 +291,7 @@ fn handle_squash(
 
     if commit_count == 0 && has_staged {
         // Just staged changes, no commits - commit them directly (no squashing needed)
-        commit_with_generated_message("Committing staged changes...", commit_generation_config)?;
+        commit_with_generated_message("Committing changes...", commit_generation_config)?;
         return Ok(None);
     }
 
@@ -315,7 +307,7 @@ fn handle_squash(
     // Get diff stats early for display in progress message
     let range = format!("{}..HEAD", merge_base);
     let diff_shortstat = repo
-        .run_command(&["diff", "--shortstat", &format!("{}..HEAD", merge_base)])
+        .run_command(&["diff", "--shortstat", &range])
         .unwrap_or_default();
     let stats = parse_diff_shortstat(&diff_shortstat);
     let stats_parts = stats.format_summary();
@@ -374,16 +366,9 @@ fn handle_squash(
 
     // Show success immediately after completing the squash
     use worktrunk::styling::{GREEN, SUCCESS_EMOJI};
-    let success_msg = match stats_parts.is_empty() {
-        true => format!(
-            "{SUCCESS_EMOJI} {GREEN}Squashed {commit_count} commits into 1 @ {commit_hash}{GREEN:#}"
-        ),
-        false => format!(
-            "{SUCCESS_EMOJI} {GREEN}Squashed {commit_count} commits into 1 ({}) @ {commit_hash}{GREEN:#}",
-            stats_parts.join(", ")
-        ),
-    };
-    crate::output::success(success_msg)?;
+    crate::output::success(format!(
+        "{SUCCESS_EMOJI} {GREEN}Squashed {commit_count} commits into 1 @ {commit_hash}{GREEN:#}"
+    ))?;
 
     Ok(Some(commit_count))
 }

@@ -98,6 +98,39 @@ Removed worktree for bugfix
 
 **Why this matters:** Immediate feedback builds confidence, failed operations are obvious, Ctrl+C interrupts don't leave uncertainty, matches how users think about sequential operations.
 
+### Information Display: Show Once, Not Twice
+
+**Core Principle: Display detailed information in progress messages, not in success messages.**
+
+When operations have both progress and success messages:
+- **Progress message**: Include detailed stats/context (what's about to happen)
+- **Success message**: Minimal confirmation with reference info (hash, path)
+
+This prevents redundant noise while giving users information when they need it most (before the operation runs).
+
+**Good pattern:**
+```rust
+// Progress: detailed stats upfront
+output::progress("🔄 Committing changes... (3 files, +45, -12)")?;
+perform_commit()?;
+// Success: minimal confirmation with reference
+output::success("✅ Committed changes @ a1b2c3d")?;
+```
+
+**Bad pattern:**
+```rust
+// Redundant - same stats shown twice
+output::progress("🔄 Committing changes... (3 files, +45, -12)")?;
+perform_commit()?;
+output::success("✅ Committed changes (3 files, +45, -12) @ a1b2c3d")?;  // ❌ Too noisy
+```
+
+**Rationale:**
+- Users read progress messages to understand what's happening
+- Success messages just confirm completion - stats already seen
+- Commit hashes/paths in success messages enable easy reference
+- Reduces visual noise and line count in output
+
 ### Semantic Style Constants
 
 **Style constants defined in `src/styling.rs`:**
