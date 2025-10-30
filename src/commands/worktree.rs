@@ -430,7 +430,8 @@ pub fn execute_post_create_commands(
 
     // Execute each command sequentially
     for prepared in commands {
-        crate::output::progress(format!("🔄 {CYAN}Executing (post-create):{CYAN:#}"))?;
+        let label = crate::commands::format_command_label("post-create", prepared.name.as_deref());
+        crate::output::progress(format!("🔄 {CYAN}{label}{CYAN:#}"))?;
         crate::output::progress(format_bash_with_gutter(&prepared.expanded, ""))?;
 
         if let Err(e) = execute_command_in_worktree(worktree_path, &prepared.expanded) {
@@ -488,7 +489,8 @@ fn spawn_post_start_commands(
 
     // Spawn each command as a detached background process
     for prepared in commands {
-        crate::output::progress(format!("🔄 {CYAN}Starting (background):{CYAN:#}"))?;
+        let label = crate::commands::format_command_label("post-start", prepared.name.as_deref());
+        crate::output::progress(format!("🔄 {CYAN}{label}{CYAN:#}"))?;
         crate::output::progress(format_bash_with_gutter(&prepared.expanded, ""))?;
 
         let name = prepared.name.as_deref().unwrap_or("cmd");
@@ -553,7 +555,8 @@ pub fn execute_post_start_commands_sequential(
 
     // Execute sequentially for testing
     for prepared in commands {
-        crate::output::progress(format!("🔄 {CYAN}Executing (post-start):{CYAN:#}"))?;
+        let label = crate::commands::format_command_label("post-start", prepared.name.as_deref());
+        crate::output::progress(format!("🔄 {CYAN}{label}{CYAN:#}"))?;
         crate::output::progress(format_bash_with_gutter(&prepared.expanded, ""))?;
 
         if let Err(e) = execute_command_in_worktree(worktree_path, &prepared.expanded) {

@@ -432,12 +432,8 @@ pub fn run_pre_merge_commands(
         },
     )?;
     for prepared in commands {
-        let header = if let Some(name) = &prepared.name {
-            format!("🔄 {CYAN}Running pre-merge command {CYAN_BOLD}{name}{CYAN_BOLD:#}:{CYAN:#}")
-        } else {
-            format!("🔄 {CYAN}Running pre-merge command:{CYAN:#}")
-        };
-        crate::output::progress(header)?;
+        let label = crate::commands::format_command_label("pre-merge", prepared.name.as_deref());
+        crate::output::progress(format!("🔄 {CYAN}{label}{CYAN:#}"))?;
         crate::output::progress(format_bash_with_gutter(&prepared.expanded, ""))?;
 
         if let Err(e) = execute_command_in_worktree(worktree_path, &prepared.expanded) {
@@ -502,12 +498,8 @@ pub fn execute_post_merge_commands(
 
     // Execute each command sequentially in the main worktree
     for prepared in commands {
-        let header = if let Some(name) = &prepared.name {
-            format!("🔄 {CYAN}Running post-merge command {CYAN_BOLD}{name}{CYAN_BOLD:#}:{CYAN:#}")
-        } else {
-            format!("🔄 {CYAN}Running post-merge command:{CYAN:#}")
-        };
-        crate::output::progress(header)?;
+        let label = crate::commands::format_command_label("post-merge", prepared.name.as_deref());
+        crate::output::progress(format!("🔄 {CYAN}{label}{CYAN:#}"))?;
         crate::output::progress(format_bash_with_gutter(&prepared.expanded, ""))?;
 
         if let Err(e) = execute_command_in_worktree(main_worktree_path, &prepared.expanded) {

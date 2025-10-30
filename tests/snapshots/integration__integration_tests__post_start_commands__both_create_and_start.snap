@@ -17,15 +17,15 @@ info:
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpq2cN92/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpo60Axs/test-config.toml
 ---
 success: true
 exit_code: 0
 ----- stdout -----
-🔄 [36mExecuting (post-create):[0m
+🔄 [36mRunning post-create:[0m
 [40m [0m [1m[34mecho [32m'Setup done' [36m> setup.txt
 
-🔄 [36mStarting (background):[0m
+🔄 [36mRunning post-start: server[0m
 [40m [0m [1m[34msleep 0.5 [36m&& [1m[34mecho [32m'Server running' [36m> server.txt
 
 ✅ [32mCreated new worktree for [1m[32mfeature[0m at [REPO].feature[0m

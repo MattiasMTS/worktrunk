@@ -21,3 +21,15 @@ pub use worktree::{handle_push, handle_remove, handle_switch};
 
 // Re-export Shell from the canonical location
 pub use worktrunk::shell::Shell;
+
+/// Format command execution label with optional command name.
+///
+/// Examples:
+/// - `format_command_label("post-create", Some("install"))` → `"Running post-create: install"`
+/// - `format_command_label("post-create", None)` → `"Running post-create:"`
+pub fn format_command_label(command_type: &str, name: Option<&str>) -> String {
+    match name {
+        Some(name) => format!("Running {command_type}: {name}"),
+        None => format!("Running {command_type}:"),
+    }
+}
