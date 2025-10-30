@@ -3,6 +3,8 @@ use std::process::{self, Stdio};
 use worktrunk::config::CommitGenerationConfig;
 use worktrunk::git::{GitError, Repository};
 
+use minijinja::Environment;
+
 /// Default template for commit message prompts
 const DEFAULT_TEMPLATE: &str = r#"Format
 - First line: <50 chars, present tense, describes WHAT and WHY (not HOW).
@@ -24,14 +26,31 @@ The following is the context for your task:
 ---
 <git-diff>
 ```
-{git-diff}
+{{ git_diff }}
 ```
 </git-diff>
 
 <git-info>
-  <current-branch>{branch}</current-branch>
-{recent-commits}
+  <current-branch>{{ branch }}</current-branch>
+{% if recent_commits %}
+  <previous-commit-message-titles>
+{% for commit in recent_commits %}
+    <previous-commit-message-title>{{ commit }}</previous-commit-message-title>
+{% endfor %}
+  </previous-commit-message-titles>
+{% endif %}
 </git-info>
+"#;
+
+/// Default template for squash commit message prompts
+const DEFAULT_SQUASH_TEMPLATE: &str = r#"Generate a conventional commit message (feat/fix/docs/style/refactor) that combines these changes into one cohesive message. Output only the commit message without any explanation.
+
+Squashing commits on current branch since branching from {{ target_branch }}
+
+Commits being combined:
+{% for commit in commits %}
+- {{ commit }}
+{% endfor %}
 "#;
 
 /// Execute an LLM command with the given prompt via stdin.
@@ -82,25 +101,7 @@ fn execute_llm_command(
     Ok(message)
 }
 
-/// Format recent commits for template expansion
-fn format_recent_commits(commits: Option<&Vec<String>>) -> String {
-    match commits {
-        Some(commits) if !commits.is_empty() => {
-            let mut result = String::from("  <previous-commit-message-titles>\n");
-            for commit in commits {
-                result.push_str(&format!(
-                    "    <previous-commit-message-title>{}</previous-commit-message-title>\n",
-                    commit
-                ));
-            }
-            result.push_str("  </previous-commit-message-titles>");
-            result
-        }
-        _ => String::new(),
-    }
-}
-
-/// Build the commit prompt from config template or default
+/// Build the commit prompt from config template or default using minijinja
 fn build_commit_prompt(
     config: &CommitGenerationConfig,
     diff: &str,
@@ -132,19 +133,69 @@ fn build_commit_prompt(
         return Err("Template is empty".into());
     }
 
-    // Format recent commits
-    let recent_commits_formatted = format_recent_commits(recent_commits);
+    // Render template with minijinja
+    let env = Environment::new();
+    let tmpl = env.template_from_str(&template)?;
 
-    // Expand variables
-    let expanded = worktrunk::config::expand_commit_template(
-        &template,
-        diff,
-        branch,
-        &recent_commits_formatted,
-        repo_name,
-    );
+    let rendered = tmpl.render(minijinja::context! {
+        git_diff => diff,
+        branch => branch,
+        recent_commits => recent_commits.unwrap_or(&vec![]),
+        repo => repo_name,
+    })?;
 
-    Ok(expanded)
+    Ok(rendered)
+}
+
+/// Build the squash commit prompt from config template or default using minijinja
+fn build_squash_prompt(
+    config: &CommitGenerationConfig,
+    target_branch: &str,
+    commits: &[String],
+    current_branch: &str,
+    repo_name: &str,
+) -> Result<String, Box<dyn std::error::Error>> {
+    // Get template source
+    let template = match (&config.squash_template, &config.squash_template_file) {
+        (Some(inline), None) => inline.clone(),
+        (None, Some(path)) => {
+            let expanded_path = worktrunk::config::expand_tilde(path);
+            std::fs::read_to_string(&expanded_path).map_err(|e| {
+                format!(
+                    "Failed to read squash-template-file '{}': {}",
+                    expanded_path.display(),
+                    e
+                )
+            })?
+        }
+        (None, None) => DEFAULT_SQUASH_TEMPLATE.to_string(),
+        (Some(_), Some(_)) => {
+            unreachable!(
+                "Config validation should prevent both squash-template and squash-template-file"
+            )
+        }
+    };
+
+    // Validate non-empty
+    if template.trim().is_empty() {
+        return Err("Squash template is empty".into());
+    }
+
+    // Render template with minijinja
+    let env = Environment::new();
+    let tmpl = env.template_from_str(&template)?;
+
+    // Reverse commits so they're in chronological order
+    let commits_reversed: Vec<&String> = commits.iter().rev().collect();
+
+    let rendered = tmpl.render(minijinja::context! {
+        target_branch => target_branch,
+        commits => commits_reversed,
+        branch => current_branch,
+        repo => repo_name,
+    })?;
+
+    Ok(rendered)
 }
 
 pub fn generate_commit_message(
@@ -219,6 +270,8 @@ fn try_generate_commit_message(
 pub fn generate_squash_message(
     target_branch: &str,
     subjects: &[String],
+    current_branch: &str,
+    repo_name: &str,
     commit_generation_config: &CommitGenerationConfig,
 ) -> Result<String, Box<dyn std::error::Error>> {
     // Check if commit generation is configured (non-empty command)
@@ -226,12 +279,14 @@ pub fn generate_squash_message(
         && !command.trim().is_empty()
     {
         // Commit generation is explicitly configured - fail if it doesn't work
-        return try_generate_llm_message(
+        let prompt = build_squash_prompt(
+            commit_generation_config,
             target_branch,
             subjects,
-            command,
-            &commit_generation_config.args,
-        );
+            current_branch,
+            repo_name,
+        )?;
+        return execute_llm_command(command, &commit_generation_config.args, &prompt);
     }
 
     // Fallback: deterministic commit message (only when not configured)
@@ -244,24 +299,201 @@ pub fn generate_squash_message(
     Ok(commit_message)
 }
 
-fn try_generate_llm_message(
-    target_branch: &str,
-    subjects: &[String],
-    command: &str,
-    args: &[String],
-) -> Result<String, Box<dyn std::error::Error>> {
-    // Build context prompt
-    let mut context = format!(
-        "Squashing commits on current branch since branching from {}\n\n",
-        target_branch
-    );
-    context.push_str("Commits being combined:\n");
-    for subject in subjects.iter().rev() {
-        context.push_str(&format!("- {}\n", subject));
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_build_commit_prompt_with_default_template() {
+        let config = CommitGenerationConfig::default();
+        let result = build_commit_prompt(&config, "diff content", "main", None, "myrepo");
+        assert!(result.is_ok());
+        let prompt = result.unwrap();
+        assert!(prompt.contains("diff content"));
+        assert!(prompt.contains("main"));
+        // Default template doesn't directly show repo name in output
     }
 
-    let prompt = "Generate a conventional commit message (feat/fix/docs/style/refactor) that combines these changes into one cohesive message. Output only the commit message without any explanation.";
-    let full_prompt = format!("{}\n\n{}", context, prompt);
+    #[test]
+    fn test_build_commit_prompt_with_recent_commits() {
+        let config = CommitGenerationConfig::default();
+        let commits = vec!["feat: add feature".to_string(), "fix: bug".to_string()];
+        let result = build_commit_prompt(&config, "diff", "main", Some(&commits), "repo");
+        assert!(result.is_ok());
+        let prompt = result.unwrap();
+        assert!(prompt.contains("feat: add feature"));
+        assert!(prompt.contains("fix: bug"));
+        assert!(prompt.contains("<previous-commit-message-titles>"));
+    }
 
-    execute_llm_command(command, args, &full_prompt)
+    #[test]
+    fn test_build_commit_prompt_empty_recent_commits() {
+        let config = CommitGenerationConfig::default();
+        let commits = vec![];
+        let result = build_commit_prompt(&config, "diff", "main", Some(&commits), "repo");
+        assert!(result.is_ok());
+        // Should not render the recent commits section if empty
+        let prompt = result.unwrap();
+        assert!(!prompt.contains("<previous-commit-message-titles>"));
+    }
+
+    #[test]
+    fn test_build_commit_prompt_with_custom_template() {
+        let config = CommitGenerationConfig {
+            command: None,
+            args: vec![],
+            template: Some("Branch: {{ branch }}\nDiff: {{ git_diff }}".to_string()),
+            template_file: None,
+            squash_template: None,
+            squash_template_file: None,
+        };
+        let result = build_commit_prompt(&config, "my diff", "feature", None, "repo");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "Branch: feature\nDiff: my diff");
+    }
+
+    #[test]
+    fn test_build_commit_prompt_malformed_jinja() {
+        let config = CommitGenerationConfig {
+            command: None,
+            args: vec![],
+            template: Some("{{ unclosed".to_string()),
+            template_file: None,
+            squash_template: None,
+            squash_template_file: None,
+        };
+        let result = build_commit_prompt(&config, "diff", "main", None, "repo");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_build_commit_prompt_empty_template() {
+        let config = CommitGenerationConfig {
+            command: None,
+            args: vec![],
+            template: Some("   ".to_string()),
+            template_file: None,
+            squash_template: None,
+            squash_template_file: None,
+        };
+        let result = build_commit_prompt(&config, "diff", "main", None, "repo");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().to_string(), "Template is empty");
+    }
+
+    #[test]
+    fn test_build_commit_prompt_with_all_variables() {
+        let config = CommitGenerationConfig {
+            command: None,
+            args: vec![],
+            template: Some(
+                "Repo: {{ repo }}\nBranch: {{ branch }}\nDiff: {{ git_diff }}\n{% for c in recent_commits %}{{ c }}\n{% endfor %}"
+                    .to_string(),
+            ),
+            template_file: None,
+            squash_template: None,
+            squash_template_file: None,
+        };
+        let commits = vec!["commit1".to_string(), "commit2".to_string()];
+        let result = build_commit_prompt(&config, "my diff", "feature", Some(&commits), "myrepo");
+        assert!(result.is_ok());
+        let prompt = result.unwrap();
+        assert_eq!(
+            prompt,
+            "Repo: myrepo\nBranch: feature\nDiff: my diff\ncommit1\ncommit2\n"
+        );
+    }
+
+    #[test]
+    fn test_build_squash_prompt_with_default_template() {
+        let config = CommitGenerationConfig::default();
+        let commits = vec!["feat: A".to_string(), "fix: B".to_string()];
+        let result = build_squash_prompt(&config, "main", &commits, "feature", "repo");
+        assert!(result.is_ok());
+        let prompt = result.unwrap();
+        // Commits should be reversed (chronological order: B first, then A)
+        assert!(prompt.contains("fix: B"));
+        assert!(prompt.contains("feat: A"));
+        assert!(prompt.contains("main"));
+    }
+
+    #[test]
+    fn test_build_squash_prompt_with_custom_template() {
+        let config = CommitGenerationConfig {
+            command: None,
+            args: vec![],
+            template: None,
+            template_file: None,
+            squash_template: Some(
+                "Target: {{ target_branch }}\n{% for c in commits %}{{ c }}\n{% endfor %}"
+                    .to_string(),
+            ),
+            squash_template_file: None,
+        };
+        let commits = vec!["A".to_string(), "B".to_string()];
+        let result = build_squash_prompt(&config, "main", &commits, "feature", "repo");
+        assert!(result.is_ok());
+        // Commits are reversed, so chronological order is B, A
+        assert_eq!(result.unwrap(), "Target: main\nB\nA\n");
+    }
+
+    #[test]
+    fn test_build_squash_prompt_empty_commits() {
+        let config = CommitGenerationConfig::default();
+        let commits = vec![];
+        let result = build_squash_prompt(&config, "main", &commits, "feature", "repo");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_build_squash_prompt_malformed_jinja() {
+        let config = CommitGenerationConfig {
+            command: None,
+            args: vec![],
+            template: None,
+            template_file: None,
+            squash_template: Some("{% for x in commits %}{{ x }".to_string()),
+            squash_template_file: None,
+        };
+        let result = build_squash_prompt(&config, "main", &[], "feature", "repo");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_build_squash_prompt_empty_template() {
+        let config = CommitGenerationConfig {
+            command: None,
+            args: vec![],
+            template: None,
+            template_file: None,
+            squash_template: Some("  \n  ".to_string()),
+            squash_template_file: None,
+        };
+        let result = build_squash_prompt(&config, "main", &[], "feature", "repo");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().to_string(), "Squash template is empty");
+    }
+
+    #[test]
+    fn test_build_squash_prompt_with_all_variables() {
+        let config = CommitGenerationConfig {
+            command: None,
+            args: vec![],
+            template: None,
+            template_file: None,
+            squash_template: Some(
+                "Repo: {{ repo }}\nBranch: {{ branch }}\nTarget: {{ target_branch }}\n{% for c in commits %}{{ c }}\n{% endfor %}"
+                    .to_string(),
+            ),
+            squash_template_file: None,
+        };
+        let commits = vec!["A".to_string(), "B".to_string()];
+        let result = build_squash_prompt(&config, "main", &commits, "feature", "myrepo");
+        assert!(result.is_ok());
+        let prompt = result.unwrap();
+        assert_eq!(
+            prompt,
+            "Repo: myrepo\nBranch: feature\nTarget: main\nB\nA\n"
+        );
+    }
 }

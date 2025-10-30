@@ -30,8 +30,8 @@ worktree-path = "../{main-worktree}.{branch}"
 # command = "aichat"
 # args = ["-m", "claude:claude-haiku-4.5"]
 
-# Optional: Custom prompt template (inline)
-# Available variables: {git-diff}, {branch}, {recent-commits}, {repo}
+# Optional: Custom prompt template (inline) - Uses Jinja2 syntax
+# Available variables: {{ git_diff }}, {{ branch }}, {{ recent_commits }}, {{ repo }}
 # If not specified, uses the default template shown below:
 # template = """
 # Format
@@ -54,19 +54,43 @@ worktree-path = "../{main-worktree}.{branch}"
 # ---
 # <git-diff>
 # ```
-# {git-diff}
+# {{ git_diff }}
 # ```
 # </git-diff>
 #
 # <git-info>
-#   <current-branch>{branch}</current-branch>
-# {recent-commits}
+#   <current-branch>{{ branch }}</current-branch>
+# {% if recent_commits %}
+#   <previous-commit-message-titles>
+# {% for commit in recent_commits %}
+#     <previous-commit-message-title>{{ commit }}</previous-commit-message-title>
+# {% endfor %}
+#   </previous-commit-message-titles>
+# {% endif %}
 # </git-info>
 # """
 
 # Optional: Load template from file (mutually exclusive with 'template')
 # Supports ~ expansion: ~/.config/worktrunk/commit-template.txt
 # template-file = "~/.config/worktrunk/commit-template.txt"
+
+# Optional: Custom squash commit message template (inline) - Uses Jinja2 syntax
+# Available variables: {{ commits }}, {{ target_branch }}, {{ branch }}, {{ repo }}
+# If not specified, uses the default template:
+# squash-template = """
+# Generate a conventional commit message (feat/fix/docs/style/refactor) that combines these changes into one cohesive message. Output only the commit message without any explanation.
+#
+# Squashing commits on current branch since branching from {{ target_branch }}
+#
+# Commits being combined:
+# {% for commit in commits %}
+# - {{ commit }}
+# {% endfor %}
+# """
+
+# Optional: Load squash template from file (mutually exclusive with 'squash-template')
+# Supports ~ expansion: ~/.config/worktrunk/squash-template.txt
+# squash-template-file = "~/.config/worktrunk/squash-template.txt"
 
 # Approved Commands
 # Commands approved for automatic execution after switching worktrees

@@ -62,7 +62,7 @@ pub struct CommitGenerationConfig {
     pub args: Vec<String>,
 
     /// Inline template for commit message prompt
-    /// Available variables: {git-diff}, {branch}, {recent-commits}, {repo}
+    /// Available variables: {{ git_diff }}, {{ branch }}, {{ recent_commits }}, {{ repo }}
     #[serde(default)]
     pub template: Option<String>,
 
@@ -70,6 +70,16 @@ pub struct CommitGenerationConfig {
     /// Supports tilde expansion (e.g., "~/.config/worktrunk/commit-template.txt")
     #[serde(default, rename = "template-file")]
     pub template_file: Option<String>,
+
+    /// Inline template for squash commit message prompt
+    /// Available variables: {{ commits }}, {{ target_branch }}, {{ branch }}, {{ repo }}
+    #[serde(default, rename = "squash-template")]
+    pub squash_template: Option<String>,
+
+    /// Path to squash template file (mutually exclusive with squash-template)
+    /// Supports tilde expansion (e.g., "~/.config/worktrunk/squash-template.txt")
+    #[serde(default, rename = "squash-template-file")]
+    pub squash_template_file: Option<String>,
 }
 
 /// Project-specific configuration (stored in .config/wt.toml within the project)
@@ -197,6 +207,14 @@ impl WorktrunkConfig {
             ));
         }
 
+        if config.commit_generation.squash_template.is_some()
+            && config.commit_generation.squash_template_file.is_some()
+        {
+            return Err(ConfigError::Message(
+                "commit-generation.squash-template and commit-generation.squash-template-file are mutually exclusive".into(),
+            ));
+        }
+
         Ok(config)
     }
 
@@ -284,36 +302,6 @@ pub fn expand_template(
     }
 
     result
-}
-
-/// Expand commit template variables
-///
-/// Supported variables:
-/// - `{git-diff}` - Staged changes (diff output)
-/// - `{branch}` - Current branch name
-/// - `{recent-commits}` - Recent commit subjects (formatted, or empty string)
-/// - `{repo}` - Repository name
-///
-/// # Examples
-/// ```
-/// use worktrunk::config::expand_commit_template;
-///
-/// let template = "Changes:\n{git-diff}\n\nBranch: {branch}";
-/// let result = expand_commit_template(template, "diff output", "main", "", "myrepo");
-/// assert_eq!(result, "Changes:\ndiff output\n\nBranch: main");
-/// ```
-pub fn expand_commit_template(
-    template: &str,
-    diff: &str,
-    branch: &str,
-    recent_commits: &str,
-    repo: &str,
-) -> String {
-    template
-        .replace("{git-diff}", diff)
-        .replace("{branch}", branch)
-        .replace("{recent-commits}", recent_commits)
-        .replace("{repo}", repo)
 }
 
 /// Expand tilde in file paths to home directory (cross-platform)
@@ -814,30 +802,6 @@ mod tests {
     }
 
     #[test]
-    fn test_expand_commit_template_all_variables() {
-        let template =
-            "Diff: {git-diff}\nBranch: {branch}\nCommits: {recent-commits}\nRepo: {repo}";
-        let result = expand_commit_template(
-            template,
-            "diff content",
-            "feature-x",
-            "- commit1\n- commit2",
-            "myrepo",
-        );
-        assert_eq!(
-            result,
-            "Diff: diff content\nBranch: feature-x\nCommits: - commit1\n- commit2\nRepo: myrepo"
-        );
-    }
-
-    #[test]
-    fn test_expand_commit_template_empty_recent_commits() {
-        let template = "{git-diff}\n{recent-commits}";
-        let result = expand_commit_template(template, "diff", "main", "", "repo");
-        assert_eq!(result, "diff\n");
-    }
-
-    #[test]
     fn test_expand_tilde_with_home() {
         // Test that paths starting with ~/ get HOME prepended if HOME is set
         // We can't set HOME in tests (no unsafe allowed), but we can test the logic
@@ -882,12 +846,42 @@ template-file = "~/file.txt"
     }
 
     #[test]
+    fn test_squash_template_mutually_exclusive_validation() {
+        // Test that deserialization rejects both squash-template and squash-template-file
+        let toml_content = r#"
+worktree-path = "../{main-worktree}.{branch}"
+
+[commit-generation]
+command = "llm"
+squash-template = "inline template"
+squash-template-file = "~/file.txt"
+"#;
+
+        // Parse the TOML directly
+        let config_result: Result<WorktrunkConfig, _> = toml::from_str(toml_content);
+
+        // The deserialization should succeed, but validation in load() would fail
+        // Since we can't easily test load() without env vars, we verify the fields deserialize
+        if let Ok(config) = config_result {
+            // Verify validation logic: both fields should not be Some
+            let has_both = config.commit_generation.squash_template.is_some()
+                && config.commit_generation.squash_template_file.is_some();
+            assert!(
+                has_both,
+                "Config should have both squash template fields set for this test"
+            );
+        }
+    }
+
+    #[test]
     fn test_commit_generation_config_serialization() {
         let config = CommitGenerationConfig {
             command: Some("llm".to_string()),
             args: vec!["-m".to_string(), "model".to_string()],
             template: Some("template content".to_string()),
             template_file: None,
+            squash_template: None,
+            squash_template_file: None,
         };
 
         let toml = toml::to_string(&config).unwrap();

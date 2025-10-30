@@ -298,9 +298,22 @@ fn handle_squash(
         "🔄 {CYAN}Generating squash commit message...{CYAN:#}"
     ))?;
 
-    let commit_message =
-        crate::llm::generate_squash_message(target_branch, &subjects, commit_generation_config)
-            .git_context("Failed to generate commit message")?;
+    // Get current branch and repo name for template variables
+    let current_branch = repo.current_branch()?.unwrap_or_else(|| "HEAD".to_string());
+    let repo_root = repo.worktree_root()?;
+    let repo_name = repo_root
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("repo");
+
+    let commit_message = crate::llm::generate_squash_message(
+        target_branch,
+        &subjects,
+        &current_branch,
+        repo_name,
+        commit_generation_config,
+    )
+    .git_context("Failed to generate commit message")?;
 
     // Display the generated commit message
     let formatted_message = format_commit_message_for_display(&commit_message);
