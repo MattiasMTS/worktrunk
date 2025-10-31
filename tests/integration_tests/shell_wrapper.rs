@@ -329,6 +329,18 @@ mod tests {
     // Note: Zsh tests run in isolated mode (--no-rcs, ZDOTDIR=/dev/null) to prevent
     // user startup files from touching /dev/tty, which would cause SIGTTIN/TTOU/TSTP
     // signals. This isolation ensures tests are deterministic across all environments.
+    //
+    // SNAPSHOT CONSOLIDATION:
+    // Tests use `insta::allow_duplicates!` to share a single snapshot across all shells
+    // when output is deterministic and identical. This reduces snapshot count from 3×N to N.
+    //
+    // Trade-off: If future changes introduce shell-specific output differences, all three
+    // shells will fail with "doesn't match snapshot" rather than showing which specific
+    // shell differs. For tests with non-deterministic output (PTY buffering causes varying
+    // order), we keep shell-specific snapshots.
+    //
+    // TODO: Consider adding a test assertion that compares bash/zsh/fish outputs are
+    // byte-identical before the snapshot check, so we can identify which shell diverged.
 
     #[rstest]
     #[case("bash")]
@@ -358,11 +370,10 @@ mod tests {
             output.combined
         );
 
-        // Snapshot for shell-specific formatting
-        assert_snapshot!(
-            format!("command_failure_{}", shell),
-            output.normalized().as_ref()
-        );
+        // Consolidated snapshot - output should be identical across all shells
+        insta::allow_duplicates! {
+            assert_snapshot!("command_failure", output.normalized().as_ref());
+        }
     }
 
     #[rstest]
@@ -385,11 +396,10 @@ mod tests {
             shell
         );
 
-        // Shell-specific snapshot
-        assert_snapshot!(
-            format!("switch_create_{}", shell),
-            output.normalized().as_ref()
-        );
+        // Consolidated snapshot - output should be identical across all shells
+        insta::allow_duplicates! {
+            assert_snapshot!("switch_create", output.normalized().as_ref());
+        }
     }
 
     #[rstest]
@@ -409,8 +419,10 @@ mod tests {
         assert_eq!(output.exit_code, 0, "{}: Command should succeed", shell);
         output.assert_no_directive_leaks();
 
-        // Shell-specific snapshot
-        assert_snapshot!(format!("remove_{}", shell), output.normalized().as_ref());
+        // Consolidated snapshot - output should be identical across all shells
+        insta::allow_duplicates! {
+            assert_snapshot!("remove", output.normalized().as_ref());
+        }
     }
 
     #[rstest]
@@ -430,8 +442,10 @@ mod tests {
         assert_eq!(output.exit_code, 0, "{}: Command should succeed", shell);
         output.assert_no_directive_leaks();
 
-        // Shell-specific snapshot
-        assert_snapshot!(format!("merge_{}", shell), output.normalized().as_ref());
+        // Consolidated snapshot - output should be identical across all shells
+        insta::allow_duplicates! {
+            assert_snapshot!("merge", output.normalized().as_ref());
+        }
     }
 
     #[rstest]
@@ -466,11 +480,10 @@ mod tests {
             shell
         );
 
-        // Shell-specific snapshot
-        assert_snapshot!(
-            format!("switch_with_execute_{}", shell),
-            output.normalized().as_ref()
-        );
+        // Consolidated snapshot - output should be identical across all shells
+        insta::allow_duplicates! {
+            assert_snapshot!("switch_with_execute", output.normalized().as_ref());
+        }
     }
 
     /// Test switch --create with post-create-command (blocking) and post-start-command (background)
@@ -534,6 +547,7 @@ command = "echo 'Watching for file changes'"
         assert_eq!(output.exit_code, 0, "{}: Command should succeed", shell);
         output.assert_no_directive_leaks();
 
+        // Shell-specific snapshot - output ordering varies due to PTY buffering
         assert_snapshot!(
             format!("switch_with_hooks_{}", shell),
             output.normalized().as_ref()
@@ -619,6 +633,7 @@ command = "echo '✓ All 47 tests passed in 2.3s'"
         assert_eq!(output.exit_code, 0, "{}: Merge should succeed", shell);
         output.assert_no_directive_leaks();
 
+        // Shell-specific snapshot - output ordering varies due to PTY buffering
         assert_snapshot!(
             format!("merge_with_pre_merge_success_{}", shell),
             output.normalized().as_ref()
@@ -698,6 +713,7 @@ command = "echo '✗ Test suite failed: 3 tests failing' && exit 1"
 
         output.assert_no_directive_leaks();
 
+        // Shell-specific snapshot - output ordering varies due to PTY buffering
         assert_snapshot!(
             format!("merge_with_pre_merge_failure_{}", shell),
             output.normalized().as_ref()

@@ -36,24 +36,7 @@ pub fn handle_merge(
     // Load config for LLM integration
     let config = WorktrunkConfig::load().git_context("Failed to load config")?;
 
-    // Run pre-merge checks unless --no-hooks was specified
-    // Do this BEFORE committing so we fail fast if checks won't pass
-    if !no_hooks && let Ok(Some(project_config)) = ProjectConfig::load(&repo.worktree_root()?) {
-        let worktree_path =
-            std::env::current_dir().git_context("Failed to get current directory")?;
-        run_pre_merge_commands(
-            &project_config,
-            &current_branch,
-            &target_branch,
-            &worktree_path,
-            &repo,
-            &config,
-            force,
-        )?;
-    }
-
     // Handle uncommitted changes depending on whether we're squashing
-    // Only do this after pre-merge checks pass
     if repo.is_dirty()? {
         if squash {
             // Just stage - squash will handle committing
@@ -106,6 +89,22 @@ pub fn handle_merge(
             state,
             target_branch: target_branch.to_string(),
         });
+    }
+
+    // Run pre-merge checks unless --no-hooks was specified
+    // Do this AFTER rebase to validate the final state that will be pushed
+    if !no_hooks && let Ok(Some(project_config)) = ProjectConfig::load(&repo.worktree_root()?) {
+        let worktree_path =
+            std::env::current_dir().git_context("Failed to get current directory")?;
+        run_pre_merge_commands(
+            &project_config,
+            &current_branch,
+            &target_branch,
+            &worktree_path,
+            &repo,
+            &config,
+            force,
+        )?;
     }
 
     // Fast-forward push to target branch (reuse handle_push logic)
