@@ -417,6 +417,15 @@ fn handle_squash(
     repo.run_command(&["reset", "--soft", &merge_base])
         .git_context("Failed to reset to merge base")?;
 
+    // Check if there are actually any changes to commit
+    // This can happen if all commits result in no net changes (e.g., series of changes and reverts)
+    if !repo.has_staged_changes()? {
+        use worktrunk::styling::{ERROR, ERROR_EMOJI, HINT, HINT_EMOJI};
+        return Err(GitError::CommandFailed(format!(
+            "{ERROR_EMOJI} {ERROR}No changes to commit after squashing {commit_count} commits{ERROR:#}\n\n{HINT_EMOJI} {HINT}The commits resulted in no net changes (e.g., changes were reverted or already in {CYAN_BOLD}{target_branch}{CYAN_BOLD:#}){HINT:#}"
+        )));
+    }
+
     // Commit with the generated message
     repo.run_command(&["commit", "-m", &commit_message])
         .git_context("Failed to create squash commit")?;

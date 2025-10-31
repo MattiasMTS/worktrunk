@@ -579,6 +579,82 @@ fn test_merge_squash_single_commit() {
 }
 
 #[test]
+fn test_merge_squash_empty_changes() {
+    let mut repo = TestRepo::new();
+    repo.commit("Initial commit");
+    repo.setup_remote("main");
+
+    // Create a worktree for main
+    let main_wt = repo.root_path().parent().unwrap().join("test-repo.main-wt");
+    let mut cmd = Command::new("git");
+    repo.configure_git_cmd(&mut cmd);
+    cmd.args(["worktree", "add", main_wt.to_str().unwrap(), "main"])
+        .current_dir(repo.root_path())
+        .output()
+        .expect("Failed to add worktree");
+
+    // Create a feature worktree with commits that result in no net changes
+    let feature_wt = repo.add_worktree("feature", "feature");
+
+    // Get the initial content of file.txt (created by the initial commit)
+    let file_path = feature_wt.join("file.txt");
+    let initial_content = std::fs::read_to_string(&file_path).expect("Failed to read file.txt");
+
+    // Commit 1: Modify file.txt
+    std::fs::write(&file_path, "change1").expect("Failed to write file");
+    let mut cmd = Command::new("git");
+    repo.configure_git_cmd(&mut cmd);
+    cmd.args(["add", "file.txt"])
+        .current_dir(&feature_wt)
+        .output()
+        .expect("Failed to add file");
+    let mut cmd = Command::new("git");
+    repo.configure_git_cmd(&mut cmd);
+    cmd.args(["commit", "-m", "Change 1"])
+        .current_dir(&feature_wt)
+        .output()
+        .expect("Failed to commit");
+
+    // Commit 2: Modify file.txt again
+    std::fs::write(&file_path, "change2").expect("Failed to write file");
+    let mut cmd = Command::new("git");
+    repo.configure_git_cmd(&mut cmd);
+    cmd.args(["add", "file.txt"])
+        .current_dir(&feature_wt)
+        .output()
+        .expect("Failed to add file");
+    let mut cmd = Command::new("git");
+    repo.configure_git_cmd(&mut cmd);
+    cmd.args(["commit", "-m", "Change 2"])
+        .current_dir(&feature_wt)
+        .output()
+        .expect("Failed to commit");
+
+    // Commit 3: Revert to original content
+    std::fs::write(&file_path, initial_content).expect("Failed to write file");
+    let mut cmd = Command::new("git");
+    repo.configure_git_cmd(&mut cmd);
+    cmd.args(["add", "file.txt"])
+        .current_dir(&feature_wt)
+        .output()
+        .expect("Failed to add file");
+    let mut cmd = Command::new("git");
+    repo.configure_git_cmd(&mut cmd);
+    cmd.args(["commit", "-m", "Revert to initial"])
+        .current_dir(&feature_wt)
+        .output()
+        .expect("Failed to commit");
+
+    // Merge with squash - should fail with helpful error about no net changes
+    snapshot_merge(
+        "merge_squash_empty_changes",
+        &repo,
+        &["main", "--squash"],
+        Some(&feature_wt),
+    );
+}
+
+#[test]
 fn test_merge_auto_commit_deterministic() {
     let mut repo = TestRepo::new();
     repo.commit("Initial commit");
