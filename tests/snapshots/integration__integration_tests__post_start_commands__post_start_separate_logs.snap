@@ -17,7 +17,7 @@ info:
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpyBOrPy/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpHGYMBC/test-config.toml
 ---
 success: true
 exit_code: 0
@@ -26,13 +26,13 @@ exit_code: 0
 
 To enable automatic cd, run: wt config shell
 🔄 [36mRunning post-start: [1mtask1[0m[0m
-[40m [0m [1m[34mecho [32m'TASK1_OUTPUT'
+[40m [0m [1m[34mecho[0m [32m'TASK1_OUTPUT'[0m[0m
 
 🔄 [36mRunning post-start: [1mtask2[0m[0m
-[40m [0m [1m[34mecho [32m'TASK2_OUTPUT'
+[40m [0m [1m[34mecho[0m [32m'TASK2_OUTPUT'[0m[0m
 
 🔄 [36mRunning post-start: [1mtask3[0m[0m
-[40m [0m [1m[34mecho [32m'TASK3_OUTPUT'
+[40m [0m [1m[34mecho[0m [32m'TASK3_OUTPUT'[0m[0m
 
 
 ----- stderr -----

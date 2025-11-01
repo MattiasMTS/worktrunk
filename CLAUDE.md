@@ -204,6 +204,18 @@ let warning_bold = WARNING.bold();
 "{WARNING}Text with {warning_bold}composed{warning_bold:#} styles{WARNING:#}"
 ```
 
+**CRITICAL: Resetting all styles** - To reset ALL ANSI attributes at once, use `anstyle::Reset`, NOT `{:#}` on an empty `Style`:
+
+```rust
+// ❌ BAD - produces empty string, NO reset!
+output.push_str(&format!("{:#}", Style::new()));
+
+// ✅ GOOD - produces \x1b[0m reset code
+output.push_str(&format!("{}", anstyle::Reset));
+```
+
+**Why this matters:** `{:#}` only resets when used on a style with attributes. Using it on `Style::new()` (empty style) produces an empty string, causing color bleeding into subsequent output. This was the root cause of color leaking from gutter-formatted commands into child process output.
+
 ### Information Hierarchy & Styling
 
 **Principle: Bold what answers the user's question, dim what provides context.**

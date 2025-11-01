@@ -419,13 +419,13 @@ pub fn format_bash_with_gutter(content: &str, left_margin: &str) -> String {
                 }
                 HighlightEvent::HighlightEnd => {
                     // End of highlighted region - reset style
-                    output.push_str(&format!("{:#}", Style::new()));
+                    output.push_str(&format!("{}", anstyle::Reset));
                 }
             }
         }
 
         // Ensure all styles are reset at end of line to prevent leaking into child process output
-        output.push_str(&format!("{:#}", Style::new()));
+        output.push_str(&format!("{}", anstyle::Reset));
         output.push('\n');
     }
 
@@ -826,5 +826,68 @@ command = "npm install"
         [40m [0m audit last month. The new implementation follows industry best practices and
         [40m [0m includes proper token rotation and expiration handling.
         ");
+    }
+
+    #[test]
+    fn test_bash_gutter_formatting_ends_with_reset() {
+        // Test that bash gutter formatting properly resets colors at the end of each line
+        // to prevent color bleeding into subsequent output (like child process output)
+        let command = "pre-commit run --all-files";
+        let result = format_bash_with_gutter(command, "");
+
+        // The output should end with ANSI reset code followed by newline
+        // ANSI reset is \x1b[0m (ESC[0m)
+        assert!(
+            result.ends_with("\x1b[0m\n"),
+            "Bash gutter formatting should end with ANSI reset code followed by newline, got: {:?}",
+            result.chars().rev().take(20).collect::<String>()
+        );
+
+        // Verify the reset appears at the end of EVERY line (for multi-line commands)
+        let multi_line_command = "npm install && \\\n    npm run build";
+        let multi_result = format_bash_with_gutter(multi_line_command, "");
+
+        // Each line should end with reset code
+        for line in multi_result.lines() {
+            if !line.is_empty() {
+                // Check that line contains a reset code somewhere
+                // (The actual position depends on the highlighting, but it should be present)
+                assert!(
+                    line.contains("\x1b[0m"),
+                    "Each line should contain ANSI reset code, line: {:?}",
+                    line
+                );
+            }
+        }
+
+        // Most importantly: the final output should end with reset + newline
+        assert!(
+            multi_result.ends_with("\x1b[0m\n"),
+            "Multi-line bash gutter formatting should end with ANSI reset + newline"
+        );
+    }
+
+    #[test]
+    fn test_reset_code_behavior() {
+        // IMPORTANT: {:#} on Style::new() produces an EMPTY STRING, not a reset!
+        // This is the root cause of color bleeding bugs.
+        let style_reset = format!("{:#}", Style::new());
+        assert_eq!(
+            style_reset, "",
+            "Style::new() with {{:#}} produces empty string (this is why we had color leaking!)"
+        );
+
+        // The correct way to get a reset code is anstyle::Reset
+        let anstyle_reset = format!("{}", anstyle::Reset);
+        assert_eq!(
+            anstyle_reset, "\x1b[0m",
+            "anstyle::Reset produces proper ESC[0m reset code"
+        );
+
+        // Document the fix: always use anstyle::Reset, never {:#} on Style::new()
+        assert_ne!(
+            style_reset, anstyle_reset,
+            "Style::new() and anstyle::Reset are NOT equivalent - always use anstyle::Reset"
+        );
     }
 }

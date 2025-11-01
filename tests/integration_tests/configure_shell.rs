@@ -33,7 +33,7 @@ fn test_configure_shell_with_yes() {
         exit_code: 0
         ----- stdout -----
         Added [1mzsh[0m [TEMP_HOME]/.zshrc
-        [40m [0m [1m[35mif [1m[34mcommand [36m-v wt [36m>/dev/null [33m2>&1; [1m[35mthen [1m[34meval [32m"$([1m[34mwt init zsh)"; [1m[35mfi
+        [40m [0m [1m[35mif[0m [1m[34mcommand[0m [36m-v[0m wt [36m>[0m/dev/null [33m2[0m>&1; [1m[35mthen[0m [1m[34meval[0m [32m"$([1m[34mwt[0m init zsh)"[0m; [1m[35mfi[0m[0m
 
         ✅ [32mConfigured 1 shell[0m
 
@@ -78,7 +78,7 @@ fn test_configure_shell_specific_shell() {
         exit_code: 0
         ----- stdout -----
         Added [1mzsh[0m [TEMP_HOME]/.zshrc
-        [40m [0m [1m[35mif [1m[34mcommand [36m-v wt [36m>/dev/null [33m2>&1; [1m[35mthen [1m[34meval [32m"$([1m[34mwt init zsh)"; [1m[35mfi
+        [40m [0m [1m[35mif[0m [1m[34mcommand[0m [36m-v[0m wt [36m>[0m/dev/null [33m2[0m>&1; [1m[35mthen[0m [1m[34meval[0m [32m"$([1m[34mwt[0m init zsh)"[0m; [1m[35mfi[0m[0m
 
         ✅ [32mConfigured 1 shell[0m
 
@@ -164,7 +164,7 @@ fn test_configure_shell_fish() {
         exit_code: 0
         ----- stdout -----
         Created [1mfish[0m [TEMP_HOME]/.config/fish/conf.d/wt.fish
-        [40m [0m [1m[35mif [1m[34mtype [36m-q wt; [1m[34mwt init fish [36m| [1m[34msource; end
+        [40m [0m [1m[35mif[0m [1m[34mtype[0m [36m-q[0m wt; [1m[34mwt[0m init fish [36m|[0m [1m[34msource[0m; end[0m
 
         ✅ [32mConfigured 1 shell[0m
 
@@ -258,9 +258,9 @@ fn test_configure_shell_multiple_configs() {
         exit_code: 0
         ----- stdout -----
         Added [1mbash[0m [TEMP_HOME]/.bash_profile
-        [40m [0m [1m[35mif [1m[34mcommand [36m-v wt [36m>/dev/null [33m2>&1; [1m[35mthen [1m[34meval [32m"$([1m[34mwt init bash)"; [1m[35mfi
+        [40m [0m [1m[35mif[0m [1m[34mcommand[0m [36m-v[0m wt [36m>[0m/dev/null [33m2[0m>&1; [1m[35mthen[0m [1m[34meval[0m [32m"$([1m[34mwt[0m init bash)"[0m; [1m[35mfi[0m[0m
         Added [1mzsh[0m [TEMP_HOME]/.zshrc
-        [40m [0m [1m[35mif [1m[34mcommand [36m-v wt [36m>/dev/null [33m2>&1; [1m[35mthen [1m[34meval [32m"$([1m[34mwt init zsh)"; [1m[35mfi
+        [40m [0m [1m[35mif[0m [1m[34mcommand[0m [36m-v[0m wt [36m>[0m/dev/null [33m2[0m>&1; [1m[35mthen[0m [1m[34meval[0m [32m"$([1m[34mwt[0m init zsh)"[0m; [1m[35mfi[0m[0m
 
         ✅ [32mConfigured 2 shells[0m
 
@@ -326,9 +326,9 @@ fn test_configure_shell_mixed_states() {
         exit_code: 0
         ----- stdout -----
         Already configured [1mbash[0m [TEMP_HOME]/.bash_profile
-        [40m [0m [1m[35mif [1m[34mcommand [36m-v wt [36m>/dev/null [33m2>&1; [1m[35mthen [1m[34meval [32m"$([1m[34mwt init bash)"; [1m[35mfi
+        [40m [0m [1m[35mif[0m [1m[34mcommand[0m [36m-v[0m wt [36m>[0m/dev/null [33m2[0m>&1; [1m[35mthen[0m [1m[34meval[0m [32m"$([1m[34mwt[0m init bash)"[0m; [1m[35mfi[0m[0m
         Added [1mzsh[0m [TEMP_HOME]/.zshrc
-        [40m [0m [1m[35mif [1m[34mcommand [36m-v wt [36m>/dev/null [33m2>&1; [1m[35mthen [1m[34meval [32m"$([1m[34mwt init zsh)"; [1m[35mfi
+        [40m [0m [1m[35mif[0m [1m[34mcommand[0m [36m-v[0m wt [36m>[0m/dev/null [33m2[0m>&1; [1m[35mthen[0m [1m[34meval[0m [32m"$([1m[34mwt[0m init zsh)"[0m; [1m[35mfi[0m[0m
 
         ✅ [32mConfigured 1 shell[0m
 
