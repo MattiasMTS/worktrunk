@@ -161,15 +161,39 @@ pub(crate) fn execute_streaming(
 /// Merges stdout into stderr using shell redirection (1>&2) to ensure deterministic output ordering.
 /// Per CLAUDE.md guidelines: child process output goes to stderr, worktrunk output goes to stdout.
 ///
+/// ## Color Bleeding Prevention
+///
+/// This function explicitly resets ANSI codes on stderr before executing child commands.
+///
+/// Root cause: Terminal emulators maintain a single rendering state machine. When stdout
+/// and stderr both connect to the same TTY, output from both streams passes through this
+/// state machine in arrival order. If stdout writes color codes but stderr's output arrives
+/// next, the terminal applies stdout's color state to stderr's text. The flush ensures stdout
+/// completes, but doesn't reset the terminal state - hence this explicit reset to stderr.
+///
+/// We write the reset to stderr (not stdout) because:
+/// 1. Child process output goes to stderr (per CLAUDE.md guidelines)
+/// 2. The reset must reach the terminal before child output
+/// 3. Writing to stdout could arrive after stderr due to buffering
+///
 /// Calls terminate_output() after completion to handle mode-specific cleanup
 /// (NUL terminator in directive mode, no-op in interactive mode).
 pub fn execute_command_in_worktree(
     worktree_path: &std::path::Path,
     command: &str,
 ) -> Result<(), GitError> {
+    use std::io::Write;
+    use worktrunk::styling::{eprint, stderr};
+
     // Flush stdout before executing command to ensure all our messages appear
     // before the child process output
     super::flush()?;
+
+    // Reset ANSI codes on stderr to prevent color bleeding (see function docs for details)
+    // This fixes color bleeding observed when worktrunk prints colored output to stdout
+    // followed immediately by child process output to stderr (e.g., pre-commit run output).
+    eprint!("{}", anstyle::Reset);
+    stderr().flush().ok(); // Ignore flush errors - reset is best-effort, command execution should proceed
 
     // Execute with stdout→stderr redirect for deterministic ordering
     // Convert io::Error to GitError::CommandFailed to preserve error message formatting

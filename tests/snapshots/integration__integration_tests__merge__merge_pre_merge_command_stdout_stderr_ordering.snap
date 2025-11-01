@@ -13,11 +13,10 @@ info:
     GIT_COMMITTER_DATE: "2025-01-01T00:00:00Z"
     GIT_CONFIG_GLOBAL: /dev/null
     GIT_CONFIG_SYSTEM: /dev/null
-    GIT_EDITOR: ""
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpeOO9yg/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpMGhwKV/test-config.toml
 ---
 success: true
 exit_code: 0
@@ -42,7 +41,7 @@ exit_code: 0
 ✅ [32mReturned to primary at [2m[REPO][0m[0m
 
 ----- stderr -----
-[check1] stdout line 1
+[0m[check1] stdout line 1
 [check1] stderr line 1
 [check1] stdout line 2
 [check1] stderr line 2
@@ -50,7 +49,7 @@ exit_code: 0
 [check1] stderr line 3
 [check1] stdout complete
 [check1] stderr complete
-[check2] stdout line 1
+[0m[check2] stdout line 1
 [check2] stderr line 1
 [check2] stdout line 2
 [check2] stderr line 2

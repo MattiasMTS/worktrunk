@@ -4,15 +4,15 @@ expression: output.normalized().as_ref()
 ---
 🔄 [36mRebasing onto [1m[36mmain[0m...[0m
 🔄 [36mRunning pre-merge: [1mformat[0m[0m
-[40m [0m [1m[34mecho [32m'✓ Code formatting check passed'
+[0m[40m [0m [1m[34mecho [32m'✓ Code formatting check passed'
 
 ✓ Code formatting check passed
 🔄 [36mRunning pre-merge: [1mlint[0m[0m
-[40m [0m [1m[34mecho [32m'✓ Linting passed - no warnings'
+[0m[40m [0m [1m[34mecho [32m'✓ Linting passed - no warnings'
 
 ✓ Linting passed - no warnings
 🔄 [36mRunning pre-merge: [1mtest[0m[0m
-[40m [0m [1m[34mecho [32m'✓ All 47 tests passed in 2.3s'
+[0m[40m [0m [1m[34mecho [32m'✓ All 47 tests passed in 2.3s'
 
 ✓ All 47 tests passed in 2.3s
 🔄 [36mMerging 1 commit to [1m[36mmain[0m[0m @ [2md067f01[0m
