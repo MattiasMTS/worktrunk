@@ -51,7 +51,11 @@ pub enum GitError {
         worktree_path: PathBuf,
     },
     /// Push is not a fast-forward
-    NotFastForward { target_branch: String },
+    NotFastForward {
+        target_branch: String,
+        commits_formatted: String,
+        files_formatted: String,
+    },
     /// Found merge commits in push range
     MergeCommitsFound,
     /// Command was not approved by user
@@ -206,11 +210,33 @@ impl std::fmt::Display for GitError {
             }
 
             // Not fast-forward
-            GitError::NotFastForward { target_branch } => {
+            GitError::NotFastForward {
+                target_branch,
+                commits_formatted,
+                files_formatted,
+            } => {
                 let error_bold = ERROR.bold();
+
+                writeln!(
+                    f,
+                    "{ERROR_EMOJI} {ERROR}Can't push to local {error_bold}{target_branch}{error_bold:#} branch: it has newer commits{ERROR:#}"
+                )?;
+
+                // Show the formatted commit log
+                if !commits_formatted.is_empty() {
+                    writeln!(f)?;
+                    write!(f, "{}", commits_formatted)?;
+                }
+
+                // Show the formatted diff stat
+                if !files_formatted.is_empty() {
+                    writeln!(f)?;
+                    write!(f, "{}", files_formatted)?;
+                }
+
                 write!(
                     f,
-                    "{ERROR_EMOJI} {ERROR}Not a fast-forward from {ERROR:#}{error_bold}{target_branch}{error_bold:#}{ERROR} to HEAD{ERROR:#}\n\n{HINT_EMOJI} {HINT}The target branch has commits not in your current branch{HINT:#}\n{HINT_EMOJI} {HINT}Consider: git pull or git rebase{HINT:#}"
+                    "\n{HINT_EMOJI} {HINT}Use 'wt merge' to rebase your changes onto {target_branch}{HINT:#}"
                 )
             }
 

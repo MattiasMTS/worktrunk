@@ -574,8 +574,36 @@ pub fn handle_push(
 
     // Check if it's a fast-forward
     if !repo.is_ancestor(&target_branch, "HEAD")? {
+        // Get formatted commit log (commits in target that we don't have)
+        let commits_formatted = repo
+            .run_command(&[
+                "log",
+                "--color=always",
+                "--graph",
+                "--oneline",
+                "--decorate",
+                &format!("HEAD..{}", target_branch),
+            ])?
+            .trim()
+            .to_string();
+
+        // Get formatted diff stat
+        let term_width = crate::display::get_terminal_width();
+        let files_formatted = repo
+            .run_command(&[
+                "diff",
+                "--color=always",
+                "--stat",
+                &format!("--stat-width={}", term_width),
+                &format!("HEAD...{}", target_branch),
+            ])?
+            .trim_end()
+            .to_string();
+
         return Err(GitError::NotFastForward {
             target_branch: target_branch.to_string(),
+            commits_formatted,
+            files_formatted,
         });
     }
 

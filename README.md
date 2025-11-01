@@ -14,7 +14,7 @@ Running ten agents on different features? `wt switch --create feature-a`, `wt sw
 
 ## What It Does
 
-Automates the full lifecycle: create worktree, work, merge back, remove worktree.
+Automates the full lifecycle: create worktree, work, merge back to local main, remove worktree.
 
 ```bash
 $ wt switch --create fix-auth
@@ -22,15 +22,21 @@ $ wt switch --create fix-auth
 
 # Agent works, makes changes, then:
 $ wt merge main --squash
-🔄 Switching to main...
-🔄 Staging changes (3 modified)...
-🔄 Merging fix-auth → main...
-✅ Merged and pushed
-✅ Removed worktree
+🔄 Rebasing onto main...
+🔄 Merging 1 commit to main @ a1b2c3d
+
+* a1b2c3d (HEAD -> fix-auth) Add authentication
+
+ auth.js | 45 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
+
+✅ Merged to main (1 commit, 1 file, +45)
+🔄 Cleaning up worktree...
+✅ Returned to primary at ../repo
 # Shell back in main
 ```
 
-Shell integration means directories change automatically. Merge handles staging, committing, merging, pushing, cleanup. One command.
+Shell integration means directories change automatically. Merge handles staging, committing, merging to main, cleanup. One command.
 
 ## Installation
 
@@ -48,8 +54,9 @@ wt switch --create feature-name
 
 **Finish and merge:**
 ```bash
-wt merge main --squash
+wt merge main --squash  # Rebases onto main, merges to main, removes worktree
 ```
+Merges your changes into main: rebases your branch onto the latest main, merges the result into your local main branch, and cleans up the worktree. Use `--squash` to combine all commits into one.
 
 **See active worktrees:**
 ```bash
@@ -77,20 +84,39 @@ wt config help  # Setup guide
 
 Worktrunk is opinionated. The choices optimize for AI agent workflows:
 
-1. **Merge does everything** - Staging, committing, merging, pushing, cleanup in one command
+1. **Merge does everything** - Staging, committing, merging to main, cleanup in one command
 2. **Squash by default** - Linear history, configurable
 3. **Automatic shell navigation** - No manual `cd` commands
 4. **Fail-fast hooks** - Tests block bad merges
 
 These trade manual control for automation. For fine-grained control, use `git worktree` directly.
 
+## Local Workflow Model
+
+Worktrunk manages **local git worktrees** with **local operations**:
+
+- **Local operations only** - `wt merge` merges commits to your local main branch, not to remote repositories
+- **Fast-forward only** - No force pushes or commit rewriting; main branch advances cleanly forward
+- **Remote sync separate** - You manage `git push`/`git pull` to remotes yourself, worktrunk focuses on local branch workflow
+
+**Example workflow:**
+```bash
+wt switch --create feature    # Create feature worktree
+# ... make changes ...
+wt merge main                 # Rebase and merge to local main branch
+cd ../repo                    # Switch to main worktree
+git push origin main          # Push to remote (standard git)
+```
+
+Worktrunk doesn't replace git—it automates the worktree lifecycle on top of it.
+
 ## All Commands
 
 - `wt switch [branch]` - Switch to existing worktree
 - `wt switch --create [branch]` - Create and switch
 - `wt remove` - Remove current, return to main
-- `wt merge [target]` - Merge, push, cleanup
-- `wt push [target]` - Move changes to another branch
+- `wt merge [target]` - Rebase onto target, merge to target, and cleanup worktree
+- `wt push [target]` - Fast-forward merge to another branch (no rebase)
 - `wt list` - Show all worktrees
 - `wt config` - Manage configuration
 
@@ -267,7 +293,7 @@ Automate common tasks by creating `.config/wt.toml` in your repository root. Run
 | **pre-commit-command** | Before committing changes during `wt merge` (when not squashing) | Sequential, blocking, fail-fast | Terminates merge immediately |
 | **pre-squash-command** | Before squashing commits during `wt merge --squash` | Sequential, blocking, fail-fast | Terminates merge immediately |
 | **pre-merge-command** | Before any commits/rebasing during `wt merge` | Sequential, blocking, fail-fast | Terminates merge immediately |
-| **post-merge-command** | After successful merge and push to target branch, before cleanup | Sequential, blocking | Logs warning, continues with remaining commands |
+| **post-merge-command** | After successful merge to target branch, before cleanup | Sequential, blocking | Logs warning, continues with remaining commands |
 
 **Template variables:** `{repo}`, `{branch}`, `{worktree}`, `{repo_root}`, `{target}`
 
@@ -299,14 +325,14 @@ worktree-path = "../worktrees/{main-worktree}/{branch}"
 
 ### Fast Branch Switching
 
-Push changes from the current worktree directly to another branch without committing or merging. Useful for moving work-in-progress code.
+Move changes from the current worktree directly to another branch without committing or merging. Useful for moving work-in-progress code.
 
 ```bash
-# Push current changes to another branch
+# Move current changes to another branch
 $ wt push feature-experiment
 ```
 
-Worktrunk stages the changes, creates a commit, and pushes it to the target branch's worktree if it exists.
+Worktrunk stages the changes, creates a commit, and merges it to the target branch.
 
 ### Shell Integration Details
 
