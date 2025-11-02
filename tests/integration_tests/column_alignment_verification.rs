@@ -38,6 +38,7 @@ struct ColumnPositions {
 
 impl ColumnPositions {
     /// Parse column positions from a header line (without ANSI codes)
+    /// Returns positions as display column indices, not byte indices
     fn from_header(header: &str) -> Self {
         let mut positions = ColumnPositions {
             age: None,
@@ -51,33 +52,37 @@ impl ColumnPositions {
             path: None,
         };
 
+        // Helper to convert byte position to display position
+        let byte_to_display_pos = |byte_pos: usize| -> usize { header[..byte_pos].width() };
+
         // Find column headers by their known names
-        if let Some(pos) = header.find("Age") {
-            positions.age = Some(pos);
+        // Note: str.find() returns byte positions, we need display positions
+        if let Some(byte_pos) = header.find("Age") {
+            positions.age = Some(byte_to_display_pos(byte_pos));
         }
-        if let Some(pos) = header.find("Main-Cmt") {
-            positions.cmts = Some(pos);
+        if let Some(byte_pos) = header.find("Main-Cmt") {
+            positions.cmts = Some(byte_to_display_pos(byte_pos));
         }
-        if let Some(pos) = header.find("Main-Δ") {
-            positions.cmt_diff = Some(pos);
+        if let Some(byte_pos) = header.find("Main ↕") {
+            positions.cmt_diff = Some(byte_to_display_pos(byte_pos));
         }
-        if let Some(pos) = header.find("Dirty") {
-            positions.wt_diff = Some(pos);
+        if let Some(byte_pos) = header.find("Working ±") {
+            positions.wt_diff = Some(byte_to_display_pos(byte_pos));
         }
-        if let Some(pos) = header.find("Remote") {
-            positions.remote = Some(pos);
+        if let Some(byte_pos) = header.find("Remote") {
+            positions.remote = Some(byte_to_display_pos(byte_pos));
         }
-        if let Some(pos) = header.find("Commit") {
-            positions.commit = Some(pos);
+        if let Some(byte_pos) = header.find("Commit") {
+            positions.commit = Some(byte_to_display_pos(byte_pos));
         }
-        if let Some(pos) = header.find("Message") {
-            positions.message = Some(pos);
+        if let Some(byte_pos) = header.find("Message") {
+            positions.message = Some(byte_to_display_pos(byte_pos));
         }
-        if let Some(pos) = header.find("State") {
-            positions.state = Some(pos);
+        if let Some(byte_pos) = header.find("State") {
+            positions.state = Some(byte_to_display_pos(byte_pos));
         }
-        if let Some(pos) = header.find("Path") {
-            positions.path = Some(pos);
+        if let Some(byte_pos) = header.find("Path") {
+            positions.path = Some(byte_to_display_pos(byte_pos));
         }
 
         positions
@@ -86,38 +91,41 @@ impl ColumnPositions {
 
 /// Extract column boundaries by finding transitions from content to spaces
 /// This is a more sophisticated approach that handles sparse columns
+/// Positions are in display columns, not character or byte indices
 #[derive(Debug, Clone)]
 struct ColumnBoundary {
-    start: usize,
-    end: usize,
+    start: usize, // Display column position
+    end: usize,   // Display column position
     content: String,
 }
 
 fn find_column_boundaries(line: &str) -> Vec<ColumnBoundary> {
     let mut boundaries = Vec::new();
     let chars: Vec<char> = line.chars().collect();
-    let mut i = 0;
+    let mut char_idx = 0;
+    let mut display_pos = 0;
 
-    while i < chars.len() {
+    while char_idx < chars.len() {
         // Skip leading spaces
-        while i < chars.len() && chars[i] == ' ' {
-            i += 1;
+        while char_idx < chars.len() && chars[char_idx] == ' ' {
+            char_idx += 1;
+            display_pos += 1;
         }
 
-        if i >= chars.len() {
+        if char_idx >= chars.len() {
             break;
         }
 
         // Found start of content
-        let start = i;
+        let start_display_pos = display_pos;
         let mut content = String::new();
 
         // Collect content until we hit 2+ consecutive spaces or end
-        while i < chars.len() {
-            if chars[i] == ' ' {
+        while char_idx < chars.len() {
+            if chars[char_idx] == ' ' {
                 // Check if this is a column separator (2+ spaces)
                 let mut space_count = 0;
-                let mut j = i;
+                let mut j = char_idx;
                 while j < chars.len() && chars[j] == ' ' {
                     space_count += 1;
                     j += 1;
@@ -128,18 +136,22 @@ fn find_column_boundaries(line: &str) -> Vec<ColumnBoundary> {
                     break;
                 } else {
                     // Single space within content
-                    content.push(chars[i]);
-                    i += 1;
+                    content.push(chars[char_idx]);
+                    char_idx += 1;
+                    display_pos += 1;
                 }
             } else {
-                content.push(chars[i]);
-                i += 1;
+                let ch = chars[char_idx];
+                content.push(ch);
+                char_idx += 1;
+                // Add display width of this character
+                display_pos += UnicodeWidthStr::width(ch.to_string().as_str());
             }
         }
 
         boundaries.push(ColumnBoundary {
-            start,
-            end: i,
+            start: start_display_pos,
+            end: display_pos,
             content: content.trim_end().to_string(),
         });
     }
@@ -221,22 +233,23 @@ fn verify_table_alignment(output: &str) -> Result<(), String> {
                     .map(|b| b.start);
 
                 // For the Path column specifically, verify it starts exactly where the header says
-                if *col_name == "Path" && *expected_pos < row.len() {
+                if *col_name == "Path" {
                     // Find where the actual path content starts (typically "./")
-                    if let Some(path_start) =
-                        row[*expected_pos..].find("./").map(|p| expected_pos + p)
-                        && path_start != *expected_pos
+                    // We need to convert from display position to check the content
+                    if let Some(path_boundary) = boundaries.iter().find(|b| {
+                        b.start <= *expected_pos
+                            && b.end > *expected_pos
+                            && b.content.starts_with("./")
+                    }) && path_boundary.start != *expected_pos
                     {
                         errors.push(format!(
-                            "Row {}: Path column content starts at position {} but header says it should be at {}. Misalignment: {} characters.\n  Row text: '{}'\n  At position {}: '{}'\n  Actual path: '{}'",
+                            "Row {}: Path column content starts at display position {} but header says it should be at {}. Misalignment: {} characters.\n  Row text: '{}'\n  Path content: '{}'",
                             row_num,
-                            path_start,
+                            path_boundary.start,
                             expected_pos,
-                            path_start - expected_pos,
+                            path_boundary.start.abs_diff(*expected_pos),
                             row,
-                            expected_pos,
-                            &row[*expected_pos..(*expected_pos + 20).min(row.len())].replace(' ', "·"),
-                            &row[path_start..]
+                            path_boundary.content
                         ));
                     }
                 }

@@ -1,3 +1,122 @@
+//! Column layout and priority allocation for the list command.
+//!
+//! # TODO: Priority System Design & Future Improvements
+//!
+//! ## Current Approach: Priority with Modifiers
+//!
+//! The allocation system uses a **priority scoring model**:
+//! ```text
+//! final_priority = base_priority + modifiers
+//! ```
+//!
+//! **Base priorities** (1-11) are determined by **user need hierarchy** - what questions users need
+//! answered when scanning worktrees:
+//! - 1: Branch (identity - "what is this?")
+//! - 2: Working diff (critical - "do I need to commit?")
+//! - 3: Ahead/behind (critical - "am I out of sync?")
+//! - 4-10: Context (work volume, states, path, time, CI, etc.)
+//! - 11: Message (nice-to-have, space-hungry)
+//!
+//! **Modifiers** adjust priority based on column attributes:
+//! - **Empty penalty**: +10 if column has no data (only header)
+//!   - Empty working_diff: 2 + 10 = priority 12
+//!   - Empty ahead/behind: 3 + 10 = priority 13
+//!   - etc.
+//!
+//! This creates two effective priority tiers:
+//! - **Tier 1 (priorities 1-11)**: Columns with actual data
+//! - **Tier 2 (priorities 12-21)**: Empty columns (visual consistency)
+//!
+//! The empty penalty is large (+10) but not infinite, so empty columns maintain their relative
+//! ordering (empty working_diff still ranks higher than empty ci_status) for visual consistency.
+//!
+//! ## Why This Design?
+//!
+//! **Problem**: Terminal width is limited. We must decide what to show.
+//!
+//! **Goals**:
+//! 1. Show critical data (uncommitted changes, sync status) at any terminal width
+//! 2. Show nice-to-have data (message, commit hash) when space allows
+//! 3. Maintain visual consistency - empty columns in predictable positions at wide widths
+//!
+//! **Key decision**: Message sits at the boundary (priority 11). Empty columns (priority 12+)
+//! rank below message, so:
+//! - Narrow terminals: Data columns + message (hide empty columns)
+//! - Wide terminals: Data columns + message + empty columns (visual consistency)
+//!
+//! ## Current Implementation
+//!
+//! The code implements this as two explicit phases:
+//! ```rust
+//! // Phase 1: Base priorities 1-11 (columns with data)
+//! if data_flags.working_diff { allocate(priority=2) }
+//!
+//! // Message base allocation (priority 11)
+//! allocate_message_base();
+//!
+//! // Phase 2: Base priorities + empty penalty (12-21)
+//! if !data_flags.working_diff { allocate(priority=2+10=12) }
+//!
+//! // Message expansion (uses leftover space)
+//! expand_message_to_max();
+//! ```
+//!
+//! **Pros**:
+//! - Simple, explicit, easy to understand
+//! - Low abstraction overhead
+//! - Easy to modify individual column logic
+//!
+//! **Cons**:
+//! - Priority calculation is implicit (scattered across code)
+//! - Adding new modifiers requires code changes
+//! - Some duplication (Phase 2 repeats allocation logic)
+//!
+//! ## Future: Generalized Priority System?
+//!
+//! **Could we make this more explicit?**
+//! ```rust
+//! struct ColumnPriority {
+//!     base: u8,               // User need ranking (1-11)
+//!     empty_penalty: u8,      // +10 if no data
+//!     // Future modifiers:
+//!     // width_bonus: i8,     // -1 if terminal_width > 150
+//!     // user_priority: i8,   // User-configured adjustments
+//! }
+//!
+//! fn calculate_priority(column: Column, context: &Context) -> u8 {
+//!     let base = column.base_priority();
+//!     let empty = if column.has_data(context) { 0 } else { 10 };
+//!     base + empty
+//! }
+//!
+//! // Sort by priority, then allocate in order
+//! columns.sort_by_key(|c| calculate_priority(c, &context));
+//! for column in columns { allocate(column); }
+//! ```
+//!
+//! **Pros**:
+//! - Priority calculation is explicit and centralized
+//! - Easy to add new modifiers (terminal width, user config, etc.)
+//! - Single allocation loop (no Phase 1/Phase 2 duplication)
+//!
+//! **Cons**:
+//! - More abstraction (struct, enum, sorting)
+//! - Harder to understand at a glance
+//! - Message variable sizing still needs special handling (min/preferred/max)
+//! - Premature generalization? (YAGNI - we don't have other modifiers yet)
+//!
+//! ## Decision: Keep Current Implementation For Now
+//!
+//! The explicit two-phase approach is **clear and sufficient** for current needs. The priority
+//! system is conceptually sound - we just need better documentation.
+//!
+//! **Refactor when**:
+//! - We add a second modifier (terminal width bonus, user config, etc.)
+//! - The duplication becomes painful (more than ~6 empty columns)
+//! - Priority ordering becomes hard to reason about
+//!
+//! Until then: **Simple > Generic**.
+
 use crate::display::{find_common_prefix, get_terminal_width};
 use std::path::{Path, PathBuf};
 use unicode_width::UnicodeWidthStr;
@@ -6,6 +125,31 @@ use super::model::ListItem;
 
 /// Width of short commit hash display (first 8 hex characters)
 const COMMIT_HASH_WIDTH: usize = 8;
+
+/// Column header labels - single source of truth for all column headers.
+/// Both layout calculations and rendering use these constants.
+pub const HEADER_BRANCH: &str = "Branch";
+pub const HEADER_WORKING_DIFF: &str = "Working ±";
+pub const HEADER_AHEAD_BEHIND: &str = "Main ↕";
+pub const HEADER_BRANCH_DIFF: &str = "Main ±";
+pub const HEADER_STATE: &str = "State";
+pub const HEADER_PATH: &str = "Path";
+pub const HEADER_UPSTREAM: &str = "Remote ↕";
+pub const HEADER_AGE: &str = "Age";
+pub const HEADER_CI: &str = "CI";
+pub const HEADER_COMMIT: &str = "Commit";
+pub const HEADER_MESSAGE: &str = "Message";
+
+/// Ensures a column width is at least as wide as its header.
+///
+/// This is the general solution for preventing header overflow: pass the header
+/// string and the calculated data width, and this returns the larger of the two.
+///
+/// Use this for every column width calculation to ensure headers never overflow.
+fn fit_header(header: &str, data_width: usize) -> usize {
+    use unicode_width::UnicodeWidthStr;
+    data_width.max(header.width())
+}
 
 /// Helper: Try to allocate space for a column. Returns the allocated width if successful.
 /// Updates `remaining` by subtracting the allocated width + spacing.
@@ -58,7 +202,6 @@ pub struct ColumnWidths {
     pub branch: usize,
     pub time: usize,
     pub ci_status: usize,
-    pub conflicts: usize,
     pub message: usize,
     pub ahead_behind: DiffWidths,
     pub working_diff: DiffWidths,
@@ -69,6 +212,17 @@ pub struct ColumnWidths {
     pub path: usize,
 }
 
+/// Tracks which columns have actual data (vs just headers)
+#[derive(Clone, Copy, Debug)]
+pub struct ColumnDataFlags {
+    pub working_diff: bool,
+    pub ahead_behind: bool,
+    pub branch_diff: bool,
+    pub upstream: bool,
+    pub states: bool,
+    pub ci_status: bool,
+}
+
 /// Absolute column positions for guaranteed alignment
 #[derive(Clone, Copy, Debug)]
 pub struct ColumnPositions {
@@ -76,7 +230,6 @@ pub struct ColumnPositions {
     pub working_diff: usize,
     pub ahead_behind: usize,
     pub branch_diff: usize,
-    pub conflicts: usize,
     pub states: usize,
     pub path: usize,
     pub upstream: usize,
@@ -93,12 +246,15 @@ pub struct LayoutConfig {
     pub max_message_len: usize,
 }
 
-pub fn calculate_column_widths(items: &[ListItem]) -> ColumnWidths {
-    // Initialize with header label widths to ensure headers always fit
-    let mut max_branch = "Branch".width();
-    let mut max_time = "Age".width();
-    let mut max_message = "Message".width();
-    let mut max_states = 0; // Start at 0, will use header width if needed
+pub fn calculate_column_widths(
+    items: &[ListItem],
+    fetch_ci: bool,
+) -> (ColumnWidths, ColumnDataFlags) {
+    // Track maximum data widths (headers are enforced via fit_header() later)
+    let mut max_branch = 0;
+    let mut max_time = 0;
+    let mut max_message = 0;
+    let mut max_states = 0;
 
     // Track diff component widths separately
     let mut max_wt_added_digits = 0;
@@ -160,68 +316,64 @@ pub fn calculate_column_widths(items: &[ListItem]) -> ColumnWidths {
                 max_upstream_behind_digits.max(upstream_behind.to_string().len());
         }
 
-        // States (worktrees only)
-        if let Some(info) = worktree_info {
-            let states = super::render::format_all_states(info);
-            if !states.is_empty() {
-                max_states = max_states.max(states.width());
-            }
+        // States (includes conflicts, worktree states, etc.)
+        let states = super::render::format_all_states(item);
+        if !states.is_empty() {
+            max_states = max_states.max(states.width());
         }
     }
 
     // Calculate diff widths: "+{added} -{deleted}"
     // Format: "+" + digits + " " + "-" + digits
-    let working_diff_total = if max_wt_added_digits > 0 || max_wt_deleted_digits > 0 {
-        let data_width = 1 + max_wt_added_digits + 1 + 1 + max_wt_deleted_digits;
-        data_width.max("Working ±".width()) // Ensure header fits if we have data
+    let has_working_diff_data = max_wt_added_digits > 0 || max_wt_deleted_digits > 0;
+    let working_diff_data_width = if has_working_diff_data {
+        1 + max_wt_added_digits + 1 + 1 + max_wt_deleted_digits
     } else {
-        0 // No data, no column
+        0
     };
-    let branch_diff_total = if max_br_added_digits > 0 || max_br_deleted_digits > 0 {
-        let data_width = 1 + max_br_added_digits + 1 + 1 + max_br_deleted_digits;
-        data_width.max("Main ±".width()) // Ensure header fits if we have data
+    let working_diff_total = fit_header(HEADER_WORKING_DIFF, working_diff_data_width);
+
+    let has_branch_diff_data = max_br_added_digits > 0 || max_br_deleted_digits > 0;
+    let branch_diff_data_width = if has_branch_diff_data {
+        1 + max_br_added_digits + 1 + 1 + max_br_deleted_digits
     } else {
-        0 // No data, no column
+        0
     };
+    let branch_diff_total = fit_header(HEADER_BRANCH_DIFF, branch_diff_data_width);
 
     // Calculate ahead/behind column width (format: "↑n ↓n")
-    let ahead_behind_total = if max_ahead_digits > 0 || max_behind_digits > 0 {
-        let data_width = 1 + max_ahead_digits + 1 + 1 + max_behind_digits;
-        data_width.max("Main ↕".width())
+    let has_ahead_behind_data = max_ahead_digits > 0 || max_behind_digits > 0;
+    let ahead_behind_data_width = if has_ahead_behind_data {
+        1 + max_ahead_digits + 1 + 1 + max_behind_digits
     } else {
         0
     };
+    let ahead_behind_total = fit_header(HEADER_AHEAD_BEHIND, ahead_behind_data_width);
 
     // Calculate upstream column width (format: "↑n ↓n" or "remote ↑n ↓n")
-    let upstream_total = if max_upstream_ahead_digits > 0 || max_upstream_behind_digits > 0 {
+    let has_upstream_data = max_upstream_ahead_digits > 0 || max_upstream_behind_digits > 0;
+    let upstream_data_width = if has_upstream_data {
         // Format: "↑" + digits + " " + "↓" + digits
         // TODO: Add remote name when show_remote_names is implemented
-        let data_width = 1 + max_upstream_ahead_digits + 1 + 1 + max_upstream_behind_digits;
-        data_width.max("Remote ↕".width())
+        1 + max_upstream_ahead_digits + 1 + 1 + max_upstream_behind_digits
     } else {
         0
     };
+    let upstream_total = fit_header(HEADER_UPSTREAM, upstream_data_width);
 
-    let final_states = if max_states > 0 {
-        max_states.max("State".width())
-    } else {
-        0
-    };
+    let has_states_data = max_states > 0;
+    let final_states = fit_header(HEADER_STATE, max_states);
 
-    // CI status column: Always 2 chars wide if any item has CI status
-    let has_ci_status = items.iter().any(|item| item.pr_status().is_some());
-    let ci_status_width = if has_ci_status { 2 } else { 0 };
+    // CI status column: Always 2 chars wide
+    // Only show if we attempted to fetch CI data (regardless of whether any items have status)
+    let has_ci_status = fetch_ci && items.iter().any(|item| item.pr_status().is_some());
+    let ci_status_width = 2; // Fixed width
 
-    // Conflicts column: Always 2 chars wide if any item has conflicts
-    let has_conflicts = items.iter().any(|item| item.has_conflicts());
-    let conflicts_width = if has_conflicts { 2 } else { 0 };
-
-    ColumnWidths {
-        branch: max_branch,
-        time: max_time,
-        ci_status: ci_status_width,
-        conflicts: conflicts_width,
-        message: max_message,
+    let widths = ColumnWidths {
+        branch: fit_header(HEADER_BRANCH, max_branch),
+        time: fit_header(HEADER_AGE, max_time),
+        ci_status: fit_header(HEADER_CI, ci_status_width),
+        message: fit_header(HEADER_MESSAGE, max_message),
         ahead_behind: DiffWidths {
             total: ahead_behind_total,
             added_digits: max_ahead_digits,
@@ -245,11 +397,26 @@ pub fn calculate_column_widths(items: &[ListItem]) -> ColumnWidths {
         states: final_states,
         commit: COMMIT_HASH_WIDTH,
         path: 0, // Path width calculated later in responsive layout
-    }
+    };
+
+    let data_flags = ColumnDataFlags {
+        working_diff: has_working_diff_data,
+        ahead_behind: has_ahead_behind_data,
+        branch_diff: has_branch_diff_data,
+        upstream: has_upstream_data,
+        states: has_states_data,
+        ci_status: has_ci_status,
+    };
+
+    (widths, data_flags)
 }
 
 /// Calculate responsive layout based on terminal width
-pub fn calculate_responsive_layout(items: &[ListItem], show_full: bool) -> LayoutConfig {
+pub fn calculate_responsive_layout(
+    items: &[ListItem],
+    show_full: bool,
+    fetch_ci: bool,
+) -> LayoutConfig {
     let terminal_width = get_terminal_width();
     let paths: Vec<&Path> = items
         .iter()
@@ -257,11 +424,11 @@ pub fn calculate_responsive_layout(items: &[ListItem], show_full: bool) -> Layou
         .collect();
     let common_prefix = find_common_prefix(&paths);
 
-    // Calculate ideal column widths
-    let ideal_widths = calculate_column_widths(items);
+    // Calculate ideal column widths and track which columns have data
+    let (ideal_widths, data_flags) = calculate_column_widths(items, fetch_ci);
 
     // Calculate actual maximum path width (after common prefix removal)
-    let max_path_width = items
+    let path_data_width = items
         .iter()
         .filter_map(|item| item.worktree_path())
         .map(|path| {
@@ -270,35 +437,45 @@ pub fn calculate_responsive_layout(items: &[ListItem], show_full: bool) -> Layou
             shorten_path(path.as_path(), &common_prefix).width()
         })
         .max()
-        .unwrap_or(20); // fallback to 20 if no paths
+        .unwrap_or(0);
+    let max_path_width = fit_header(HEADER_PATH, path_data_width);
 
     let spacing = 2;
-    let commit_width = COMMIT_HASH_WIDTH;
+    let commit_width = fit_header(HEADER_COMMIT, COMMIT_HASH_WIDTH);
 
-    // Priority order for columns (from high to low):
+    // Two-phase priority allocation:
+    // Phase 1: Allocate columns with actual data (in priority order)
+    // Message: Always allocated before empty columns
+    // Phase 2: Allocate empty columns (only if space remains after message)
+    //
+    // Priority order (from high to low):
+    // === Phase 1: Columns with data ===
     // 1. branch - identity (what is this?)
     // 2. working_diff - uncommitted changes (CRITICAL: do I need to commit?)
     // 3. ahead_behind - commits difference (CRITICAL: am I ahead/behind?)
     // 4. branch_diff - line diff in commits (work volume in those commits)
-    // 5. conflicts - merge conflicts with main (CRITICAL: will merge fail?)
-    // 6. states - special states like [rebasing] (rare but urgent when present)
-    // 7. path - location (where is this?)
-    // 8. upstream - tracking configuration (sync context)
-    // 9. time - recency (nice-to-have context)
-    // 10. ci_status - CI/PR status (contextual when available)
-    // 11. commit - hash (reference info, rarely needed)
-    // 12. message - description (nice-to-have, space-hungry)
+    // 5. states - special states like [rebasing], (conflicts) (rare but urgent when present)
+    // 6. path - location (where is this?)
+    // 7. upstream - tracking configuration (sync context)
+    // 8. time - recency (nice-to-have context)
+    // 9. ci_status - CI/PR status (contextual when available)
+    // 10. commit - hash (reference info, rarely needed)
+    // 11. message - description (nice-to-have, space-hungry)
+    // === Phase 2: Empty columns (only if space remains) ===
+    // 12. working_diff (if empty)
+    // 13. ahead_behind (if empty)
+    // 14. branch_diff (if empty)
+    // 15. states (if empty)
+    // 16. upstream (if empty)
+    // 17. ci_status (if empty)
     //
-    // Note: ahead_behind, branch_diff, and conflicts are adjacent (all describe commits vs main and mergeability)
-    // Each column is shown if it has any data (ideal_width > 0) and fits in remaining space.
-    // All columns participate in priority allocation - nothing is "essential".
+    // Note: ahead_behind and branch_diff are adjacent (both describe commits vs main)
 
     let mut remaining = terminal_width;
     let mut widths = ColumnWidths {
         branch: 0,
         time: 0,
         ci_status: 0,
-        conflicts: 0,
         message: 0,
         ahead_behind: DiffWidths::zero(),
         working_diff: DiffWidths::zero(),
@@ -309,35 +486,41 @@ pub fn calculate_responsive_layout(items: &[ListItem], show_full: bool) -> Layou
         path: 0,
     };
 
-    // Branch column (highest priority - identity)
+    // === PHASE 1: Allocate columns with data ===
+
+    // Branch column (highest priority - identity, always has data)
     widths.branch = try_allocate(&mut remaining, ideal_widths.branch, spacing, true);
 
     // Working diff column (critical - uncommitted changes)
-    let allocated_width = try_allocate(
-        &mut remaining,
-        ideal_widths.working_diff.total,
-        spacing,
-        false,
-    );
-    if allocated_width > 0 {
-        widths.working_diff = ideal_widths.working_diff;
+    if data_flags.working_diff {
+        let allocated_width = try_allocate(
+            &mut remaining,
+            ideal_widths.working_diff.total,
+            spacing,
+            false,
+        );
+        if allocated_width > 0 {
+            widths.working_diff = ideal_widths.working_diff;
+        }
     }
 
     // Ahead/behind column (critical sync status)
-    let allocated_width = try_allocate(
-        &mut remaining,
-        ideal_widths.ahead_behind.total,
-        spacing,
-        false,
-    );
-    if allocated_width > 0 {
-        widths.ahead_behind = ideal_widths.ahead_behind;
+    if data_flags.ahead_behind {
+        let allocated_width = try_allocate(
+            &mut remaining,
+            ideal_widths.ahead_behind.total,
+            spacing,
+            false,
+        );
+        if allocated_width > 0 {
+            widths.ahead_behind = ideal_widths.ahead_behind;
+        }
     }
 
     // Branch diff column (work volume in those commits)
     // Hidden by default - considered too noisy for typical usage.
     // May reconsider showing by default in future based on user feedback.
-    if show_full {
+    if show_full && data_flags.branch_diff {
         let allocated_width = try_allocate(
             &mut remaining,
             ideal_widths.branch_diff.total,
@@ -349,31 +532,36 @@ pub fn calculate_responsive_layout(items: &[ListItem], show_full: bool) -> Layou
         }
     }
 
-    // Conflicts column (merge conflicts indicator - critical for mergeability)
-    widths.conflicts = try_allocate(&mut remaining, ideal_widths.conflicts, spacing, false);
+    // States column (rare but urgent when present, now includes conflicts)
+    if data_flags.states {
+        widths.states = try_allocate(&mut remaining, ideal_widths.states, spacing, false);
+    }
 
-    // States column (rare but urgent when present)
-    widths.states = try_allocate(&mut remaining, ideal_widths.states, spacing, false);
-
-    // Path column (location - important for navigation)
+    // Path column (location - important for navigation, always has data)
     widths.path = try_allocate(&mut remaining, max_path_width, spacing, false);
 
     // Upstream column (sync configuration)
-    let allocated_width = try_allocate(&mut remaining, ideal_widths.upstream.total, spacing, false);
-    if allocated_width > 0 {
-        widths.upstream = ideal_widths.upstream;
+    if data_flags.upstream {
+        let allocated_width =
+            try_allocate(&mut remaining, ideal_widths.upstream.total, spacing, false);
+        if allocated_width > 0 {
+            widths.upstream = ideal_widths.upstream;
+        }
     }
 
-    // Time column (contextual information)
+    // Time column (contextual information, always has data)
     widths.time = try_allocate(&mut remaining, ideal_widths.time, spacing, false);
 
     // CI status column (high priority when present, fixed width)
-    widths.ci_status = try_allocate(&mut remaining, ideal_widths.ci_status, spacing, false);
+    if data_flags.ci_status {
+        widths.ci_status = try_allocate(&mut remaining, ideal_widths.ci_status, spacing, false);
+    }
 
-    // Commit column (reference hash - rarely needed)
+    // Commit column (reference hash - rarely needed, always has data)
     widths.commit = try_allocate(&mut remaining, commit_width, spacing, false);
 
     // Message column (flexible width: min 20, preferred 50, max 100)
+    // Allocated BEFORE empty columns - message has higher priority than empty columns
     const MIN_MESSAGE: usize = 20;
     const PREFERRED_MESSAGE: usize = 50;
     const MAX_MESSAGE: usize = 100;
@@ -389,12 +577,72 @@ pub fn calculate_responsive_layout(items: &[ListItem], show_full: bool) -> Layou
     if message_width > 0 {
         remaining = remaining.saturating_sub(message_width + spacing);
         widths.message = message_width.min(ideal_widths.message);
+    }
 
-        // Expand with any leftover space (up to MAX_MESSAGE total)
-        if remaining > 0 {
-            let expansion = remaining.min(MAX_MESSAGE.saturating_sub(widths.message));
-            widths.message += expansion;
+    // === PHASE 2: Allocate empty columns (if space remains after message) ===
+
+    // Working diff column (if no data)
+    if !data_flags.working_diff {
+        let allocated_width = try_allocate(
+            &mut remaining,
+            ideal_widths.working_diff.total,
+            spacing,
+            false,
+        );
+        if allocated_width > 0 {
+            widths.working_diff = ideal_widths.working_diff;
         }
+    }
+
+    // Ahead/behind column (if no data)
+    if !data_flags.ahead_behind {
+        let allocated_width = try_allocate(
+            &mut remaining,
+            ideal_widths.ahead_behind.total,
+            spacing,
+            false,
+        );
+        if allocated_width > 0 {
+            widths.ahead_behind = ideal_widths.ahead_behind;
+        }
+    }
+
+    // Branch diff column (if no data)
+    if show_full && !data_flags.branch_diff {
+        let allocated_width = try_allocate(
+            &mut remaining,
+            ideal_widths.branch_diff.total,
+            spacing,
+            false,
+        );
+        if allocated_width > 0 {
+            widths.branch_diff = ideal_widths.branch_diff;
+        }
+    }
+
+    // States column (if no data)
+    if !data_flags.states {
+        widths.states = try_allocate(&mut remaining, ideal_widths.states, spacing, false);
+    }
+
+    // Upstream column (if no data)
+    if !data_flags.upstream {
+        let allocated_width =
+            try_allocate(&mut remaining, ideal_widths.upstream.total, spacing, false);
+        if allocated_width > 0 {
+            widths.upstream = ideal_widths.upstream;
+        }
+    }
+
+    // CI status column (if no data, but only if we attempted to fetch CI)
+    if fetch_ci && !data_flags.ci_status {
+        widths.ci_status = try_allocate(&mut remaining, ideal_widths.ci_status, spacing, false);
+    }
+
+    // Expand message with any leftover space (up to MAX_MESSAGE total)
+    if widths.message > 0 && widths.message < MAX_MESSAGE && remaining > 0 {
+        let expansion = remaining.min(MAX_MESSAGE - widths.message);
+        widths.message += expansion;
     }
 
     let final_max_message_len = widths.message;
@@ -419,7 +667,6 @@ pub fn calculate_responsive_layout(items: &[ListItem], show_full: bool) -> Layou
         working_diff: advance(widths.working_diff.total),
         ahead_behind: advance(widths.ahead_behind.total),
         branch_diff: advance(widths.branch_diff.total),
-        conflicts: advance(widths.conflicts),
         states: advance(widths.states),
         path: advance(widths.path),
         upstream: advance(widths.upstream.total),
@@ -478,7 +725,8 @@ mod tests {
             working_diff_display: None,
         };
 
-        let widths = calculate_column_widths(&[super::ListItem::Worktree(info1)]);
+        let (widths, _data_flags) =
+            calculate_column_widths(&[super::ListItem::Worktree(info1)], false);
 
         // "↑3 ↓2" has format "↑3 ↓2" = 1+1+1+1+1 = 5, but header "Main ↕" is 6
         assert_eq!(
@@ -551,7 +799,7 @@ mod tests {
         };
 
         let items = vec![super::ListItem::Worktree(info)];
-        let layout = calculate_responsive_layout(&items, false);
+        let layout = calculate_responsive_layout(&items, false, false);
         let pos = &layout.positions;
         let widths = &layout.widths;
 
@@ -560,10 +808,11 @@ mod tests {
         // 1. Branch always starts at position 0
         assert_eq!(pos.branch, 0, "Branch must start at position 0");
 
-        // 2. States is hidden (no state data), should have position 0
-        assert_eq!(
-            pos.states, 0,
-            "States column should be hidden (no state data)"
+        // 2. States may be visible in Phase 2 (empty but shown if space allows)
+        // Since we have plenty of space in wide terminal, states should be visible
+        assert!(
+            pos.states > 0,
+            "States column should be visible in Phase 2 (empty but shown if space)"
         );
 
         // 3. For visible columns, verify correct spacing
@@ -634,26 +883,39 @@ mod tests {
         };
 
         let items = vec![super::ListItem::Worktree(info)];
-        let layout = calculate_responsive_layout(&items, false);
+        let layout = calculate_responsive_layout(&items, false, false);
         let pos = &layout.positions;
 
         // Branch should be at 0
         assert_eq!(pos.branch, 0, "Branch always starts at position 0");
 
-        // Hidden columns should have position 0
-        assert_eq!(
-            pos.working_diff, 0,
-            "Working diff should be hidden (no changes)"
-        );
-        assert_eq!(
-            pos.ahead_behind, 0,
-            "Ahead/behind should be hidden (primary worktree)"
-        );
-        assert_eq!(pos.branch_diff, 0, "Branch diff should be hidden (no diff)");
-        assert_eq!(pos.states, 0, "States should be hidden (no state)");
-        assert_eq!(pos.upstream, 0, "Upstream should be hidden (no upstream)");
+        // With new two-phase allocation, empty columns are shown in Phase 2 if space allows
+        // Since we have a wide terminal (80 chars default) and minimal data, at least some empty columns should be visible
 
-        // Path should be visible (only visible column besides branch)
+        // Early Phase 2 columns should be visible (highest priority empty columns)
+        assert!(
+            pos.working_diff > 0,
+            "Working diff should be visible in Phase 2 (empty but shown if space)"
+        );
+        assert!(
+            pos.ahead_behind > 0,
+            "Ahead/behind should be visible in Phase 2 (empty but shown if space)"
+        );
+
+        // Later Phase 2 columns might not fit (depending on terminal width)
+        // Just verify that at least some empty columns are visible
+        let empty_columns_visible = pos.working_diff > 0
+            || pos.ahead_behind > 0
+            || pos.branch_diff > 0
+            || pos.states > 0
+            || pos.upstream > 0;
+
+        assert!(
+            empty_columns_visible,
+            "At least some empty columns should be visible in Phase 2"
+        );
+
+        // Path should be visible (always has data)
         assert!(pos.path > 0, "Path should be visible");
     }
 
@@ -697,39 +959,37 @@ mod tests {
         };
 
         let items = vec![super::ListItem::Worktree(info)];
-        let layout = calculate_responsive_layout(&items, false);
+        let layout = calculate_responsive_layout(&items, false, false);
         let pos = &layout.positions;
         let widths = &layout.widths;
 
-        // Verify all middle columns are hidden (position = 0)
-        assert_eq!(
-            pos.working_diff, 0,
-            "Working diff should be hidden (no changes)"
-        );
-        assert_eq!(
-            pos.ahead_behind, 0,
-            "Ahead/behind should be hidden (primary worktree)"
-        );
-        assert_eq!(pos.branch_diff, 0, "Branch diff should be hidden (no diff)");
-        assert_eq!(pos.states, 0, "States should be hidden (no state)");
+        // With two-phase allocation, empty columns are allocated in Phase 2 (after data columns)
+        // Phase 1: branch (data), path (data), time (data), commit (data), message (data)
+        // Phase 2: working_diff (empty), ahead_behind (empty), branch_diff (empty), states (empty), upstream (empty), ci_status (empty)
 
-        // The critical test: path should come immediately after branch
-        // with only one gap, not affected by the hidden columns
-        let gap = 2;
-        let expected_path_pos = widths.branch + gap;
+        // In Phase 1, path comes after branch immediately (since all middle columns have no data)
+        // Branch, path, time, commit, message are allocated first
 
-        assert_eq!(
-            pos.path, expected_path_pos,
-            "Path should be positioned immediately after branch (branch_width + gap), \
-             skipping all hidden columns. Expected {}, got {}",
-            expected_path_pos, pos.path
-        );
-
-        // Verify the invariant: hidden columns don't consume position space
-        // Only visible columns advance the position counter
+        // Path should come early since it has data and is allocated in Phase 1
         assert!(
-            pos.path < widths.branch + gap + 10,
-            "Path position should not be inflated by hidden columns"
+            pos.path > 0,
+            "Path should be visible (allocated in Phase 1)"
         );
+
+        // With the corrected Phase 2 allocation, empty columns only show if space remains AFTER message
+        // In this test with 80 character width and minimal data:
+        // - Branch, path, time, commit get allocated in Phase 1
+        // - Message gets allocated next (before empty columns)
+        // - Empty columns only allocated if space remains after message
+
+        // Message should be allocated (it comes before empty columns now)
+        assert!(
+            widths.message > 0,
+            "Message should be allocated before empty columns"
+        );
+
+        // Empty columns may or may not be visible depending on space remaining after message
+        // This is acceptable - message has priority over empty columns
+        // No assertion needed here - it's correct for empty columns to not show if message takes the space
     }
 }

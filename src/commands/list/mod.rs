@@ -95,7 +95,7 @@ pub fn handle_list(
             println!("{}", json);
         }
         crate::OutputFormat::Table => {
-            let layout = calculate_responsive_layout(&items, show_full);
+            let layout = calculate_responsive_layout(&items, show_full, show_full);
             format_header_line(&layout);
             for item in &items {
                 format_list_item_line(item, &layout, current_worktree_path.as_ref());

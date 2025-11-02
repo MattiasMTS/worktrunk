@@ -3,8 +3,12 @@ use anstyle::{AnsiColor, Color, Style};
 use worktrunk::styling::{ADDITION, CURRENT, DELETION, StyledLine, println};
 
 use super::ci_status::{CiStatus, PrStatus};
-use super::layout::{DiffWidths, LayoutConfig};
-use super::model::{ListItem, WorktreeInfo};
+use super::layout::{
+    DiffWidths, HEADER_AGE, HEADER_AHEAD_BEHIND, HEADER_BRANCH, HEADER_BRANCH_DIFF, HEADER_CI,
+    HEADER_COMMIT, HEADER_MESSAGE, HEADER_PATH, HEADER_STATE, HEADER_UPSTREAM, HEADER_WORKING_DIFF,
+    LayoutConfig,
+};
+use super::model::ListItem;
 
 /// Format ahead/behind counts as plain text with ANSI colors (for json-pretty)
 pub fn format_ahead_behind_plain(ahead: usize, behind: usize) -> Option<String> {
@@ -222,22 +226,30 @@ fn format_ci_status(pr_status: &PrStatus) -> StyledLine {
     segment
 }
 
-pub fn format_all_states(info: &WorktreeInfo) -> String {
+pub fn format_all_states(item: &ListItem) -> String {
     let mut states = Vec::new();
 
-    if let Some(state) = info.worktree_state.as_ref() {
-        states.push(format!("[{}]", state));
+    // Add conflicts state (applies to both worktrees and branches)
+    if item.has_conflicts() {
+        states.push("(conflicts)".to_string());
     }
 
-    if info.worktree.bare {
-        states.push("(bare)".to_string());
-    }
+    // Worktree-specific states
+    if let Some(info) = item.worktree_info() {
+        if let Some(state) = info.worktree_state.as_ref() {
+            states.push(format!("[{}]", state));
+        }
 
-    if let Some(state) = optional_reason_state("locked", info.worktree.locked.as_deref()) {
-        states.push(state);
-    }
-    if let Some(state) = optional_reason_state("prunable", info.worktree.prunable.as_deref()) {
-        states.push(state);
+        if info.worktree.bare {
+            states.push("(bare)".to_string());
+        }
+
+        if let Some(state) = optional_reason_state("locked", info.worktree.locked.as_deref()) {
+            states.push(state);
+        }
+        if let Some(state) = optional_reason_state("prunable", info.worktree.prunable.as_deref()) {
+            states.push(state);
+        }
     }
 
     states.join(" ")
@@ -250,56 +262,67 @@ pub fn format_header_line(layout: &LayoutConfig) {
     let mut line = StyledLine::new();
 
     // Use absolute positions for guaranteed alignment
-    push_header_at(&mut line, "Branch", widths.branch, positions.branch, style);
     push_header_at(
         &mut line,
-        "Working ±",
+        HEADER_BRANCH,
+        widths.branch,
+        positions.branch,
+        style,
+    );
+    push_header_at(
+        &mut line,
+        HEADER_WORKING_DIFF,
         widths.working_diff.total,
         positions.working_diff,
         style,
     );
     push_header_at(
         &mut line,
-        "Main ↕",
+        HEADER_AHEAD_BEHIND,
         widths.ahead_behind.total,
         positions.ahead_behind,
         style,
     );
     push_header_at(
         &mut line,
-        "Main ±",
+        HEADER_BRANCH_DIFF,
         widths.branch_diff.total,
         positions.branch_diff,
         style,
     );
     push_header_at(
         &mut line,
-        "⚠️",
-        widths.conflicts,
-        positions.conflicts,
+        HEADER_STATE,
+        widths.states,
+        positions.states,
         style,
     );
-    push_header_at(&mut line, "State", widths.states, positions.states, style);
-    push_header_at(&mut line, "Path", widths.path, positions.path, style);
+    push_header_at(&mut line, HEADER_PATH, widths.path, positions.path, style);
     push_header_at(
         &mut line,
-        "Remote ↕",
+        HEADER_UPSTREAM,
         widths.upstream.total,
         positions.upstream,
         style,
     );
-    push_header_at(&mut line, "Age", widths.time, positions.time, style);
+    push_header_at(&mut line, HEADER_AGE, widths.time, positions.time, style);
     push_header_at(
         &mut line,
-        "CI",
+        HEADER_CI,
         widths.ci_status,
         positions.ci_status,
         style,
     );
-    push_header_at(&mut line, "Commit", widths.commit, positions.commit, style);
     push_header_at(
         &mut line,
-        "Message",
+        HEADER_COMMIT,
+        widths.commit,
+        positions.commit,
+        style,
+    );
+    push_header_at(
+        &mut line,
+        HEADER_MESSAGE,
         widths.message,
         positions.message,
         style,
@@ -434,30 +457,13 @@ pub fn format_list_item_line(
         }
     }
 
-    // Conflicts indicator
-    if widths.conflicts > 0 {
-        line.pad_to(positions.conflicts);
-        if item.has_conflicts() {
-            line.push_styled(
-                "⚠️".to_string(),
-                Style::new().fg_color(Some(Color::Ansi(AnsiColor::Yellow))),
-            );
-        } else {
-            push_blank(&mut line, widths.conflicts);
-        }
-    }
-
-    // States (worktrees only)
+    // States (includes conflicts)
     if widths.states > 0 {
         line.pad_to(positions.states);
-        if let Some(info) = worktree_info {
-            let states = format_all_states(info);
-            if !states.is_empty() {
-                let states_text = format!("{:width$}", states, width = widths.states);
-                line.push_raw(states_text);
-            } else {
-                push_blank(&mut line, widths.states);
-            }
+        let states = format_all_states(item);
+        if !states.is_empty() {
+            let states_text = format!("{:width$}", states, width = widths.states);
+            line.push_raw(states_text);
         } else {
             push_blank(&mut line, widths.states);
         }
