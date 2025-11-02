@@ -154,7 +154,6 @@ pub fn handle_complete(args: Vec<String>) -> Result<(), GitError> {
             println!("post-create");
             println!("post-start");
             println!("pre-commit");
-            println!("pre-squash");
             println!("pre-merge");
             println!("post-merge");
         }

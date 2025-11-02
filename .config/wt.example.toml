@@ -51,8 +51,9 @@
 # watch = "npm run watch"
 
 # Pre-Commit Commands
-# Runs SEQUENTIALLY before committing changes (blocking, fail-fast)
+# Runs SEQUENTIALLY before committing changes during merge (blocking, fail-fast)
 # All commands must exit with code 0 for commit to proceed
+# Runs for both squash and no-squash merge modes
 # Use for: formatters, linters, quick validation
 #
 # Format options same as post-create-command
@@ -62,14 +63,6 @@
 # [pre-commit-command]
 # format = "cargo fmt -- --check"
 # lint = "cargo clippy -- -D warnings"
-
-# Pre-Squash Commands
-# Runs SEQUENTIALLY before squashing commits (blocking, fail-fast)
-# All commands must exit with code 0 for squash to proceed
-# Use for: validation before combining commits
-#
-# Format options same as post-create-command
-# pre-squash-command = "cargo test"
 
 # Pre-Merge Commands
 # Runs SEQUENTIALLY before merging to target branch (blocking, fail-fast)

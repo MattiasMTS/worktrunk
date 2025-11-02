@@ -269,8 +269,7 @@ Automate common tasks by creating `.config/wt.toml` in your repository root. Run
 |------|--------------|-----------|------------------|
 | **post-create-command** | After `git worktree add` completes | Sequential, blocking | Logs warning, continues with remaining commands |
 | **post-start-command** | After post-create completes | Parallel, non-blocking (background processes) | Logs warning, doesn't affect switch result |
-| **pre-commit-command** | Before committing changes during `wt merge --no-squash` | Sequential, blocking, fail-fast | Terminates merge immediately |
-| **pre-squash-command** | Before squashing commits during `wt merge` (default behavior) | Sequential, blocking, fail-fast | Terminates merge immediately |
+| **pre-commit-command** | Before committing changes during `wt merge` (both squash and no-squash modes) | Sequential, blocking, fail-fast | Terminates merge immediately |
 | **pre-merge-command** | After rebase completes during `wt merge` (validates rebased state before push) | Sequential, blocking, fail-fast | Terminates merge immediately |
 | **post-merge-command** | After successful merge and push to target branch, before cleanup | Sequential, blocking | Logs warning, continues with remaining commands |
 

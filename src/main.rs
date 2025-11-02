@@ -99,7 +99,7 @@ enum DevCommand {
         #[arg(short, long)]
         force: bool,
 
-        /// Skip all project hooks (pre-squash-command)
+        /// Skip all project hooks (pre-commit-command, pre-merge-command)
         #[arg(long)]
         no_verify: bool,
     },

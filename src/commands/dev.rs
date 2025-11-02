@@ -7,8 +7,7 @@ use worktrunk::styling::{
 
 use super::merge::{
     commit_with_generated_message, execute_post_merge_commands, format_commit_message_for_display,
-    run_pre_commit_commands, run_pre_merge_commands, run_pre_squash_commands,
-    show_llm_config_hint_if_needed,
+    run_pre_commit_commands, run_pre_merge_commands, show_llm_config_hint_if_needed,
 };
 use super::worktree::{
     execute_post_create_commands, execute_post_start_commands_sequential, parse_diff_shortstat,
@@ -44,6 +43,8 @@ pub fn handle_dev_run_hook(hook_type: HookType, force: bool) -> Result<(), GitEr
         }
         HookType::PreCommit => {
             check_hook_configured(&project_config.pre_commit_command, hook_type)?;
+            // Pre-commit hook can optionally use target branch context
+            let target_branch = repo.default_branch().ok();
             run_pre_commit_commands(
                 &project_config,
                 &branch,
@@ -51,19 +52,7 @@ pub fn handle_dev_run_hook(hook_type: HookType, force: bool) -> Result<(), GitEr
                 &repo,
                 &config,
                 force,
-            )
-        }
-        HookType::PreSquash => {
-            check_hook_configured(&project_config.pre_squash_command, hook_type)?;
-            let target_branch = repo.default_branch().unwrap_or_else(|_| "main".to_string());
-            run_pre_squash_commands(
-                &project_config,
-                &branch,
-                &target_branch,
-                &worktree_path,
-                &repo,
-                &config,
-                force,
+                target_branch.as_deref(),
             )
         }
         HookType::PreMerge => {
@@ -141,6 +130,7 @@ pub fn handle_dev_commit(force: bool, no_verify: bool) -> Result<(), GitError> {
     if !no_verify && let Ok(Some(project_config)) = ProjectConfig::load(&repo.worktree_root()?) {
         let worktree_path =
             std::env::current_dir().git_context("Failed to get current directory")?;
+        // No target branch context for standalone commits
         run_pre_commit_commands(
             &project_config,
             &current_branch,
@@ -148,6 +138,7 @@ pub fn handle_dev_commit(force: bool, no_verify: bool) -> Result<(), GitError> {
             &repo,
             &config,
             force,
+            None,
         )?;
     }
 
@@ -173,18 +164,18 @@ pub fn handle_dev_squash(
     // Get target branch (default to default branch if not provided)
     let target_branch = repo.resolve_target_branch(target)?;
 
-    // Run pre-squash hook unless --no-verify was specified
+    // Run pre-commit hook unless --no-verify was specified
     if !no_verify && let Ok(Some(project_config)) = ProjectConfig::load(&repo.worktree_root()?) {
         let worktree_path =
             std::env::current_dir().git_context("Failed to get current directory")?;
-        run_pre_squash_commands(
+        run_pre_commit_commands(
             &project_config,
             &current_branch,
-            &target_branch,
             &worktree_path,
             &repo,
             &config,
             force,
+            Some(&target_branch),
         )?;
     }
 

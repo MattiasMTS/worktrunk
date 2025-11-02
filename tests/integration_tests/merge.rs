@@ -1550,12 +1550,12 @@ fn test_merge_pre_squash_command_success() {
     repo.commit("Initial commit");
     repo.setup_remote("main");
 
-    // Create project config with pre-squash command
+    // Create project config with pre-commit command (used for both squash and no-squash)
     let config_dir = repo.root_path().join(".config");
     fs::create_dir_all(&config_dir).expect("Failed to create config dir");
     fs::write(
         config_dir.join("wt.toml"),
-        r#"pre-squash-command = "echo 'Pre-squash check passed'""#,
+        "pre-commit-command = \"echo 'Pre-commit check passed'\"",
     )
     .expect("Failed to write config");
 
@@ -1603,12 +1603,12 @@ fn test_merge_pre_squash_command_failure() {
     repo.commit("Initial commit");
     repo.setup_remote("main");
 
-    // Create project config with failing pre-squash command
+    // Create project config with failing pre-commit command (used for both squash and no-squash)
     let config_dir = repo.root_path().join(".config");
     fs::create_dir_all(&config_dir).expect("Failed to create config dir");
     fs::write(
         config_dir.join("wt.toml"),
-        r#"pre-squash-command = "exit 1""#,
+        r#"pre-commit-command = "exit 1""#,
     )
     .expect("Failed to write config");
 
@@ -1641,7 +1641,7 @@ fn test_merge_pre_squash_command_failure() {
         .output()
         .expect("Failed to commit");
 
-    // Merge with --force (squashing is default) - pre-squash command should fail and block merge
+    // Merge with --force (squashing is default) - pre-commit command should fail and block merge
     snapshot_merge(
         "merge_pre_squash_command_failure",
         &repo,

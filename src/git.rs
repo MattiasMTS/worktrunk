@@ -7,7 +7,6 @@ pub enum HookType {
     PostCreate,
     PostStart,
     PreCommit,
-    PreSquash,
     PreMerge,
     PostMerge,
 }

@@ -20,9 +20,8 @@
 //! **Settings**:
 //! - `post-create-command` - Sequential blocking commands when creating worktree
 //! - `post-start-command` - Parallel background commands after worktree created
-//! - `pre-commit-command` - Validation before committing
-//! - `pre-squash-command` - Validation before squashing commits
-//! - `pre-merge-command` - Validation before merging
+//! - `pre-commit-command` - Validation before committing changes during merge
+//! - `pre-merge-command` - Validation before merging to target branch
 //! - `post-merge-command` - Cleanup after successful merge
 //!
 //! **Managed by**: Checked into the repository, shared across all developers
@@ -138,7 +137,7 @@ pub struct CommitGenerationConfig {
 /// - `{worktree}` - Absolute path to the worktree
 /// - `{repo_root}` - Absolute path to the repository root
 ///
-/// Merge-related commands (`pre-squash-command`, `pre-merge-command`, `post-merge-command`) also support:
+/// Merge-related commands (`pre-commit-command`, `pre-merge-command`, `post-merge-command`) also support:
 /// - `{target}` - Target branch for the merge (e.g., "main")
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
 pub struct ProjectConfig {
@@ -156,21 +155,14 @@ pub struct ProjectConfig {
     #[serde(default, rename = "post-start-command")]
     pub post_start_command: Option<CommandConfig>,
 
-    /// Commands to execute before committing changes (blocking, fail-fast validation)
+    /// Commands to execute before committing changes during merge (blocking, fail-fast validation)
     /// Supports string (single command), array (sequential), or table (named, sequential)
     /// All commands must exit with code 0 for commit to proceed
-    ///
-    /// Available template variables: `{repo}`, `{branch}`, `{worktree}`, `{repo_root}`
-    #[serde(default, rename = "pre-commit-command")]
-    pub pre_commit_command: Option<CommandConfig>,
-
-    /// Commands to execute before squashing commits (blocking, fail-fast validation)
-    /// Supports string (single command), array (sequential), or table (named, sequential)
-    /// All commands must exit with code 0 for squash to proceed
+    /// Runs before any commit operation during `wt merge` (both squash and no-squash modes)
     ///
     /// Available template variables: `{repo}`, `{branch}`, `{worktree}`, `{repo_root}`, `{target}`
-    #[serde(default, rename = "pre-squash-command")]
-    pub pre_squash_command: Option<CommandConfig>,
+    #[serde(default, rename = "pre-commit-command")]
+    pub pre_commit_command: Option<CommandConfig>,
 
     /// Commands to execute before merging (blocking, fail-fast validation)
     /// Supports string (single command), array (sequential), or table (named, sequential)

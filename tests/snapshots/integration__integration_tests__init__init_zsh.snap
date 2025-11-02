@@ -16,7 +16,7 @@ info:
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpYlKodK/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpC5169N/test-config.toml
 ---
 success: true
 exit_code: 0
@@ -248,7 +248,7 @@ _arguments "${_arguments_options[@]}" : \
 '--verbose[Enable verbose output (show git commands and debug info)]' \
 '-h[Print help]' \
 '--help[Print help]' \
-':hook_type -- Hook type to run:(post-create post-start pre-commit pre-squash pre-merge post-merge)' \
+':hook_type -- Hook type to run:(post-create post-start pre-commit pre-merge post-merge)' \
 && ret=0
 ;;
 (commit)
@@ -266,7 +266,7 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 '-f[Skip command approval prompts]' \
 '--force[Skip command approval prompts]' \
-'--no-verify[Skip all project hooks (pre-squash-command)]' \
+'--no-verify[Skip all project hooks (pre-commit-command, pre-merge-command)]' \
 '-v[Enable verbose output (show git commands and debug info)]' \
 '--verbose[Enable verbose output (show git commands and debug info)]' \
 '-h[Print help]' \

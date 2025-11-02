@@ -95,6 +95,7 @@ pub fn handle_merge(
             handle_commit_changes(
                 &config.commit_generation,
                 &current_branch,
+                Some(&target_branch),
                 no_verify,
                 force,
                 tracked_only,
@@ -310,6 +311,7 @@ pub fn commit_with_generated_message(
 fn handle_commit_changes(
     commit_generation_config: &worktrunk::config::CommitGenerationConfig,
     current_branch: &str,
+    target_branch: Option<&str>,
     no_verify: bool,
     force: bool,
     tracked_only: bool,
@@ -328,6 +330,7 @@ fn handle_commit_changes(
             &repo,
             &config,
             force,
+            target_branch,
         )?;
     }
 
@@ -492,6 +495,7 @@ pub fn run_pre_commit_commands(
     repo: &Repository,
     config: &WorktrunkConfig,
     force: bool,
+    target_branch: Option<&str>,
 ) -> Result<(), GitError> {
     let Some(pre_commit_config) = &project_config.pre_commit_command else {
         return Ok(());
@@ -506,11 +510,19 @@ pub fn run_pre_commit_commands(
         &repo_root,
         force,
     );
+
+    // Build extra variables - include target if provided
+    let extra_vars: Vec<(&str, &str)> = if let Some(target) = target_branch {
+        vec![("target", target)]
+    } else {
+        vec![]
+    };
+
     let commands = prepare_project_commands(
         pre_commit_config,
         &ctx,
         false,
-        &[],
+        &extra_vars,
         "Pre-commit commands",
         |_name, command| {
             let dim = AnstyleStyle::new().dimmed();
@@ -531,65 +543,6 @@ pub fn run_pre_commit_commands(
         if let Err(e) = execute_command_in_worktree(worktree_path, &prepared.expanded) {
             return Err(GitError::HookCommandFailed {
                 hook_type: HookType::PreCommit,
-                command_name: prepared.name.clone(),
-                error: e.to_string(),
-            });
-        }
-    }
-
-    crate::output::flush()?;
-
-    Ok(())
-}
-
-/// Run pre-squash commands sequentially (blocking, fail-fast)
-pub fn run_pre_squash_commands(
-    project_config: &ProjectConfig,
-    current_branch: &str,
-    target_branch: &str,
-    worktree_path: &std::path::Path,
-    repo: &Repository,
-    config: &WorktrunkConfig,
-    force: bool,
-) -> Result<(), GitError> {
-    let Some(pre_squash_config) = &project_config.pre_squash_command else {
-        return Ok(());
-    };
-
-    let repo_root = repo.main_worktree_root()?;
-    let ctx = CommandContext::new(
-        repo,
-        config,
-        current_branch,
-        worktree_path,
-        &repo_root,
-        force,
-    );
-    let commands = prepare_project_commands(
-        pre_squash_config,
-        &ctx,
-        false,
-        &[("target", target_branch)],
-        "Pre-squash commands",
-        |_name, command| {
-            let dim = AnstyleStyle::new().dimmed();
-            crate::output::progress(format!("{dim}Skipping command: {command}{dim:#}")).ok();
-        },
-    )?;
-
-    if commands.is_empty() {
-        return Ok(());
-    }
-
-    // Execute each command sequentially
-    for prepared in commands {
-        let label = crate::commands::format_command_label("pre-squash", prepared.name.as_deref());
-        crate::output::progress(format!("🔄 {CYAN}{label}{CYAN:#}"))?;
-        crate::output::progress(format_bash_with_gutter(&prepared.expanded, ""))?;
-
-        if let Err(e) = execute_command_in_worktree(worktree_path, &prepared.expanded) {
-            return Err(GitError::HookCommandFailed {
-                hook_type: HookType::PreSquash,
                 command_name: prepared.name.clone(),
                 error: e.to_string(),
             });

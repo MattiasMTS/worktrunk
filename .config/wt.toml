@@ -23,7 +23,7 @@ cp -cR {repo_root}/target/. {worktree}/target/
 post-merge-command = "cargo install --path ."
 
 # Pre-commit commands
-# These run sequentially before committing changes
+# These run sequentially before committing changes during merge (both squash and no-squash)
 # All commands must exit with code 0 for commit to proceed
 [pre-commit-command]
 pre-commit = "pre-commit run --all-files"

@@ -706,10 +706,9 @@ fn test_complete_dev_run_hook_shows_hook_types() {
     assert!(hooks.contains(&"post-create"), "Missing post-create");
     assert!(hooks.contains(&"post-start"), "Missing post-start");
     assert!(hooks.contains(&"pre-commit"), "Missing pre-commit");
-    assert!(hooks.contains(&"pre-squash"), "Missing pre-squash");
     assert!(hooks.contains(&"pre-merge"), "Missing pre-merge");
     assert!(hooks.contains(&"post-merge"), "Missing post-merge");
-    assert_eq!(hooks.len(), 6, "Should have exactly 6 hook types");
+    assert_eq!(hooks.len(), 5, "Should have exactly 5 hook types");
 }
 
 #[test]
