@@ -261,14 +261,7 @@ pub fn format_commit_message_for_display(message: &str) -> String {
 pub fn show_llm_config_hint_if_needed(
     commit_generation_config: &worktrunk::config::CommitGenerationConfig,
 ) -> Result<(), GitError> {
-    // Check if LLM is NOT configured (matching llm.rs logic)
-    let is_configured = commit_generation_config
-        .command
-        .as_ref()
-        .map(|s| !s.trim().is_empty())
-        .unwrap_or(false);
-
-    if !is_configured {
+    if !commit_generation_config.is_configured() {
         crate::output::hint(format!(
             "{HINT_EMOJI} {HINT}Using fallback commit message. Run 'wt config help' to configure LLM-generated messages{HINT:#}"
         ))?;
@@ -276,9 +269,8 @@ pub fn show_llm_config_hint_if_needed(
     Ok(())
 }
 
-/// Commit already-staged changes with an LLM-generated message
-pub fn commit_with_generated_message(
-    progress_msg: &str,
+/// Commit already-staged changes with LLM-generated or fallback message
+pub fn commit_staged_changes(
     commit_generation_config: &worktrunk::config::CommitGenerationConfig,
 ) -> Result<(), GitError> {
     let repo = Repository::current();
@@ -290,19 +282,19 @@ pub fn commit_with_generated_message(
     let stats = parse_diff_shortstat(&diff_shortstat);
     let stats_parts = stats.format_summary();
 
-    // Format progress message with stats
-    // Don't nest styles - stats already contain ADDITION/DELETION colors
+    // Format progress message based on whether we're using LLM or fallback
+    let action = if commit_generation_config.is_configured() {
+        "Generating commit message and committing..."
+    } else {
+        "Committing with default message..."
+    };
+
     let full_progress_msg = match stats_parts.is_empty() {
-        true => format!("🔄 {CYAN}{progress_msg}{CYAN:#}"),
-        false => format!(
-            "🔄 {CYAN}{}{CYAN:#} ({})",
-            progress_msg,
-            stats_parts.join(", ")
-        ),
+        true => format!("🔄 {CYAN}{action}{CYAN:#}"),
+        false => format!("🔄 {CYAN}{action}{CYAN:#} ({})", stats_parts.join(", ")),
     };
 
     crate::output::progress(full_progress_msg)?;
-    crate::output::progress(format!("🔄 {CYAN}Generating commit message...{CYAN:#}"))?;
 
     show_llm_config_hint_if_needed(commit_generation_config)?;
     let commit_message = crate::llm::generate_commit_message(commit_generation_config)?;
@@ -369,7 +361,7 @@ fn handle_commit_changes(
             .git_context("Failed to stage changes")?;
     }
 
-    commit_with_generated_message("Committing changes...", commit_generation_config)
+    commit_staged_changes(commit_generation_config)
 }
 
 fn handle_squash(target_branch: &str, no_verify: bool, force: bool) -> Result<bool, GitError> {

@@ -123,6 +123,16 @@ pub struct CommitGenerationConfig {
     pub squash_template_file: Option<String>,
 }
 
+impl CommitGenerationConfig {
+    /// Returns true if an LLM command is configured
+    pub fn is_configured(&self) -> bool {
+        self.command
+            .as_ref()
+            .map(|s| !s.trim().is_empty())
+            .unwrap_or(false)
+    }
+}
+
 /// Project-specific configuration with hooks and commands.
 ///
 /// This config is stored at `<repo>/.config/wt.toml` within the repository and

@@ -202,9 +202,8 @@ pub fn generate_commit_message(
     commit_generation_config: &CommitGenerationConfig,
 ) -> Result<String, GitError> {
     // Check if commit generation is configured (non-empty command)
-    if let Some(ref command) = commit_generation_config.command
-        && !command.trim().is_empty()
-    {
+    if commit_generation_config.is_configured() {
+        let command = commit_generation_config.command.as_ref().unwrap();
         // Commit generation is explicitly configured - fail if it doesn't work
         return try_generate_commit_message(
             command,
@@ -275,9 +274,8 @@ pub fn generate_squash_message(
     commit_generation_config: &CommitGenerationConfig,
 ) -> Result<String, Box<dyn std::error::Error>> {
     // Check if commit generation is configured (non-empty command)
-    if let Some(ref command) = commit_generation_config.command
-        && !command.trim().is_empty()
-    {
+    if commit_generation_config.is_configured() {
+        let command = commit_generation_config.command.as_ref().unwrap();
         // Commit generation is explicitly configured - fail if it doesn't work
         let prompt = build_squash_prompt(
             commit_generation_config,

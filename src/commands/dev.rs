@@ -6,7 +6,7 @@ use worktrunk::styling::{
 };
 
 use super::merge::{
-    commit_with_generated_message, execute_post_merge_commands, format_commit_message_for_display,
+    commit_staged_changes, execute_post_merge_commands, format_commit_message_for_display,
     run_pre_commit_commands, run_pre_merge_commands, show_llm_config_hint_if_needed,
 };
 use super::worktree::{
@@ -146,7 +146,7 @@ pub fn handle_dev_commit(force: bool, no_verify: bool) -> Result<(), GitError> {
     repo.run_command(&["add", "-A"])
         .git_context("Failed to stage changes")?;
 
-    commit_with_generated_message("Committing changes...", &config.commit_generation)
+    commit_staged_changes(&config.commit_generation)
 }
 
 /// Handle `wt dev squash` command
@@ -201,7 +201,7 @@ pub fn handle_dev_squash(
 
     if commit_count == 0 && has_staged {
         // Just staged changes, no commits - commit them directly (no squashing needed)
-        commit_with_generated_message("Committing changes...", &config.commit_generation)?;
+        commit_staged_changes(&config.commit_generation)?;
         return Ok(false);
     }
 
