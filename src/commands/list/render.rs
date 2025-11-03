@@ -351,7 +351,6 @@ fn optional_reason_state(label: &str, reason: Option<&str>) -> Option<String> {
     })
 }
 
-/// Push a header at an absolute column position
 fn push_header_at(line: &mut StyledLine, label: &str, width: usize, position: usize, style: Style) {
     if width > 0 {
         // Pad to absolute position
