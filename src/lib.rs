@@ -10,4 +10,7 @@ pub use git::HookType;
 // Test comment
 
 #[cfg(test)]
+mod config_template_test;
+
+#[cfg(test)]
 mod git_parse_test;

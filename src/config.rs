@@ -459,16 +459,24 @@ pub fn expand_template(
     branch: &str,
     extra: &std::collections::HashMap<&str, &str>,
 ) -> String {
+    use shell_escape::escape;
+    use std::borrow::Cow;
+
     // Sanitize branch name by replacing path separators
     let safe_branch = branch.replace(['/', '\\'], "-");
 
-    let mut result = template
-        .replace("{main-worktree}", main_worktree)
-        .replace("{branch}", &safe_branch);
+    // Shell-escape all variables to prevent issues with spaces and special characters
+    let escaped_worktree = escape(Cow::Borrowed(main_worktree));
+    let escaped_branch = escape(Cow::Borrowed(safe_branch.as_str()));
 
-    // Apply any extra variables
+    let mut result = template
+        .replace("{main-worktree}", &escaped_worktree)
+        .replace("{branch}", &escaped_branch);
+
+    // Apply any extra variables (also escaped)
     for (key, value) in extra {
-        result = result.replace(&format!("{{{}}}", key), value);
+        let escaped_value = escape(Cow::Borrowed(*value));
+        result = result.replace(&format!("{{{}}}", key), &escaped_value);
     }
 
     result
