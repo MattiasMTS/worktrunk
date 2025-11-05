@@ -67,8 +67,8 @@ if command -v wt >/dev/null 2>&1 || [[ -n "${WORKTRUNK_BIN:-}" ]]; then
                 shift
                 _wt_exec --internal "$subcommand" "$@"
                 ;;
-            dev)
-                # Check if dev subcommand is select
+            beta)
+                # Check if beta subcommand is select
                 if [[ "$2" == "select" ]]; then
                     _wt_exec --internal "$@"
                 else

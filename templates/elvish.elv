@@ -92,8 +92,8 @@ if (or (has-external wt) (has-env WORKTRUNK_BIN)) {
             # Commands that need --internal for directory change support
             var rest-args = $filtered-args[1..]
             _wt_exec --internal $subcommand $@rest-args
-        } elif (eq $subcommand "dev") {
-            # Check if dev subcommand is select
+        } elif (eq $subcommand ​"beta") {
+            # Check if beta subcommand is select
             if (and (> (count $filtered-args) 1) (eq $filtered-args[1] "select")) {
                 _wt_exec --internal $@filtered-args
             } else {

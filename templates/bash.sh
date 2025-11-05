@@ -86,8 +86,8 @@ if command -v wt >/dev/null 2>&1 || [[ -n "${WORKTRUNK_BIN:-}" ]]; then
                     # Commands that need --internal for directory change support
                     _wt_exec --internal "${args[@]}"
                     ;;
-                dev)
-                    # Check if dev subcommand is select
+                beta)
+                    # Check if beta subcommand is select
                     if [[ ${{ '{' }}#args[@]} -gt 1 ]] && [[ "${args[1]}" == "select" ]]; then
                         _wt_exec --internal "${args[@]}"
                     else

@@ -16,7 +16,7 @@ info:
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmptrPwrW/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpgJM1Ra/test-config.toml
 ---
 success: true
 exit_code: 0
@@ -90,8 +90,8 @@ if command -v wt >/dev/null 2>&1 || [[ -n "${WORKTRUNK_BIN:-}" ]]; then
                 shift
                 _wt_exec --internal "$subcommand" "$@"
                 ;;
-            dev)
-                # Check if dev subcommand is select
+            beta)
+                # Check if beta subcommand is select
                 if [[ "$2" == "select" ]]; then
                     _wt_exec --internal "$@"
                 else
@@ -232,21 +232,21 @@ _arguments "${_arguments_options[@]}" : \
     ;;
 esac
 ;;
-(dev)
+(beta)
 _arguments "${_arguments_options[@]}" : \
 '-v[Enable verbose output (show git commands and debug info)]' \
 '--verbose[Enable verbose output (show git commands and debug info)]' \
 '-h[Print help]' \
 '--help[Print help]' \
-":: :_wt__dev_commands" \
-"*::: :->dev" \
+":: :_wt__beta_commands" \
+"*::: :->beta" \
 && ret=0
 
     case $state in
-    (dev)
+    (beta)
         words=($line[1] "${words[@]}")
         (( CURRENT += 1 ))
-        curcontext="${curcontext%:*:*}:wt-dev-command-$line[1]:"
+        curcontext="${curcontext%:*:*}:wt-beta-command-$line[1]:"
         case $line[1] in
             (run-hook)
 _arguments "${_arguments_options[@]}" : \
@@ -408,7 +408,7 @@ _wt_commands() {
     local commands; commands=(
 'init:Generate shell integration code' \
 'config:Manage configuration' \
-'dev:Development and testing utilities' \
+'beta:Development and testing utilities' \
 'list:List worktrees and optionally branches' \
 'switch:Switch to a worktree' \
 'remove:Finish current worktree, returning to primary if current' \
@@ -417,6 +417,54 @@ _wt_commands() {
 'complete:Internal completion helper (hidden)' \
     )
     _describe -t commands 'wt commands' commands "$@"
+}
+(( $+functions[_wt__beta_commands] )) ||
+_wt__beta_commands() {
+    local commands; commands=(
+'run-hook:Run a project hook for testing' \
+'commit:Commit changes with LLM-generated message' \
+'squash:Squash commits with LLM-generated message' \
+'push:Push changes to target branch' \
+'rebase:Rebase current branch onto target branch' \
+'ask-approvals:Approve commands in the project config (shows unapproved by default)' \
+'select:Interactive worktree selector' \
+    )
+    _describe -t commands 'wt beta commands' commands "$@"
+}
+(( $+functions[_wt__beta__ask-approvals_commands] )) ||
+_wt__beta__ask-approvals_commands() {
+    local commands; commands=()
+    _describe -t commands 'wt beta ask-approvals commands' commands "$@"
+}
+(( $+functions[_wt__beta__commit_commands] )) ||
+_wt__beta__commit_commands() {
+    local commands; commands=()
+    _describe -t commands 'wt beta commit commands' commands "$@"
+}
+(( $+functions[_wt__beta__push_commands] )) ||
+_wt__beta__push_commands() {
+    local commands; commands=()
+    _describe -t commands 'wt beta push commands' commands "$@"
+}
+(( $+functions[_wt__beta__rebase_commands] )) ||
+_wt__beta__rebase_commands() {
+    local commands; commands=()
+    _describe -t commands 'wt beta rebase commands' commands "$@"
+}
+(( $+functions[_wt__beta__run-hook_commands] )) ||
+_wt__beta__run-hook_commands() {
+    local commands; commands=()
+    _describe -t commands 'wt beta run-hook commands' commands "$@"
+}
+(( $+functions[_wt__beta__select_commands] )) ||
+_wt__beta__select_commands() {
+    local commands; commands=()
+    _describe -t commands 'wt beta select commands' commands "$@"
+}
+(( $+functions[_wt__beta__squash_commands] )) ||
+_wt__beta__squash_commands() {
+    local commands; commands=()
+    _describe -t commands 'wt beta squash commands' commands "$@"
 }
 (( $+functions[_wt__complete_commands] )) ||
 _wt__complete_commands() {
@@ -463,54 +511,6 @@ _wt__config__refresh-cache_commands() {
 _wt__config__shell_commands() {
     local commands; commands=()
     _describe -t commands 'wt config shell commands' commands "$@"
-}
-(( $+functions[_wt__dev_commands] )) ||
-_wt__dev_commands() {
-    local commands; commands=(
-'run-hook:Run a project hook for testing' \
-'commit:Commit changes with LLM-generated message' \
-'squash:Squash commits with LLM-generated message' \
-'push:Push changes to target branch' \
-'rebase:Rebase current branch onto target branch' \
-'ask-approvals:Approve commands in the project config (shows unapproved by default)' \
-'select:Interactive worktree selector' \
-    )
-    _describe -t commands 'wt dev commands' commands "$@"
-}
-(( $+functions[_wt__dev__ask-approvals_commands] )) ||
-_wt__dev__ask-approvals_commands() {
-    local commands; commands=()
-    _describe -t commands 'wt dev ask-approvals commands' commands "$@"
-}
-(( $+functions[_wt__dev__commit_commands] )) ||
-_wt__dev__commit_commands() {
-    local commands; commands=()
-    _describe -t commands 'wt dev commit commands' commands "$@"
-}
-(( $+functions[_wt__dev__push_commands] )) ||
-_wt__dev__push_commands() {
-    local commands; commands=()
-    _describe -t commands 'wt dev push commands' commands "$@"
-}
-(( $+functions[_wt__dev__rebase_commands] )) ||
-_wt__dev__rebase_commands() {
-    local commands; commands=()
-    _describe -t commands 'wt dev rebase commands' commands "$@"
-}
-(( $+functions[_wt__dev__run-hook_commands] )) ||
-_wt__dev__run-hook_commands() {
-    local commands; commands=()
-    _describe -t commands 'wt dev run-hook commands' commands "$@"
-}
-(( $+functions[_wt__dev__select_commands] )) ||
-_wt__dev__select_commands() {
-    local commands; commands=()
-    _describe -t commands 'wt dev select commands' commands "$@"
-}
-(( $+functions[_wt__dev__squash_commands] )) ||
-_wt__dev__squash_commands() {
-    local commands; commands=()
-    _describe -t commands 'wt dev squash commands' commands "$@"
 }
 (( $+functions[_wt__init_commands] )) ||
 _wt__init_commands() {

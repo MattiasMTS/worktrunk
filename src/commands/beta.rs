@@ -12,8 +12,8 @@ use super::merge::{
 };
 use super::worktree::{execute_post_create_commands, execute_post_start_commands_sequential};
 
-/// Handle `wt dev run-hook` command
-pub fn handle_dev_run_hook(hook_type: HookType, force: bool) -> Result<(), GitError> {
+/// Handle `wt beta run-hook` command
+pub fn handle_beta_run_hook(hook_type: HookType, force: bool) -> Result<(), GitError> {
     // Derive context from current environment
     let repo = Repository::current();
     let worktree_path = std::env::current_dir()
@@ -117,8 +117,8 @@ fn check_hook_configured<T>(hook: &Option<T>, hook_type: HookType) -> Result<(),
     Ok(())
 }
 
-/// Handle `wt dev commit` command
-pub fn handle_dev_commit(force: bool, no_verify: bool) -> Result<(), GitError> {
+/// Handle `wt beta commit` command
+pub fn handle_beta_commit(force: bool, no_verify: bool) -> Result<(), GitError> {
     let repo = Repository::current();
     let config = WorktrunkConfig::load().git_context("Failed to load config")?;
     let current_branch = repo
@@ -149,13 +149,13 @@ pub fn handle_dev_commit(force: bool, no_verify: bool) -> Result<(), GitError> {
     commit_staged_changes(&config.commit_generation, false)
 }
 
-/// Handle `wt dev squash` command
+/// Handle `wt beta squash` command
 ///
 /// # Arguments
 /// * `auto_trust` - If true, skip approval prompts for pre-commit commands (already approved in batch)
 ///
 /// Returns true if a commit or squash operation occurred, false if nothing needed to be done
-pub fn handle_dev_squash(
+pub fn handle_beta_squash(
     target: Option<&str>,
     force: bool,
     no_verify: bool,
@@ -306,8 +306,8 @@ pub fn handle_dev_squash(
     Ok(true)
 }
 
-/// Handle `wt dev push` command
-pub fn handle_dev_push(target: Option<&str>, allow_merge_commits: bool) -> Result<(), GitError> {
+/// Handle `wt beta push` command
+pub fn handle_beta_push(target: Option<&str>, allow_merge_commits: bool) -> Result<(), GitError> {
     super::worktree::handle_push(
         target,
         allow_merge_commits,
@@ -318,9 +318,9 @@ pub fn handle_dev_push(target: Option<&str>, allow_merge_commits: bool) -> Resul
     )
 }
 
-/// Handle `wt dev rebase` command
+/// Handle `wt beta rebase` command
 /// Returns true if rebasing occurred, false if already up-to-date
-pub fn handle_dev_rebase(target: Option<&str>) -> Result<bool, GitError> {
+pub fn handle_beta_rebase(target: Option<&str>) -> Result<bool, GitError> {
     let repo = Repository::current();
 
     // Get target branch (default to default branch if not provided)
@@ -386,8 +386,8 @@ pub fn handle_dev_rebase(target: Option<&str>) -> Result<bool, GitError> {
     Ok(true)
 }
 
-/// Handle `wt dev ask-approvals` command - approve all commands in the project
-pub fn handle_dev_ask_approvals(force: bool, show_all: bool) -> Result<(), GitError> {
+/// Handle `wt beta ask-approvals` command - approve all commands in the project
+pub fn handle_beta_ask_approvals(force: bool, show_all: bool) -> Result<(), GitError> {
     use super::command_approval::approve_command_batch;
     use worktrunk::config::{CommandPhase, WorktrunkConfig};
 

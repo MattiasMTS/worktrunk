@@ -76,8 +76,8 @@ if (which wt | is-not-empty) or ($env.WORKTRUNK_BIN? | is-not-empty) {
                 let exit_code = (_wt_exec $cmd ...$internal_args)
                 return $exit_code
             }
-            "dev" => {
-                # Check if dev subcommand is select
+            ​"beta" => {
+                # Check if beta subcommand is select
                 let dev_subcommand = ($filtered_args | get 1? | default "")
                 if $dev_subcommand == "select" {
                     let exit_code = (_wt_exec $cmd --internal ...$filtered_args)

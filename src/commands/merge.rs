@@ -199,7 +199,7 @@ pub fn handle_merge(
 
     // Rebase onto target (skip if --no-commit) - track whether rebasing occurred
     let rebased = if !no_commit {
-        super::dev::handle_dev_rebase(Some(&target_branch))?
+        super::beta::handle_beta_rebase(Some(&target_branch))?
     } else {
         false
     };
@@ -464,9 +464,9 @@ fn handle_commit_changes(
 }
 
 fn handle_squash(target_branch: &str, no_verify: bool, force: bool) -> Result<bool, GitError> {
-    // Delegate to the atomic dev command
+    // Delegate to the atomic beta command
     // auto_trust=true because commands already approved in merge batch
-    super::dev::handle_dev_squash(Some(target_branch), force, no_verify, true)
+    super::beta::handle_beta_squash(Some(target_branch), force, no_verify, true)
 }
 
 /// Run pre-merge commands sequentially (blocking, fail-fast)

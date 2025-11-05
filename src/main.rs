@@ -30,11 +30,11 @@ mod output;
 
 use commands::worktree::SwitchResult;
 use commands::{
-    ConfigAction, Shell, handle_complete, handle_completion, handle_config_help,
-    handle_config_init, handle_config_list, handle_config_refresh_cache, handle_configure_shell,
-    handle_dev_ask_approvals, handle_dev_commit, handle_dev_push, handle_dev_rebase,
-    handle_dev_run_hook, handle_dev_squash, handle_init, handle_list, handle_merge, handle_remove,
-    handle_select, handle_switch,
+    ConfigAction, Shell, handle_beta_ask_approvals, handle_beta_commit, handle_beta_push,
+    handle_beta_rebase, handle_beta_run_hook, handle_beta_squash, handle_complete,
+    handle_completion, handle_config_help, handle_config_init, handle_config_list,
+    handle_config_refresh_cache, handle_configure_shell, handle_init, handle_list, handle_merge,
+    handle_remove, handle_select, handle_switch,
 };
 use output::{execute_user_command, handle_remove_output, handle_switch_output};
 
@@ -87,7 +87,7 @@ enum ConfigCommand {
 }
 
 #[derive(Subcommand)]
-enum DevCommand {
+enum BetaCommand {
     /// Run a project hook for testing
     RunHook {
         /// Hook type to run
@@ -170,9 +170,9 @@ enum Commands {
 
     /// Development and testing utilities
     #[command(hide = true)]
-    Dev {
+    Beta {
         #[command(subcommand)]
-        action: DevCommand,
+        action: BetaCommand,
     },
 
     /// List worktrees and optionally branches
@@ -593,21 +593,21 @@ fn main() {
                     .git_err()
             }
         },
-        Commands::Dev { action } => match action {
-            DevCommand::RunHook { hook_type, force } => handle_dev_run_hook(hook_type, force),
-            DevCommand::Commit { force, no_verify } => handle_dev_commit(force, no_verify),
-            DevCommand::Squash {
+        Commands::Beta { action } => match action {
+            BetaCommand::RunHook { hook_type, force } => handle_beta_run_hook(hook_type, force),
+            BetaCommand::Commit { force, no_verify } => handle_beta_commit(force, no_verify),
+            BetaCommand::Squash {
                 target,
                 force,
                 no_verify,
-            } => handle_dev_squash(target.as_deref(), force, no_verify, false).map(|_| ()),
-            DevCommand::Push {
+            } => handle_beta_squash(target.as_deref(), force, no_verify, false).map(|_| ()),
+            BetaCommand::Push {
                 target,
                 allow_merge_commits,
-            } => handle_dev_push(target.as_deref(), allow_merge_commits),
-            DevCommand::Rebase { target } => handle_dev_rebase(target.as_deref()).map(|_| ()),
-            DevCommand::AskApprovals { force, all } => handle_dev_ask_approvals(force, all),
-            DevCommand::Select => handle_select(),
+            } => handle_beta_push(target.as_deref(), allow_merge_commits),
+            BetaCommand::Rebase { target } => handle_beta_rebase(target.as_deref()).map(|_| ()),
+            BetaCommand::AskApprovals { force, all } => handle_beta_ask_approvals(force, all),
+            BetaCommand::Select => handle_select(),
         },
         Commands::List {
             format,
