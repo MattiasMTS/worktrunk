@@ -68,6 +68,9 @@ pub struct BranchInfo {
     pub upstream: UpstreamStatus,
     pub pr_status: Option<PrStatus>,
     pub has_conflicts: bool,
+    /// User-defined status from `worktrunk.status.<branch>` git config
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_status: Option<String>,
 
     // Display fields for json-pretty format (with ANSI colors)
     #[serde(flatten)]
@@ -258,6 +261,20 @@ impl ListItem {
             ListItem::Branch(info) => info.pr_status.as_ref(),
         }
     }
+
+    /// Get combined status (git symbols + user status)
+    /// For worktrees: uses WorktreeInfo.combined_status()
+    /// For branches: returns user status (branches have no git status symbols)
+    pub fn combined_status(&self) -> String {
+        match self {
+            ListItem::Worktree(info) => info.combined_status(),
+            ListItem::Branch(info) => {
+                // Branch-only entries show just the user status (no git symbols)
+                // If no user status, show "·" to indicate "branch without worktree"
+                info.user_status.clone().unwrap_or_else(|| "·".to_string())
+            }
+        }
+    }
 }
 
 impl BranchInfo {
@@ -293,6 +310,9 @@ impl BranchInfo {
             false
         };
 
+        // Read user-defined status from git config (branch-keyed only, no worktree)
+        let user_status = read_branch_keyed_status(repo, branch);
+
         Ok(BranchInfo {
             name: branch.to_string(),
             head,
@@ -302,17 +322,37 @@ impl BranchInfo {
             upstream,
             pr_status,
             has_conflicts,
+            user_status,
             display: DisplayFields::default(),
         })
     }
 }
 
-/// Read user-defined status from worktrunk.status git config
-fn read_user_status(repo: &Repository) -> Option<String> {
-    repo.run_command(&["config", "--worktree", "--get", "worktrunk.status"])
+/// Read user-defined status from branch-keyed config only (`worktrunk.status.<branch>`)
+/// Used for branch-only entries that don't have a worktree
+fn read_branch_keyed_status(repo: &Repository, branch: &str) -> Option<String> {
+    let config_key = format!("worktrunk.status.{}", branch);
+    repo.run_command(&["config", "--get", &config_key])
         .ok()
         .map(|output| output.trim().to_string())
         .filter(|s| !s.is_empty())
+}
+
+/// Read user-defined status from git config
+/// Tries worktree-specific config first (`worktrunk.status`), then falls back to branch-keyed (`worktrunk.status.<branch>`)
+/// Used for worktree entries
+fn read_user_status(repo: &Repository, branch: Option<&str>) -> Option<String> {
+    // Try worktree-specific config first (requires extensions.worktreeConfig)
+    if let Ok(output) = repo.run_command(&["config", "--worktree", "--get", "worktrunk.status"]) {
+        let status = output.trim().to_string();
+        if !status.is_empty() {
+            return Some(status);
+        }
+    }
+
+    // Fall back to branch-keyed config (works everywhere)
+    let branch = branch?;
+    read_branch_keyed_status(repo, branch)
 }
 
 /// Git status information parsed from `git status --porcelain`
@@ -574,8 +614,8 @@ impl WorktreeInfo {
 
         symbols.insert_str(insert_pos, &state_symbols);
 
-        // Read user-defined status from git config
-        let user_status = read_user_status(&wt_repo);
+        // Read user-defined status from git config (worktree-specific or branch-keyed)
+        let user_status = read_user_status(&wt_repo, wt.branch.as_deref());
 
         Ok(WorktreeInfo {
             worktree: wt.clone(),
@@ -597,11 +637,11 @@ impl WorktreeInfo {
     }
 
     /// Combine git status symbols and user-defined status
-    /// Returns the combined string with a space separator if both are present
+    /// Returns the combined string (no separator - tools can add spaces if needed)
     pub fn combined_status(&self) -> String {
         if !self.status_symbols.is_empty() {
             if let Some(ref user_status) = self.user_status {
-                format!("{} {}", self.status_symbols, user_status)
+                format!("{}{}", self.status_symbols, user_status)
             } else {
                 self.status_symbols.clone()
             }

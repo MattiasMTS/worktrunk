@@ -388,6 +388,141 @@ test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
 
 </details>
 
+### Custom Worktree Status
+
+Add emoji status markers to worktrees that appear in `wt list`. Perfect for tracking work-in-progress states, CI status, or team coordination.
+
+**Set status manually:**
+
+```bash
+# Set an emoji status for a branch (works everywhere)
+git config worktrunk.status.feature-x "🚧"
+
+# Clear the status
+git config --unset worktrunk.status.feature-x
+```
+
+**Status appears in the Status column:**
+
+```
+Branch     Status      Working ±  Main ↕  Path
+feature-a  ≡↓!🚧                  ↓2      ./feature-a/
+feature-b  ↑!✅        +2 -1     ↑1      ./feature-b/
+feature-c  🤖                            ./feature-c/
+```
+
+The custom emoji appears directly after the git status symbols.
+
+<details>
+<summary><b>Automation with Claude Code Hooks</b></summary>
+
+Claude Code can automatically set/clear emoji status when coding sessions start and end. This shows which branches have active AI sessions.
+
+Add to `~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "git branch --show-current 2>/dev/null | xargs -I {} git config worktrunk.status.{} 🤖"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "git branch --show-current 2>/dev/null | xargs -I {} git config --unset worktrunk.status.{} 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Now when you use Claude:
+- Sets status to `🤖` for the current branch when you submit a prompt
+- Clears the status when the session stops
+
+**Status from other terminal:**
+
+```bash
+$ wt list
+Branch     Status      Working ±  Path
+main                              ./myapp/
+feature-x  ↑!🤖        +5 -2     ./myapp.feature-x/
+```
+
+**How it works:**
+
+- Status is stored as `worktrunk.status.<branch>` in `.git/config`
+- Each branch can have its own status emoji
+- The hooks automatically detect the current branch and set/clear its status
+- Status is shared across all worktrees on the same branch (by design)
+- Works with any git repository, no special configuration needed
+
+<details>
+<summary><b>Alternative: Per-Worktree Status (Advanced)</b></summary>
+
+For true per-worktree isolation (different status for multiple worktrees on the same branch), use worktree-specific config:
+
+**One-time setup (enables per-worktree config for the repo):**
+```bash
+git config extensions.worktreeConfig true
+```
+
+**Set status from within a worktree:**
+```bash
+# From within the worktree
+git config --worktree worktrunk.status "🚧"
+
+# Clear status
+git config --worktree --unset worktrunk.status
+```
+
+**Claude Code hooks for per-worktree:**
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "git rev-parse --is-inside-work-tree >/dev/null 2>&1 && git config extensions.worktreeConfig true 2>/dev/null; git config --worktree worktrunk.status 🤖 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "git config --worktree --unset worktrunk.status 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Priority:** Worktree-specific config takes precedence over branch-keyed config when both exist.
+
+</details>
+
+</details>
+
 ### Worktree Paths
 
 By default, worktrees live as siblings to the main repo:

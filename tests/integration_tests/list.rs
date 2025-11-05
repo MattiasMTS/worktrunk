@@ -619,40 +619,24 @@ fn test_list_with_user_status() {
     repo.commit("Initial commit");
 
     // Worktree with user status only (no git changes)
-    let clean_wt = repo.add_worktree("clean-with-status", "clean-with-status");
+    repo.add_worktree("clean-with-status", "clean-with-status");
 
-    // Enable worktree config
+    // Set user status (emoji only, branch-keyed)
     let mut cmd = Command::new("git");
     repo.configure_git_cmd(&mut cmd);
-    cmd.args(["config", "extensions.worktreeConfig", "true"])
-        .current_dir(&clean_wt)
-        .output()
-        .expect("Failed to enable worktree config");
-
-    // Set user status
-    let mut cmd = Command::new("git");
-    repo.configure_git_cmd(&mut cmd);
-    cmd.args(["config", "--worktree", "worktrunk.status", "waiting"])
-        .current_dir(&clean_wt)
+    cmd.args(["config", "worktrunk.status.clean-with-status", "⏸️"])
+        .current_dir(repo.root_path())
         .output()
         .expect("Failed to set user status");
 
     // Worktree with both git status and user status
     let dirty_wt = repo.add_worktree("dirty-with-status", "dirty-with-status");
 
-    // Enable worktree config
+    // Set user status (emoji only, branch-keyed)
     let mut cmd = Command::new("git");
     repo.configure_git_cmd(&mut cmd);
-    cmd.args(["config", "extensions.worktreeConfig", "true"])
-        .current_dir(&dirty_wt)
-        .output()
-        .expect("Failed to enable worktree config");
-
-    // Set user status
-    let mut cmd = Command::new("git");
-    repo.configure_git_cmd(&mut cmd);
-    cmd.args(["config", "--worktree", "worktrunk.status", "*"])
-        .current_dir(&dirty_wt)
+    cmd.args(["config", "worktrunk.status.dirty-with-status", "🤖"])
+        .current_dir(repo.root_path())
         .output()
         .expect("Failed to set user status");
 
@@ -674,22 +658,14 @@ fn test_list_json_with_user_status() {
     let mut repo = TestRepo::new();
     repo.commit("Initial commit");
 
-    // Worktree with user status
-    let with_status_wt = repo.add_worktree("with-status", "with-status");
+    // Worktree with user status (emoji only)
+    repo.add_worktree("with-status", "with-status");
 
-    // Enable worktree config
+    // Set user status (branch-keyed)
     let mut cmd = Command::new("git");
     repo.configure_git_cmd(&mut cmd);
-    cmd.args(["config", "extensions.worktreeConfig", "true"])
-        .current_dir(&with_status_wt)
-        .output()
-        .expect("Failed to enable worktree config");
-
-    // Set user status
-    let mut cmd = Command::new("git");
-    repo.configure_git_cmd(&mut cmd);
-    cmd.args(["config", "--worktree", "worktrunk.status", "processing..."])
-        .current_dir(&with_status_wt)
+    cmd.args(["config", "worktrunk.status.with-status", "🔧"])
+        .current_dir(repo.root_path())
         .output()
         .expect("Failed to set user status");
 
@@ -700,48 +676,71 @@ fn test_list_json_with_user_status() {
 }
 
 #[test]
+fn test_list_branch_only_ignores_main_worktree_status() {
+    // Regression test for bug where branch-only entries incorrectly inherited
+    // main worktree's worktree-specific status
+    let repo = TestRepo::new();
+    repo.commit("Initial commit");
+
+    // Set worktree-specific status on main worktree (requires extensions.worktreeConfig)
+    let mut cmd = Command::new("git");
+    repo.configure_git_cmd(&mut cmd);
+    cmd.args(["config", "extensions.worktreeConfig", "true"])
+        .current_dir(repo.root_path())
+        .output()
+        .expect("Failed to enable worktreeConfig");
+
+    let mut cmd = Command::new("git");
+    repo.configure_git_cmd(&mut cmd);
+    cmd.args(["config", "--worktree", "worktrunk.status", "🏠"])
+        .current_dir(repo.root_path())
+        .output()
+        .expect("Failed to set main worktree status");
+
+    // Create a branch-only entry (no worktree)
+    let mut cmd = Command::new("git");
+    repo.configure_git_cmd(&mut cmd);
+    cmd.args(["branch", "branch-only"])
+        .current_dir(repo.root_path())
+        .output()
+        .expect("Failed to create branch");
+
+    // Set branch-keyed status for the branch-only entry
+    let mut cmd = Command::new("git");
+    repo.configure_git_cmd(&mut cmd);
+    cmd.args(["config", "worktrunk.status.branch-only", "🌿"])
+        .current_dir(repo.root_path())
+        .output()
+        .expect("Failed to set branch status");
+
+    // Use --branches flag to show branch-only entries
+    snapshot_list_with_branches("branch_only_ignores_main_worktree_status", &repo);
+}
+
+#[test]
 fn test_list_user_status_with_special_characters() {
     let mut repo = TestRepo::new();
     repo.commit("Initial commit");
 
-    // Test with emoji
-    let emoji_wt = repo.add_worktree("emoji", "emoji");
+    // Test with single emoji
+    repo.add_worktree("emoji", "emoji");
 
     let mut cmd = Command::new("git");
     repo.configure_git_cmd(&mut cmd);
-    cmd.args(["config", "extensions.worktreeConfig", "true"])
-        .current_dir(&emoji_wt)
-        .output()
-        .expect("Failed to enable worktree config");
-
-    let mut cmd = Command::new("git");
-    repo.configure_git_cmd(&mut cmd);
-    cmd.args(["config", "--worktree", "worktrunk.status", "🔄"])
-        .current_dir(&emoji_wt)
+    cmd.args(["config", "worktrunk.status.emoji", "🔄"])
+        .current_dir(repo.root_path())
         .output()
         .expect("Failed to set user status");
 
-    // Test with multiple characters
-    let multi_wt = repo.add_worktree("multi", "multi");
+    // Test with compound emoji (multi-codepoint)
+    repo.add_worktree("multi", "multi");
 
     let mut cmd = Command::new("git");
     repo.configure_git_cmd(&mut cmd);
-    cmd.args(["config", "extensions.worktreeConfig", "true"])
-        .current_dir(&multi_wt)
+    cmd.args(["config", "worktrunk.status.multi", "👨‍💻"])
+        .current_dir(repo.root_path())
         .output()
-        .expect("Failed to enable worktree config");
-
-    let mut cmd = Command::new("git");
-    repo.configure_git_cmd(&mut cmd);
-    cmd.args([
-        "config",
-        "--worktree",
-        "worktrunk.status",
-        "blocked: needs review",
-    ])
-    .current_dir(&multi_wt)
-    .output()
-    .expect("Failed to set user status");
+        .expect("Failed to set user status");
 
     snapshot_list("user_status_special_chars", &repo);
 }

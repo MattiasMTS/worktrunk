@@ -309,11 +309,7 @@ pub fn format_list_item_line(
             }
             (ColumnKind::Status, _) => {
                 // Combine git status symbols + user-defined status from worktrunk.status
-                let status_content = if let Some(info) = worktree_info {
-                    info.combined_status()
-                } else {
-                    "·".to_string()
-                };
+                let status_content = item.combined_status();
 
                 let status_text = if is_last {
                     status_content
