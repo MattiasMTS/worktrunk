@@ -17,6 +17,8 @@ pub struct DisplayFields {
     pub upstream_display: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ci_status_display: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status_display: Option<String>,
 }
 
 #[derive(serde::Serialize)]
@@ -313,6 +315,15 @@ impl BranchInfo {
         // Read user-defined status from git config (branch-keyed only, no worktree)
         let user_status = read_branch_keyed_status(repo, branch);
 
+        // Create display fields with status
+        // For branches without worktrees, status is just user status or "·"
+        let status_display = Some(user_status.clone().unwrap_or_else(|| "·".to_string()));
+
+        let display = DisplayFields {
+            status_display,
+            ..Default::default()
+        };
+
         Ok(BranchInfo {
             name: branch.to_string(),
             head,
@@ -323,7 +334,7 @@ impl BranchInfo {
             pr_status,
             has_conflicts,
             user_status,
-            display: DisplayFields::default(),
+            display,
         })
     }
 }
@@ -355,6 +366,80 @@ fn read_user_status(repo: &Repository, branch: Option<&str>) -> Option<String> {
     read_branch_keyed_status(repo, branch)
 }
 
+/// Main branch divergence state
+///
+/// Represents relationship to the main/primary branch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum MainDivergence {
+    /// Up to date with main branch
+    #[default]
+    None,
+    /// Ahead of main (has commits main doesn't have)
+    Ahead,
+    /// Behind main (missing commits from main)
+    Behind,
+    /// Diverged (both ahead and behind main)
+    Diverged,
+}
+
+impl std::fmt::Display for MainDivergence {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::None => Ok(()),
+            Self::Ahead => write!(f, "↑"),
+            Self::Behind => write!(f, "↓"),
+            Self::Diverged => write!(f, "↕"),
+        }
+    }
+}
+
+impl serde::Serialize for MainDivergence {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        // Serialize as empty string for None, or the character for other variants
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+/// Upstream/remote divergence state
+///
+/// Represents relationship to the remote tracking branch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum UpstreamDivergence {
+    /// Up to date with remote
+    #[default]
+    None,
+    /// Ahead of remote (has commits remote doesn't have)
+    Ahead,
+    /// Behind remote (missing commits from remote)
+    Behind,
+    /// Diverged (both ahead and behind remote)
+    Diverged,
+}
+
+impl std::fmt::Display for UpstreamDivergence {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::None => Ok(()),
+            Self::Ahead => write!(f, "⇡"),
+            Self::Behind => write!(f, "⇣"),
+            Self::Diverged => write!(f, "⇅"),
+        }
+    }
+}
+
+impl serde::Serialize for UpstreamDivergence {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        // Serialize as empty string for None, or the character for other variants
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
 /// Structured status symbols for aligned rendering
 ///
 /// Symbols are categorized to enable vertical alignment in table output:
@@ -367,32 +452,31 @@ fn read_user_status(repo: &Repository, branch: Option<&str>) -> Option<String> {
 ///
 /// Symbols within each position may or may not be mutually exclusive:
 ///
-/// **Mutually exclusive:**
+/// **Mutually exclusive (enforced by type system):**
+/// - ↑ vs ↓ vs ↕: Main divergence states (MainDivergence enum)
+/// - ⇡ vs ⇣ vs ⇅: Upstream divergence states (UpstreamDivergence enum)
+///
+/// **Mutually exclusive (not yet type-enforced):**
 /// - ≡ vs ∅: Can't both match main AND have no commits
 /// - ↻ vs ⋈: Only one git operation at a time
-/// - ↑ vs ↓ vs ↕: Main divergence states (ahead, behind, or both)
-/// - ⇡ vs ⇣ vs ⇅: Upstream divergence states (ahead, behind, or both)
 ///
 /// **NOT mutually exclusive (can co-occur):**
 /// - = with ↻/⋈: Can have conflicts during rebase/merge
 /// - ◇, ⊠, ⚠: Worktree can be bare+locked, bare+prunable, etc.
 /// - All working tree symbols (?!+»✘): Can have multiple types of changes
-///
-/// Current implementation uses semantic grouping (co-occurrence allowed) for
-/// compactness. True mutual exclusivity would require ~9 positions.
 #[derive(Debug, Clone, Default, serde::Serialize)]
 pub struct StatusSymbols {
     /// Blocking and state symbols: =, ≡, ∅, ↻, ⋈, ◇, ⊠, ⚠
     /// Position 0 - NOT mutually exclusive (can combine like "=↻")
     prefix: String,
 
-    /// Main branch divergence: ↑ (ahead) OR ↓ (behind) OR ↕ (diverged)
-    /// Position 1 - MUTUALLY EXCLUSIVE (single character)
-    main_divergence: String,
+    /// Main branch divergence state
+    /// Position 1 - MUTUALLY EXCLUSIVE (enforced by enum)
+    main_divergence: MainDivergence,
 
-    /// Remote/upstream divergence: ⇡ (ahead) OR ⇣ (behind) OR ⇅ (diverged)
-    /// Position 2 - MUTUALLY EXCLUSIVE (single character)
-    upstream_divergence: String,
+    /// Remote/upstream divergence state
+    /// Position 2 - MUTUALLY EXCLUSIVE (enforced by enum)
+    upstream_divergence: UpstreamDivergence,
 
     /// Working tree changes: ?, !, +, », ✘
     /// Position 3+ - NOT mutually exclusive (can have "?!+" etc.)
@@ -404,8 +488,8 @@ impl StatusSymbols {
     ///
     /// Aligns all symbol types at fixed positions:
     /// - Position 0: State symbols (=, ≡, ∅, etc.) OR space
-    /// - Position 1: Main divergence (↑ or ↓) OR space
-    /// - Position 2: Upstream divergence (⇡ or ⇣) OR space
+    /// - Position 1: Main divergence (↑, ↓, or ↕) OR space
+    /// - Position 2: Upstream divergence (⇡, ⇣, or ⇅) OR space
     /// - Position 3+: Working tree symbols (!, +, », ?, ✘)
     ///
     /// This ensures vertical scannability - each symbol type appears at the same
@@ -414,8 +498,8 @@ impl StatusSymbols {
         let mut result = String::with_capacity(10);
 
         let has_any_content = !self.prefix.is_empty()
-            || !self.main_divergence.is_empty()
-            || !self.upstream_divergence.is_empty()
+            || self.main_divergence != MainDivergence::None
+            || self.upstream_divergence != UpstreamDivergence::None
             || !self.working_tree.is_empty();
 
         if !has_any_content {
@@ -429,24 +513,27 @@ impl StatusSymbols {
             result.push_str(&self.prefix);
         }
 
-        // Position 1: Main divergence (↑ or ↓)
-        if self.main_divergence.is_empty() {
+        // Position 1: Main divergence (↑, ↓, or ↕)
+        let main_str = self.main_divergence.to_string();
+        if !main_str.is_empty() {
+            result.push_str(&main_str);
+        } else {
             // Only add space if we have upstream or working_tree symbols
-            if !self.upstream_divergence.is_empty() || !self.working_tree.is_empty() {
+            if self.upstream_divergence != UpstreamDivergence::None || !self.working_tree.is_empty()
+            {
                 result.push(' ');
             }
-        } else {
-            result.push_str(&self.main_divergence);
         }
 
-        // Position 2: Upstream divergence (⇡ or ⇣)
-        if self.upstream_divergence.is_empty() {
+        // Position 2: Upstream divergence (⇡, ⇣, or ⇅)
+        let upstream_str = self.upstream_divergence.to_string();
+        if !upstream_str.is_empty() {
+            result.push_str(&upstream_str);
+        } else {
             // Only add space if we have working_tree symbols
             if !self.working_tree.is_empty() {
                 result.push(' ');
             }
-        } else {
-            result.push_str(&self.upstream_divergence);
         }
 
         // Position 3+: Working tree symbols
@@ -458,8 +545,8 @@ impl StatusSymbols {
     /// Check if symbols are empty
     pub fn is_empty(&self) -> bool {
         self.prefix.is_empty()
-            && self.main_divergence.is_empty()
-            && self.upstream_divergence.is_empty()
+            && self.main_divergence == MainDivergence::None
+            && self.upstream_divergence == UpstreamDivergence::None
             && self.working_tree.is_empty()
     }
 }
@@ -548,23 +635,21 @@ fn parse_git_status(
         symbols.prefix.push('=');
     }
 
-    // Main branch divergence (↑, ↓, or ↕ for both)
-    // Using single-character representation for mutual exclusivity
-    match (main_ahead > 0, main_behind > 0) {
-        (true, true) => symbols.main_divergence.push('↕'), // Diverged (both ahead and behind)
-        (true, false) => symbols.main_divergence.push('↑'), // Ahead only
-        (false, true) => symbols.main_divergence.push('↓'), // Behind only
-        (false, false) => {}                               // Up to date
-    }
+    // Main branch divergence - use enum for type safety
+    symbols.main_divergence = match (main_ahead > 0, main_behind > 0) {
+        (true, true) => MainDivergence::Diverged, // Both ahead and behind
+        (true, false) => MainDivergence::Ahead,   // Ahead only
+        (false, true) => MainDivergence::Behind,  // Behind only
+        (false, false) => MainDivergence::None,   // Up to date
+    };
 
-    // Upstream/remote divergence (⇡, ⇣, or ⇅ for both)
-    // Using single-character representation for mutual exclusivity
-    match (upstream_ahead > 0, upstream_behind > 0) {
-        (true, true) => symbols.upstream_divergence.push('⇅'), // Diverged (both ahead and behind)
-        (true, false) => symbols.upstream_divergence.push('⇡'), // Ahead only
-        (false, true) => symbols.upstream_divergence.push('⇣'), // Behind only
-        (false, false) => {}                                   // Up to date
-    }
+    // Upstream/remote divergence - use enum for type safety
+    symbols.upstream_divergence = match (upstream_ahead > 0, upstream_behind > 0) {
+        (true, true) => UpstreamDivergence::Diverged, // Both ahead and behind
+        (true, false) => UpstreamDivergence::Ahead,   // Ahead only
+        (false, true) => UpstreamDivergence::Behind,  // Behind only
+        (false, false) => UpstreamDivergence::None,   // Up to date
+    };
 
     // Working tree changes (position 3+)
     if has_untracked {
@@ -725,6 +810,22 @@ impl WorktreeInfo {
         // Read user-defined status from git config (worktree-specific or branch-keyed)
         let user_status = read_user_status(&wt_repo, wt.branch.as_deref());
 
+        // Create display fields with rendered status
+        let status_display = if !symbols.is_empty() || user_status.is_some() {
+            let mut rendered = symbols.render();
+            if let Some(ref user) = user_status {
+                rendered.push_str(user);
+            }
+            Some(rendered)
+        } else {
+            None
+        };
+
+        let display = DisplayFields {
+            status_display,
+            ..Default::default()
+        };
+
         Ok(WorktreeInfo {
             worktree: wt.clone(),
             commit,
@@ -739,7 +840,7 @@ impl WorktreeInfo {
             has_conflicts,
             status_symbols: symbols,
             user_status,
-            display: DisplayFields::default(),
+            display,
             working_diff_display: None,
         })
     }

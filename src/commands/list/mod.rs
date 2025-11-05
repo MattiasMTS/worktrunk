@@ -53,6 +53,7 @@ fn enrich_common_fields(
         branch_diff_display,
         upstream_display,
         ci_status_display,
+        status_display: None, // Status display is populated in WorktreeInfo/BranchInfo constructors
     }
 }
 
@@ -60,24 +61,30 @@ fn enrich_common_fields(
 fn enrich_with_display_fields(mut item: ListItem) -> ListItem {
     match &mut item {
         ListItem::Worktree(info) => {
-            info.display = enrich_common_fields(
+            let mut display = enrich_common_fields(
                 &info.counts,
                 &info.branch_diff,
                 &info.upstream,
                 &info.pr_status,
             );
+            // Preserve status_display that was set in constructor
+            display.status_display = info.display.status_display.clone();
+            info.display = display;
 
             // Working tree specific field
             let (added, deleted) = info.working_tree_diff;
             info.working_diff_display = format_diff_plain(added, deleted);
         }
         ListItem::Branch(info) => {
-            info.display = enrich_common_fields(
+            let mut display = enrich_common_fields(
                 &info.counts,
                 &info.branch_diff,
                 &info.upstream,
                 &info.pr_status,
             );
+            // Preserve status_display that was set in constructor
+            display.status_display = info.display.status_display.clone();
+            info.display = display;
         }
     }
     item

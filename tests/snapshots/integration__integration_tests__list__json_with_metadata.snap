@@ -16,7 +16,7 @@ info:
     LANG: C
     LC_ALL: C
     SOURCE_DATE_EPOCH: "1761609600"
-    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpzqmcHS/test-config.toml
+    WORKTRUNK_CONFIG_PATH: /var/folders/wf/s6ycxvvs4ln8qsdbfx40hnc40000gn/T/.tmpAfjdPd/test-config.toml
 ---
 success: true
 exit_code: 0
@@ -102,7 +102,8 @@ exit_code: 0
       "main_divergence": "",
       "upstream_divergence": "",
       "working_tree": ""
-    }
+    },
+    "status_display": "≡"
   },
   {
     "type": "worktree",
@@ -143,7 +144,8 @@ exit_code: 0
       "main_divergence": "",
       "upstream_divergence": "",
       "working_tree": ""
-    }
+    },
+    "status_display": "≡⊠"
   }
 ]
 
