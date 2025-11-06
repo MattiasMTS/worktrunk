@@ -4,10 +4,12 @@ mod command_executor;
 pub mod completion;
 pub mod config;
 pub mod configure_shell;
+pub mod context;
 pub mod init;
 pub mod list;
 pub mod merge;
 pub mod process;
+pub mod project_config;
 #[cfg(unix)]
 pub mod select;
 pub mod worktree;

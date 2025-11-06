@@ -540,6 +540,13 @@ impl Repository {
             .unwrap_or_default()
     }
 
+    /// Determine whether there are staged changes in the index.
+    ///
+    /// Returns `Ok(true)` when staged changes are present, `Ok(false)` otherwise.
+    pub fn has_staged_changes(&self) -> Result<bool, GitError> {
+        Ok(!self.run_command_check(&["diff", "--cached", "--quiet", "--exit-code"])?)
+    }
+
     /// Get all branch names (local branches only).
     pub fn all_branches(&self) -> Result<Vec<String>, GitError> {
         let stdout = self.run_command(&["branch", "--format=%(refname:short)"])?;

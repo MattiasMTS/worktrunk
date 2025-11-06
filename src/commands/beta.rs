@@ -1,31 +1,29 @@
 use worktrunk::HookType;
-use worktrunk::config::{ProjectConfig, WorktrunkConfig};
 use worktrunk::git::{GitError, GitResultExt, Repository};
 use worktrunk::styling::{
-    AnstyleStyle, CYAN, CYAN_BOLD, GREEN_BOLD, HINT, HINT_BOLD, HINT_EMOJI, eprintln,
-    format_with_gutter,
+    AnstyleStyle, CYAN, CYAN_BOLD, GREEN_BOLD, HINT, HINT_EMOJI, eprintln, format_with_gutter,
 };
 
+use super::context::CommandEnv;
 use super::merge::{
     commit_staged_changes, execute_post_merge_commands, format_commit_message_for_display,
     run_pre_commit_commands, run_pre_merge_commands, show_llm_config_hint_if_needed,
 };
+use super::project_config::{load_project_config, require_project_config};
 use super::worktree::{execute_post_create_commands, execute_post_start_commands_sequential};
 
 /// Handle `wt beta run-hook` command
 pub fn handle_beta_run_hook(hook_type: HookType, force: bool) -> Result<(), GitError> {
     // Derive context from current environment
-    let repo = Repository::current();
-    let worktree_path = std::env::current_dir()
-        .map_err(|e| GitError::CommandFailed(format!("Failed to get current directory: {}", e)))?;
-    let branch = repo
-        .current_branch()
-        .git_context("Failed to get current branch")?
-        .ok_or_else(|| GitError::CommandFailed("Not on a branch (detached HEAD)".to_string()))?;
-    let config = WorktrunkConfig::load().git_context("Failed to load config")?;
+    let CommandEnv {
+        repo,
+        branch,
+        config,
+        worktree_path,
+    } = CommandEnv::current()?;
 
     // Load project config (show helpful error if missing)
-    let project_config = load_project_config(&repo)?;
+    let project_config = require_project_config(&repo)?;
 
     // TODO: Add support for custom variable overrides (e.g., --var key=value)
     // This would allow testing hooks with different contexts without being in that context
@@ -83,28 +81,6 @@ pub fn handle_beta_run_hook(hook_type: HookType, force: bool) -> Result<(), GitE
     }
 }
 
-fn load_project_config(repo: &Repository) -> Result<ProjectConfig, GitError> {
-    let repo_root = repo.worktree_root()?;
-    let config_path = repo_root.join(".config").join("wt.toml");
-
-    match ProjectConfig::load(&repo_root).git_context("Failed to load project config")? {
-        Some(cfg) => Ok(cfg),
-        None => {
-            // No project config found - show helpful error
-            use worktrunk::styling::ERROR;
-            use worktrunk::styling::ERROR_EMOJI;
-            eprintln!("{ERROR_EMOJI} {ERROR}No project configuration found{ERROR:#}",);
-            eprintln!(
-                "{HINT_EMOJI} {HINT}Create a config file at: {HINT_BOLD}{}{HINT_BOLD:#}{HINT:#}",
-                config_path.display()
-            );
-            Err(GitError::CommandFailed(
-                "No project configuration found".to_string(),
-            ))
-        }
-    }
-}
-
 fn check_hook_configured<T>(hook: &Option<T>, hook_type: HookType) -> Result<(), GitError> {
     if hook.is_none() {
         eprintln!(
@@ -119,16 +95,15 @@ fn check_hook_configured<T>(hook: &Option<T>, hook_type: HookType) -> Result<(),
 
 /// Handle `wt beta commit` command
 pub fn handle_beta_commit(force: bool, no_verify: bool) -> Result<(), GitError> {
-    let repo = Repository::current();
-    let config = WorktrunkConfig::load().git_context("Failed to load config")?;
-    let current_branch = repo
-        .current_branch()?
-        .ok_or_else(|| GitError::CommandFailed("Not on a branch (detached HEAD)".to_string()))?;
+    let CommandEnv {
+        repo,
+        branch: current_branch,
+        config,
+        worktree_path,
+    } = CommandEnv::current()?;
 
     // Run pre-commit hook unless --no-verify was specified
-    if !no_verify && let Ok(Some(project_config)) = ProjectConfig::load(&repo.worktree_root()?) {
-        let worktree_path =
-            std::env::current_dir().git_context("Failed to get current directory")?;
+    if !no_verify && let Some(project_config) = load_project_config(&repo)? {
         // No target branch context for standalone commits
         run_pre_commit_commands(
             &project_config,
@@ -161,19 +136,18 @@ pub fn handle_beta_squash(
     no_verify: bool,
     auto_trust: bool,
 ) -> Result<bool, GitError> {
-    let repo = Repository::current();
-    let config = WorktrunkConfig::load().git_context("Failed to load config")?;
-    let current_branch = repo
-        .current_branch()?
-        .ok_or_else(|| GitError::CommandFailed("Not on a branch (detached HEAD)".to_string()))?;
+    let CommandEnv {
+        repo,
+        branch: current_branch,
+        config,
+        worktree_path,
+    } = CommandEnv::current()?;
 
     // Get target branch (default to default branch if not provided)
     let target_branch = repo.resolve_target_branch(target)?;
 
     // Run pre-commit hook unless --no-verify was specified
-    if !no_verify && let Ok(Some(project_config)) = ProjectConfig::load(&repo.worktree_root()?) {
-        let worktree_path =
-            std::env::current_dir().git_context("Failed to get current directory")?;
+    if !no_verify && let Some(project_config) = load_project_config(&repo)? {
         run_pre_commit_commands(
             &project_config,
             &current_branch,
@@ -192,10 +166,8 @@ pub fn handle_beta_squash(
     // Count commits since merge base
     let commit_count = repo.count_commits(&merge_base, "HEAD")?;
 
-    // Check if there are staged changes (git diff --cached returns 0 if no changes, 1 if changes exist)
-    let no_staged_changes =
-        repo.run_command_check(&["diff", "--cached", "--quiet", "--exit-code"])?;
-    let has_staged = !no_staged_changes;
+    // Check if there are staged changes in addition to commits
+    let has_staged = repo.has_staged_changes()?;
 
     // Handle different scenarios
     if commit_count == 0 && !has_staged {
@@ -276,9 +248,7 @@ pub fn handle_beta_squash(
         .git_context("Failed to reset to merge base")?;
 
     // Check if there are actually any changes to commit
-    let no_staged_changes =
-        repo.run_command_check(&["diff", "--cached", "--quiet", "--exit-code"])?;
-    if no_staged_changes {
+    if !repo.has_staged_changes()? {
         let dim = AnstyleStyle::new().dimmed();
         crate::output::info(format!(
             "{dim}No changes after squashing {commit_count} {commit_text} (commits resulted in no net changes){dim:#}"
@@ -396,7 +366,7 @@ pub fn handle_beta_ask_approvals(force: bool, show_all: bool) -> Result<(), GitE
     let config = WorktrunkConfig::load().git_context("Failed to load config")?;
 
     // Load project config (show helpful error if missing)
-    let project_config = load_project_config(&repo)?;
+    let project_config = require_project_config(&repo)?;
 
     // Collect all commands from the project config
     let mut commands = Vec::new();

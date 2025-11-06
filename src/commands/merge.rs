@@ -1,3 +1,4 @@
+use std::path::Path;
 use worktrunk::HookType;
 use worktrunk::config::{Command, CommandPhase, ProjectConfig, WorktrunkConfig};
 use worktrunk::git::{GitError, GitResultExt, Repository};
@@ -8,6 +9,8 @@ use worktrunk::styling::{
 
 use super::command_approval::approve_command_batch;
 use super::command_executor::{CommandContext, prepare_project_commands};
+use super::context::CommandEnv;
+use super::project_config::load_project_config;
 use super::worktree::handle_push;
 use crate::output::execute_command_in_worktree;
 
@@ -29,9 +32,7 @@ impl<'a> MergeCommandCollector<'a> {
     /// Returns original (unexpanded) commands for approval matching
     fn collect(self) -> Result<CollectedCommands, GitError> {
         let mut all_commands = Vec::new();
-        let project_config = match ProjectConfig::load(&self.repo.worktree_root()?)
-            .git_context("Failed to load project config")?
-        {
+        let project_config = match load_project_config(self.repo)? {
             Some(cfg) => cfg,
             None => return Ok((all_commands, self.repo.project_identifier()?)),
         };
@@ -111,10 +112,12 @@ pub fn handle_merge(
     force: bool,
     tracked_only: bool,
 ) -> Result<(), GitError> {
-    let repo = Repository::current();
-
-    // Get current branch
-    let current_branch = repo.current_branch()?.ok_or(GitError::DetachedHead)?;
+    let CommandEnv {
+        repo,
+        branch: current_branch,
+        config,
+        worktree_path,
+    } = CommandEnv::current()?;
 
     // Validate --no-commit: requires clean working tree
     if no_commit && repo.is_dirty()? {
@@ -142,9 +145,6 @@ pub fn handle_merge(
         ))?;
         return Ok(());
     }
-
-    // Load config for LLM integration
-    let config = WorktrunkConfig::load().git_context("Failed to load config")?;
 
     // Collect and approve all commands upfront for batch permission request
     let (all_commands, project_id) = MergeCommandCollector {
@@ -177,7 +177,9 @@ pub fn handle_merge(
         } else {
             // Commit immediately when not squashing
             handle_commit_changes(
-                &config.commit_generation,
+                &repo,
+                &config,
+                &worktree_path,
                 &current_branch,
                 Some(&target_branch),
                 no_verify,
@@ -206,9 +208,7 @@ pub fn handle_merge(
 
     // Run pre-merge checks unless --no-verify was specified
     // Do this after commit/squash/rebase to validate the final state that will be pushed
-    if !no_verify && let Ok(Some(project_config)) = ProjectConfig::load(&repo.worktree_root()?) {
-        let worktree_path =
-            std::env::current_dir().git_context("Failed to get current directory")?;
+    if !no_verify && let Some(project_config) = load_project_config(&repo)? {
         run_pre_merge_commands(
             &project_config,
             &current_branch,
@@ -417,28 +417,25 @@ pub fn commit_staged_changes(
     Ok(())
 }
 
-/// Commit uncommitted changes with LLM-generated message
+/// Commit uncommitted changes with LLM-generated message.
+#[allow(clippy::too_many_arguments)]
 fn handle_commit_changes(
-    commit_generation_config: &worktrunk::config::CommitGenerationConfig,
+    repo: &Repository,
+    config: &WorktrunkConfig,
+    worktree_path: &Path,
     current_branch: &str,
     target_branch: Option<&str>,
     no_verify: bool,
     force: bool,
     tracked_only: bool,
 ) -> Result<(), GitError> {
-    let repo = Repository::current();
-    let config = WorktrunkConfig::load().git_context("Failed to load config")?;
-
-    // Run pre-commit hook unless --no-verify was specified
-    if !no_verify && let Ok(Some(project_config)) = ProjectConfig::load(&repo.worktree_root()?) {
-        let worktree_path =
-            std::env::current_dir().git_context("Failed to get current directory")?;
+    if !no_verify && let Some(project_config) = load_project_config(repo)? {
         run_pre_commit_commands(
             &project_config,
             current_branch,
-            &worktree_path,
-            &repo,
-            &config,
+            worktree_path,
+            repo,
+            config,
             force,
             target_branch,
             true, // auto_trust: commands already approved in merge batch
@@ -447,7 +444,7 @@ fn handle_commit_changes(
 
     // Warn about untracked files before staging (only if using git add -A)
     if !tracked_only {
-        show_untracked_warning(&repo)?;
+        show_untracked_warning(repo)?;
     }
 
     // Stage changes
@@ -460,7 +457,7 @@ fn handle_commit_changes(
     }
 
     // Show "no squashing needed" since we're committing directly (not in squash mode)
-    commit_staged_changes(commit_generation_config, true)
+    commit_staged_changes(&config.commit_generation, true)
 }
 
 fn handle_squash(target_branch: &str, no_verify: bool, force: bool) -> Result<bool, GitError> {
@@ -536,9 +533,7 @@ pub fn execute_post_merge_commands(
     use worktrunk::styling::WARNING;
 
     // Load project config from the main worktree path directly
-    let project_config = match ProjectConfig::load(main_worktree_path)
-        .git_context("Failed to load project config")?
-    {
+    let project_config = match load_project_config(repo)? {
         Some(cfg) => cfg,
         None => return Ok(()),
     };
