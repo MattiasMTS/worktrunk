@@ -572,31 +572,31 @@ impl PositionMask {
 pub struct StatusSymbols {
     /// Merge conflicts indicator
     /// Position 0a - Boolean flag (= or empty)
-    has_conflicts: bool,
+    pub(crate) has_conflicts: bool,
 
     /// Branch state relative to main
     /// Position 0b - MUTUALLY EXCLUSIVE (enforced by enum)
-    branch_state: BranchState,
+    pub(crate) branch_state: BranchState,
 
     /// Git operation in progress
     /// Position 0c - MUTUALLY EXCLUSIVE (enforced by enum)
-    git_operation: GitOperation,
+    pub(crate) git_operation: GitOperation,
 
     /// Worktree attributes: ◇, ⊠, ⚠
     /// Position 0d - NOT mutually exclusive (can combine like "◇⊠")
-    worktree_attrs: String,
+    pub(crate) worktree_attrs: String,
 
     /// Main branch divergence state
     /// Position 1 - MUTUALLY EXCLUSIVE (enforced by enum)
-    main_divergence: MainDivergence,
+    pub(crate) main_divergence: MainDivergence,
 
     /// Remote/upstream divergence state
     /// Position 2 - MUTUALLY EXCLUSIVE (enforced by enum)
-    upstream_divergence: UpstreamDivergence,
+    pub(crate) upstream_divergence: UpstreamDivergence,
 
     /// Working tree changes: ?, !, +, », ✘
     /// Position 3+ - NOT mutually exclusive (can have "?!+" etc.)
-    working_tree: String,
+    pub(crate) working_tree: String,
 }
 
 impl StatusSymbols {
@@ -668,21 +668,19 @@ impl StatusSymbols {
             ),
         ];
 
-        // Render each position that's included in the mask (without allocating Vec)
-        for (i, (pos, content, has_data)) in positions_data.iter().enumerate() {
+        // Grid-based rendering: each position in mask gets exactly one column
+        // - If row has content at position: append content (may be multiple chars like "?!+")
+        // - If row has no content at position: append single space
+        // - No trimming: grid fills all columns defined by mask
+        for (pos, content, has_data) in positions_data.iter() {
             if !mask.includes(*pos) {
                 continue; // Skip positions not in mask
             }
 
-            // Check if any later position (that's included in mask) has data
-            let has_content_after = positions_data[(i + 1)..]
-                .iter()
-                .any(|(later_pos, _, later_has_data)| mask.includes(*later_pos) && *later_has_data);
-
             if *has_data {
                 result.push_str(content);
-            } else if has_content_after {
-                result.push(' '); // Spacing for alignment
+            } else {
+                result.push(' '); // Fill empty column with space
             }
         }
 

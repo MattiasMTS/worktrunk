@@ -1,5 +1,79 @@
 //! Column layout and priority allocation for the list command.
 //!
+//! # Status Column Structure
+//!
+//! The Status column combines two subcolumns without a 2-space column gap:
+//!
+//! ```text
+//! Status Column = [Git Status Symbols] + [User Status]
+//!                 ↑                       ↑
+//!                 Variable width          Aligned subcolumn
+//!                 (position mask)         (fixed position)
+//! ```
+//!
+//! ## Git Status Symbols (Variable Width)
+//!
+//! Git status symbols use position-based alignment with selective rendering:
+//! - Only positions used by at least one row are included (position mask)
+//! - Within those positions, symbols align vertically for scannability
+//! - Empty positions between symbols get spacing for alignment
+//! - No leading spaces before the first symbol
+//!
+//! Example with positions 0b (≡) and 3 (?!) used:
+//! ```text
+//! Row 1: "≡ "     (position 0b filled, position 3 empty → space)
+//! Row 2: "≡?"     (position 0b filled, position 3 filled)
+//! ```
+//!
+//! ## User Status Subcolumn (Aligned)
+//!
+//! User-defined status aligns at a fixed position within the Status column:
+//! - Starts immediately after max git symbols width (no extra gap)
+//! - All user statuses align vertically regardless of git symbols
+//! - Creates visual separation between git state and user labels
+//!
+//! Example:
+//! ```text
+//! Git Symbols  User Status
+//! ≡            ⏸            (git symbols padded to max width)
+//! ≡?           🤖           (user status aligns at fixed position)
+//! ↓!+                       (no user status)
+//! ```
+//!
+//! ## Width Calculation
+//!
+//! ```text
+//! status_width = max_git_symbols_width + max_user_status_width
+//! ```
+//!
+//! Where:
+//! - `max_git_symbols_width` = maximum rendered width using position mask
+//! - `max_user_status_width` = maximum width of user-defined status strings
+//!
+//! ## Why This Design?
+//!
+//! **Eliminates wasted space:**
+//! - Position mask removes columns for symbols that appear in zero rows
+//! - No 2-space column gap between git and user status
+//!
+//! **Maintains alignment:**
+//! - Git symbols align at their positions (vertical scannability)
+//! - User status aligns in its own subcolumn (visual consistency)
+//!
+//! **Example comparison:**
+//!
+//! BAD (no alignment):
+//! ```text
+//! ≡⏸
+//! ≡?🤖
+//! ```
+//!
+//! GOOD (aligned subcolumns):
+//! ```text
+//! ≡ ⏸
+//! ≡?🤖
+//! ```
+//!
 //! # Priority System Design
 //!
 //! ## Priority Scoring Model
@@ -131,7 +205,6 @@ const COMMIT_HASH_WIDTH: usize = 8;
 /// Both layout calculations and rendering use these constants.
 pub const HEADER_BRANCH: &str = "Branch";
 pub const HEADER_STATUS: &str = "Status";
-pub const HEADER_USER_STATUS: &str = ""; // Empty header for user status column
 pub const HEADER_WORKING_DIFF: &str = "HEAD±";
 pub const HEADER_AHEAD_BEHIND: &str = "main↕";
 pub const HEADER_BRANCH_DIFF: &str = "main…±";
@@ -219,8 +292,7 @@ pub struct DiffWidths {
 #[derive(Clone, Debug)]
 pub struct ColumnWidths {
     pub branch: usize,
-    pub status: usize,
-    pub user_status: usize,
+    pub status: usize, // Includes both git status symbols and user-defined status
     pub time: usize,
     pub ci_status: usize,
     pub message: usize,
@@ -233,8 +305,7 @@ pub struct ColumnWidths {
 /// Tracks which columns have actual data (vs just headers)
 #[derive(Clone, Copy, Debug)]
 pub struct ColumnDataFlags {
-    pub status: bool,
-    pub user_status: bool,
+    pub status: bool, // True if any item has git status symbols or user-defined status
     pub working_diff: bool,
     pub ahead_behind: bool,
     pub branch_diff: bool,
@@ -248,6 +319,8 @@ pub struct LayoutMetadata {
     pub widths: ColumnWidths,
     pub data_flags: ColumnDataFlags,
     pub status_position_mask: super::model::PositionMask,
+    /// Maximum width of git status symbols (for padding before user status subcolumn)
+    pub max_git_symbols_width: usize,
 }
 
 const EMPTY_PENALTY: u8 = 10;
@@ -256,7 +329,6 @@ fn column_has_data(kind: ColumnKind, flags: &ColumnDataFlags) -> bool {
     match kind {
         ColumnKind::Branch => true,
         ColumnKind::Status => flags.status,
-        ColumnKind::UserStatus => flags.user_status,
         ColumnKind::WorkingDiff => flags.working_diff,
         ColumnKind::AheadBehind => flags.ahead_behind,
         ColumnKind::BranchDiff => flags.branch_diff,
@@ -315,6 +387,8 @@ pub struct LayoutConfig {
     pub max_message_len: usize,
     pub hidden_nonempty_count: usize,
     pub status_position_mask: super::model::PositionMask,
+    /// Maximum width of git status symbols (for padding before user status subcolumn)
+    pub max_git_symbols_width: usize,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -413,7 +487,6 @@ fn ideal_for_column(
     match spec.kind {
         ColumnKind::Branch => ColumnIdeal::text(widths.branch),
         ColumnKind::Status => ColumnIdeal::text(widths.status),
-        ColumnKind::UserStatus => ColumnIdeal::text(widths.user_status),
         ColumnKind::Path => ColumnIdeal::text(max_path_width),
         ColumnKind::Time => ColumnIdeal::text(widths.time),
         ColumnKind::CiStatus => ColumnIdeal::text(widths.ci_status),
@@ -443,7 +516,6 @@ fn ideal_for_column(
 pub fn calculate_column_widths(items: &[ListItem], fetch_ci: bool) -> LayoutMetadata {
     // Track maximum data widths (headers are enforced via fit_header() later)
     let mut max_branch = 0;
-    let mut max_user_status = 0;
     let mut max_time = 0;
     let mut max_message = 0;
 
@@ -473,19 +545,11 @@ pub fn calculate_column_widths(items: &[ListItem], fetch_ci: bool) -> LayoutMeta
         max_branch = max_branch.max(item.branch_name().width());
 
         // Status column: git status symbols (worktrees only)
-        // User status column: user-defined status (worktrees and branches)
+        // Position mask is collected here for selective rendering
         if let Some(info) = worktree_info {
             // Collect position usage from this item's status symbols
             let item_mask = super::model::PositionMask::from_symbols(&info.status_symbols);
             status_position_mask.merge(&item_mask);
-
-            if let Some(ref user_status) = info.user_status {
-                max_user_status = max_user_status.max(user_status.width());
-            }
-        } else if let ListItem::Branch(branch_info) = item
-            && let Some(ref user_status) = branch_info.user_status
-        {
-            max_user_status = max_user_status.max(user_status.width());
         }
 
         // Time
@@ -548,9 +612,9 @@ pub fn calculate_column_widths(items: &[ListItem], fetch_ci: bool) -> LayoutMeta
         max_upstream_behind_digits,
     );
 
-    // Calculate Status column width based on position mask
-    // Now that we know which positions are used, calculate max width with selective rendering
-    let max_status = items
+    // Calculate Status column width: git symbols + user status (as aligned subcolumns)
+    // Git symbols width: maximum rendered width using position mask (variable per row)
+    let max_git_symbols = items
         .iter()
         .filter_map(|item| item.worktree_info())
         .map(|info| {
@@ -561,14 +625,28 @@ pub fn calculate_column_widths(items: &[ListItem], fetch_ci: bool) -> LayoutMeta
         .max()
         .unwrap_or(0);
 
-    // For Status column: always enforce minimum width to fit header
-    // Selective rendering narrows the column by eliminating unused positions,
-    // but the column must still be wide enough for the "Status" header text
-    let has_status_data = max_status > 0;
-    let final_status = fit_header(HEADER_STATUS, max_status);
+    // User status width: maximum user-defined status width (for alignment subcolumn)
+    let max_user_status = items
+        .iter()
+        .filter_map(|item| {
+            if let Some(info) = item.worktree_info() {
+                info.user_status.as_ref().map(|s| s.width())
+            } else if let ListItem::Branch(branch_info) = item {
+                branch_info.user_status.as_ref().map(|s| s.width())
+            } else {
+                None
+            }
+        })
+        .max()
+        .unwrap_or(0);
 
-    let has_user_status_data = max_user_status > 0;
-    let final_user_status = fit_header(HEADER_USER_STATUS, max_user_status);
+    // Total Status width = git symbols + user status (no extra gap between them)
+    let status_data_width = max_git_symbols + max_user_status;
+
+    // For Status column: always fit header to prevent header overflow
+    // Even though we want narrow columns, we can't make them narrower than the header
+    let has_status_data = status_data_width > 0;
+    let final_status = fit_header(HEADER_STATUS, status_data_width);
 
     // CI status column: Always 2 chars wide
     // Only show if we attempted to fetch CI data (regardless of whether any items have status)
@@ -578,7 +656,6 @@ pub fn calculate_column_widths(items: &[ListItem], fetch_ci: bool) -> LayoutMeta
     let widths = ColumnWidths {
         branch: fit_header(HEADER_BRANCH, max_branch),
         status: final_status,
-        user_status: final_user_status,
         time: fit_header(HEADER_AGE, max_time),
         ci_status: fit_header(HEADER_CI, ci_status_width),
         message: fit_header(HEADER_MESSAGE, max_message),
@@ -590,7 +667,6 @@ pub fn calculate_column_widths(items: &[ListItem], fetch_ci: bool) -> LayoutMeta
 
     let data_flags = ColumnDataFlags {
         status: has_status_data,
-        user_status: has_user_status_data,
         working_diff: working_diff.added_digits > 0 || working_diff.deleted_digits > 0,
         ahead_behind: ahead_behind.added_digits > 0 || ahead_behind.deleted_digits > 0,
         branch_diff: branch_diff.added_digits > 0 || branch_diff.deleted_digits > 0,
@@ -602,6 +678,7 @@ pub fn calculate_column_widths(items: &[ListItem], fetch_ci: bool) -> LayoutMeta
         widths,
         data_flags,
         status_position_mask,
+        max_git_symbols_width: max_git_symbols,
     }
 }
 
@@ -623,6 +700,7 @@ pub fn calculate_responsive_layout(
     let ideal_widths = metadata.widths;
     let data_flags = metadata.data_flags;
     let status_position_mask = metadata.status_position_mask;
+    let max_git_symbols_width = metadata.max_git_symbols_width;
 
     // Calculate actual maximum path width (after common prefix removal)
     let path_data_width = items
@@ -767,6 +845,7 @@ pub fn calculate_responsive_layout(
         max_message_len,
         hidden_nonempty_count,
         status_position_mask,
+        max_git_symbols_width,
     }
 }
 

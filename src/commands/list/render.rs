@@ -317,6 +317,7 @@ fn render_list_cell(
     column: &ColumnLayout,
     ctx: &ListRowContext,
     status_mask: &PositionMask,
+    max_git_symbols_width: usize,
     common_prefix: &Path,
     max_message_len: usize,
 ) -> StyledLine {
@@ -332,22 +333,31 @@ fn render_list_cell(
             cell
         }
         ColumnKind::Status => {
+            // Status column combines two aligned subcolumns:
+            // 1. Git status symbols (variable width, aligned by position)
+            // 2. User-defined status (aligned at fixed position after max git symbols)
             let mut cell = StyledLine::new();
+
+            // Git status symbols (worktrees only)
             if let Some(info) = ctx.worktree_info {
+                let git_symbols_start = cell.width();
                 cell.push_raw(info.status_symbols.render_with_mask(status_mask));
-            }
-            cell
-        }
-        ColumnKind::UserStatus => {
-            let mut cell = StyledLine::new();
-            let status = if let Some(info) = ctx.worktree_info {
-                info.user_status.clone()
+
+                // Only pad if this row has user status (to align the user status subcolumn)
+                if let Some(ref user_status) = info.user_status {
+                    cell.pad_to(git_symbols_start + max_git_symbols_width);
+                    cell.push_raw(user_status.clone());
+                }
             } else if let ListItem::Branch(branch_info) = ctx.item {
-                branch_info.user_status.clone()
-            } else {
-                None
-            };
-            cell.push_raw(status.unwrap_or_default());
+                // Branch-only entries: pad to max_git_symbols_width, then render user status
+                // This aligns user status with worktree entries
+                if let Some(ref user_status) = branch_info.user_status {
+                    let git_symbols_start = cell.width();
+                    cell.pad_to(git_symbols_start + max_git_symbols_width);
+                    cell.push_raw(user_status.clone());
+                }
+            }
+
             cell
         }
         ColumnKind::WorkingDiff => {
@@ -437,11 +447,19 @@ pub fn format_list_item_line(
 ) {
     let ctx = ListRowContext::new(item, current_worktree_path);
     let status_mask = &layout.status_position_mask;
+    let max_git_symbols_width = layout.max_git_symbols_width;
     let common_prefix = &layout.common_prefix;
     let max_message_len = layout.max_message_len;
 
     let line = render_line(layout, |column| {
-        render_list_cell(column, &ctx, status_mask, common_prefix, max_message_len)
+        render_list_cell(
+            column,
+            &ctx,
+            status_mask,
+            max_git_symbols_width,
+            common_prefix,
+            max_message_len,
+        )
     });
 
     println!("{}", line.render());

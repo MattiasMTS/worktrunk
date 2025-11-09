@@ -6,6 +6,8 @@ mod render;
 
 #[cfg(test)]
 mod spacing_test;
+#[cfg(test)]
+mod status_column_tests;
 
 use layout::calculate_responsive_layout;
 use model::{ListData, ListItem, gather_list_data};
