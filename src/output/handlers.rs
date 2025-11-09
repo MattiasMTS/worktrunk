@@ -2,7 +2,8 @@
 
 use crate::commands::worktree::{RemoveResult, SwitchResult};
 use crate::output::global::format_switch_success;
-use worktrunk::git::{GitError, GitResultExt};
+use worktrunk::git::GitError;
+use worktrunk::styling::{GREEN, GREEN_BOLD, WARNING, WARNING_BOLD, format_with_gutter};
 
 /// Format message for switch operation (mode-specific via output system)
 fn format_switch_message(result: &SwitchResult, branch: &str) -> String {
@@ -30,8 +31,6 @@ fn format_remove_message(
     branch: Option<&str>,
     branch_deleted: bool,
 ) -> String {
-    use worktrunk::styling::{GREEN, GREEN_BOLD};
-
     match result {
         RemoveResult::AlreadyOnDefault(branch) => {
             format!("{GREEN}Already on default branch {GREEN_BOLD}{branch}{GREEN_BOLD:#}{GREEN:#}")
@@ -144,8 +143,16 @@ pub fn handle_remove_output(
         // 2. Do the deletion (shell already changed directory if needed)
         // Progress message already shown at start of handle_remove()
         let repo = worktrunk::git::Repository::current();
-        repo.remove_worktree(worktree_path)
-            .git_context("Failed to remove worktree")?;
+        if let Err(err) = repo.remove_worktree(worktree_path) {
+            return Err(match err {
+                GitError::CommandFailed(msg) => GitError::WorktreeRemovalFailed {
+                    branch: branch_name.clone(),
+                    path: worktree_path.clone(),
+                    error: msg,
+                },
+                other => other,
+            });
+        }
 
         // 3. Delete the branch (unless --no-delete-branch was specified)
         // Returns true if branch was successfully deleted, false otherwise
@@ -160,14 +167,16 @@ pub fn handle_remove_output(
                 Ok(_) => true,
                 Err(e) => {
                     if strict_branch_deletion {
-                        return Err(GitError::CommandFailed(format!(
-                            "Failed to delete branch '{branch_name}': {e}"
-                        )));
+                        return Err(match e {
+                            GitError::CommandFailed(msg) => GitError::BranchDeletionFailed {
+                                branch: branch_name.clone(),
+                                error: msg,
+                            },
+                            other => other,
+                        });
                     }
 
                     // If branch deletion fails in non-strict mode, show a warning but don't error
-                    use worktrunk::styling::{WARNING, WARNING_BOLD, format_with_gutter};
-
                     // Show the warning message with branch name
                     super::warning(format!(
                         "{WARNING}Could not delete branch {WARNING_BOLD}{branch_name}{WARNING_BOLD:#}{WARNING:#}"

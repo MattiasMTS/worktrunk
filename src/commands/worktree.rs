@@ -261,7 +261,14 @@ pub fn handle_switch(
             }
         }
         // Fall back to generic error with context
-        return Err(e).git_context("Failed to create worktree");
+        return Err(match e {
+            GitError::CommandFailed(msg) => GitError::WorktreeCreationFailed {
+                branch: resolved_branch.clone(),
+                base_branch: base_for_creation.clone(),
+                error: msg,
+            },
+            other => other,
+        });
     }
 
     // Canonicalize the path to resolve any .. components
@@ -371,8 +378,15 @@ fn remove_current_worktree(
         }
 
         // Switch to default branch
-        repo.run_command(&["switch", &default_branch])
-            .git_context(&format!("Failed to switch to '{}'", default_branch))?;
+        if let Err(err) = repo.run_command(&["switch", &default_branch]) {
+            return Err(match err {
+                GitError::CommandFailed(msg) => GitError::SwitchFailed {
+                    branch: default_branch.clone(),
+                    error: msg,
+                },
+                other => other,
+            });
+        }
 
         Ok(RemoveResult::SwitchedToDefault(default_branch))
     }

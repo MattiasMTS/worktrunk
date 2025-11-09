@@ -29,8 +29,9 @@ fn test_switch_internal_directive() {
         ----- stdout -----
 
         ----- stderr -----
-        Failed to create worktree: ❌ [31mfatal: invalid reference: my-feature
-        [0m
+        ❌ [31mFailed to create worktree for [1m[31mmy-feature[0m[0m
+
+        [40m [0m  fatal: invalid reference: my-feature
         ");
     });
 }
@@ -57,8 +58,9 @@ fn test_switch_without_internal() {
         ----- stdout -----
 
         ----- stderr -----
-        Failed to create worktree: ❌ [31mfatal: invalid reference: my-feature
-        [0m
+        ❌ [31mFailed to create worktree for [1m[31mmy-feature[0m[0m
+
+        [40m [0m  fatal: invalid reference: my-feature
         ");
     });
 }

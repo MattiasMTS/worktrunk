@@ -56,6 +56,22 @@ pub enum GitError {
     },
     /// Worktree path already exists on filesystem
     WorktreePathExists { path: PathBuf },
+    /// Creating a worktree failed
+    WorktreeCreationFailed {
+        branch: String,
+        base_branch: Option<String>,
+        error: String,
+    },
+    /// Switching branches failed
+    SwitchFailed { branch: String, error: String },
+    /// Removing a worktree directory failed
+    WorktreeRemovalFailed {
+        branch: String,
+        path: PathBuf,
+        error: String,
+    },
+    /// Deleting a branch failed
+    BranchDeletionFailed { branch: String, error: String },
 }
 
 impl std::fmt::Display for GitError {
@@ -254,7 +270,59 @@ impl std::fmt::Display for GitError {
                     path.display()
                 )
             }
+
+            GitError::WorktreeCreationFailed {
+                branch,
+                base_branch,
+                error,
+            } => {
+                let header = match base_branch {
+                    Some(base) => format!(
+                        "{ERROR_EMOJI} {ERROR}Failed to create worktree for {ERROR_BOLD}{branch}{ERROR_BOLD:#}{ERROR} from base {ERROR_BOLD}{base}{ERROR_BOLD:#}{ERROR:#}"
+                    ),
+                    None => format!(
+                        "{ERROR_EMOJI} {ERROR}Failed to create worktree for {ERROR_BOLD}{branch}{ERROR_BOLD:#}{ERROR:#}"
+                    ),
+                };
+                write!(f, "{}", format_error_block(header, error))
+            }
+
+            GitError::SwitchFailed { branch, error } => {
+                let header = format!(
+                    "{ERROR_EMOJI} {ERROR}Failed to switch to {ERROR_BOLD}{branch}{ERROR_BOLD:#}{ERROR:#}"
+                );
+                write!(f, "{}", format_error_block(header, error))
+            }
+
+            GitError::WorktreeRemovalFailed {
+                branch,
+                path,
+                error,
+            } => {
+                let header = format!(
+                    "{ERROR_EMOJI} {ERROR}Failed to remove worktree for {ERROR_BOLD}{branch}{ERROR_BOLD:#}{ERROR} at {ERROR_BOLD}{}{ERROR_BOLD:#}{ERROR:#}",
+                    path.display()
+                );
+                write!(f, "{}", format_error_block(header, error))
+            }
+
+            GitError::BranchDeletionFailed { branch, error } => {
+                let header = format!(
+                    "{ERROR_EMOJI} {ERROR}Failed to delete branch {ERROR_BOLD}{branch}{ERROR_BOLD:#}{ERROR:#}"
+                );
+                write!(f, "{}", format_error_block(header, error))
+            }
         }
+    }
+}
+
+fn format_error_block(header: String, error: &str) -> String {
+    use crate::styling::format_with_gutter;
+    let trimmed = error.trim();
+    if trimmed.is_empty() {
+        header
+    } else {
+        format!("{header}\n\n{}", format_with_gutter(trimmed, "", None))
     }
 }
 

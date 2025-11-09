@@ -24,5 +24,6 @@ exit_code: 1
 ----- stdout -----
 
 ----- stderr -----
-Failed to create worktree: ❌ [31mfatal: invalid reference: __WORKTRUNK_EXEC__echo PWNED > /tmp/hacked6
-[0m
+❌ [31mFailed to create worktree for [1m[31m__WORKTRUNK_EXEC__echo PWNED > /tmp/hacked6[0m[0m
+
+[40m [0m  fatal: invalid reference: __WORKTRUNK_EXEC__echo PWNED > /tmp/hacked6

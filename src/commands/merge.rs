@@ -1,6 +1,6 @@
 use worktrunk::HookType;
 use worktrunk::config::{Command, CommandPhase, ProjectConfig};
-use worktrunk::git::{GitError, GitResultExt, Repository};
+use worktrunk::git::{GitError, Repository};
 use worktrunk::styling::{CYAN, CYAN_BOLD, ERROR, ERROR_EMOJI, GREEN_BOLD, HINT, HINT_EMOJI};
 
 use super::command_approval::approve_command_batch;
@@ -181,9 +181,15 @@ pub fn handle_merge(
             crate::output::progress(format!(
                 "{CYAN}Switching to {CYAN_BOLD}{target_branch}{CYAN_BOLD:#}{CYAN}...{CYAN:#}"
             ))?;
-            primary_repo
-                .run_command(&["switch", &target_branch])
-                .git_context(&format!("Failed to switch to '{}'", target_branch))?;
+            if let Err(err) = primary_repo.run_command(&["switch", &target_branch]) {
+                return Err(match err {
+                    GitError::CommandFailed(msg) => GitError::SwitchFailed {
+                        branch: target_branch.clone(),
+                        error: msg,
+                    },
+                    other => other,
+                });
+            }
         }
 
         // STEP 3: Remove worktree via shared remove output handler so final message matches wt remove
