@@ -1,0 +1,8 @@
+# Helper binary to setup test environment for debugging `wt beta select`.
+# This is a workspace member (not a separate workspace) to share target/ and Cargo.lock.
+# Never published to crates.io (publish = false) - only used during development.
+[package]
+name = "setup-select-test"
+version = "0.1.0"
+edition = "2024"
+publish = false

@@ -608,6 +608,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "dev-detach"
+version = "0.1.0"
+dependencies = [
+ "nix 0.30.1",
+]
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1718,6 +1725,10 @@ dependencies = [
  "libc",
  "winapi",
 ]
+
+[[package]]
+name = "setup-select-test"
+version = "0.1.0"
 
 [[package]]
 name = "sha2"

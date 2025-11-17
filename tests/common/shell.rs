@@ -5,7 +5,34 @@ use std::process::Command;
 /// Get the path to the dev-detach helper binary.
 /// This binary calls setsid() before exec'ing the shell, detaching it from
 /// any controlling terminal and preventing PTY-related hangs.
+///
+/// Automatically builds dev-detach if it doesn't exist, so `cargo test` works
+/// with zero setup.
 fn get_dev_detach_bin() -> std::path::PathBuf {
+    use std::sync::OnceLock;
+
+    // Build dev-detach once on first call if needed
+    static BUILT: OnceLock<()> = OnceLock::new();
+    BUILT.get_or_init(|| {
+        // Check if dev-detach binary exists in target directory
+        let expected_path = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|p| p.join("dev-detach")))
+            .filter(|p| p.exists());
+
+        if expected_path.is_none() {
+            eprintln!("Building dev-detach helper binary...");
+            let status = Command::new("cargo")
+                .args(["build", "-p", "dev-detach"])
+                .status()
+                .expect("Failed to run cargo build");
+
+            if !status.success() {
+                panic!("Failed to build dev-detach");
+            }
+        }
+    });
+
     get_cargo_bin("dev-detach")
 }
 
