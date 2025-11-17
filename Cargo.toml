@@ -38,6 +38,12 @@ path = "src/main.rs"
 name = "dev-detach"
 path = "tests/bin/dev-detach.rs"
 
+# Helper binary to setup test environment for debugging `wt beta select`.
+# Creates a temporary repo with known state for manual testing.
+[[bin]]
+name = "setup-select-test"
+path = "tests/bin/setup-select-test.rs"
+
 [dependencies]
 anstream = "0.6"
 anstyle = "1.0"
@@ -98,10 +104,11 @@ name = "list"
 harness = false
 
 [lints.rust]
-# No unsafe code in the main codebase or tests.
-# TTY isolation for shell integration tests is handled by the dev-detach helper binary,
-# which uses the nix crate's safe wrappers for Unix syscalls (setsid, execvp).
-unsafe_code = "forbid"
+# Unsafe code is denied by default but can be explicitly allowed where necessary.
+# Currently used for:
+# - TTY detachment in pager invocation (pre_exec + setsid) to prevent hangs in TUI contexts
+# - dev-detach helper binary (uses nix crate's wrappers for Unix syscalls)
+unsafe_code = "deny"
 
 # The profile that 'dist' will build with
 [profile.dist]

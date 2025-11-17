@@ -95,7 +95,8 @@ impl SkimItem for WorktreeSkimItem {
 
     fn preview(&self, _context: PreviewContext<'_>) -> ItemPreview {
         let mode = PreviewMode::read_from_state();
-        ItemPreview::AnsiText(self.preview_for_mode(mode).clone())
+        let result = self.preview_for_mode(mode);
+        ItemPreview::AnsiText(result.clone())
     }
 }
 
@@ -130,7 +131,7 @@ impl WorktreeSkimItem {
             output.push_str(&stat);
             output.push_str("\n\n");
 
-            // Show full diff with renderer
+            // Show full diff with pager (spawned via setsid to prevent TTY access)
             if let Ok(diff) = repo.run_diff_with_pager(args) {
                 output.push_str(&diff);
             }

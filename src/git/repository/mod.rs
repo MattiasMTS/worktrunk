@@ -1012,6 +1012,9 @@ impl Repository {
     }
 
     /// Run git diff through a renderer (pager) if configured, otherwise return colored diff output.
+    ///
+    /// The pager is spawned in a detached session (via setsid on Unix) to prevent it from
+    /// accessing /dev/tty, which would cause hangs when called from within TUI contexts like skim.
     pub fn run_diff_with_pager(&self, args: &[&str]) -> Result<String, GitError> {
         let mut git_args = args.to_vec();
         git_args.push("--color=always");
@@ -1058,7 +1061,11 @@ fn detect_pager() -> Option<String> {
         .or_else(|| std::env::var("PAGER").ok().and_then(|s| validate(&s)))
 }
 
+#[cfg(unix)]
+#[allow(unsafe_code)] // Required for pre_exec + setsid to detach from controlling terminal
 fn invoke_renderer(pager_cmd: &str, git_output: &str) -> Option<String> {
+    use std::os::unix::process::CommandExt;
+
     log::debug!("Invoking renderer: {}", pager_cmd);
 
     let mut cmd = Command::new("sh");
@@ -1069,10 +1076,56 @@ fn invoke_renderer(pager_cmd: &str, git_output: &str) -> Option<String> {
         .stderr(Stdio::null())
         .env("PAGER", "cat")
         .env("DELTA_PAGER", "cat")
-        .env("BAT_PAGER", "");
+        .env("BAT_PAGER", "")
+        .env("DELTA_NAVIGATE", "0"); // Disable interactive navigate mode (requires TTY)
 
-    let mut child = cmd.spawn().ok()?;
+    // Detach from controlling terminal to prevent pager from accessing /dev/tty
+    // This is critical for TUI contexts (like skim preview) where TTY access would hang
+    //
+    // SAFETY: pre_exec is safe here because:
+    // - setsid() is async-signal-safe (can be called between fork and exec)
+    // - We don't access any memory from the parent process
+    // - We don't perform any allocations or other unsafe operations
+    // - setsid() cannot fail in this context (fresh fork, not a process group leader)
+    unsafe {
+        cmd.pre_exec(|| {
+            // setsid() cannot fail after fork() - we're not a process group leader yet
+            let _ = nix::unistd::setsid();
+            Ok(())
+        });
+    }
 
+    let child = cmd.spawn().ok()?;
+    handle_pager_io(child, git_output)
+}
+
+#[cfg(windows)]
+fn invoke_renderer(pager_cmd: &str, git_output: &str) -> Option<String> {
+    use std::os::windows::process::CommandExt;
+
+    log::debug!("Invoking renderer: {}", pager_cmd);
+
+    const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
+    const DETACHED_PROCESS: u32 = 0x00000008;
+
+    let mut cmd = Command::new("cmd");
+    cmd.arg("/C")
+        .arg(pager_cmd)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .env("PAGER", "cat")
+        .env("DELTA_PAGER", "cat")
+        .env("BAT_PAGER", "")
+        .env("DELTA_NAVIGATE", "0") // Disable interactive navigate mode (requires TTY)
+        .creation_flags(CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS);
+
+    let child = cmd.spawn().ok()?;
+    handle_pager_io(child, git_output)
+}
+
+/// Common I/O handling for pager child processes
+fn handle_pager_io(mut child: std::process::Child, git_output: &str) -> Option<String> {
     if let Some(mut stdin) = child.stdin.take() {
         let _ = stdin.write_all(git_output.as_bytes());
         drop(stdin);
