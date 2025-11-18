@@ -1,8 +1,6 @@
 use worktrunk::HookType;
 use worktrunk::git::{GitError, GitResultExt, Repository};
-use worktrunk::styling::{
-    AnstyleStyle, CYAN, CYAN_BOLD, GREEN_BOLD, HINT, HINT_EMOJI, eprintln, format_with_gutter,
-};
+use worktrunk::styling::{AnstyleStyle, CYAN, CYAN_BOLD, GREEN_BOLD, format_with_gutter};
 
 use super::commit::{CommitGenerator, CommitOptions};
 use super::context::CommandEnv;
@@ -55,12 +53,7 @@ pub fn handle_standalone_run_hook(hook_type: HookType, force: bool) -> Result<()
 
 fn check_hook_configured<T>(hook: &Option<T>, hook_type: HookType) -> Result<(), GitError> {
     if hook.is_none() {
-        eprintln!(
-            "{HINT_EMOJI} {HINT}No {hook_type} commands configured in project config{HINT:#}"
-        );
-        return Err(GitError::CommandFailed(format!(
-            "No {hook_type} commands configured"
-        )));
+        return Err(GitError::message(format!("No {hook_type} hook configured")));
     }
     Ok(())
 }
