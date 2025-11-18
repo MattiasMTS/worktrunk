@@ -1,20 +1,6 @@
 use super::{TestRepo, wt_command};
 use insta_cmd::get_cargo_bin;
-use std::path::PathBuf;
 use std::process::Command;
-use std::sync::OnceLock;
-
-/// Get the path to the workspace Cargo.toml.
-/// Computed once and cached for the lifetime of the test process.
-fn workspace_manifest() -> &'static PathBuf {
-    static MANIFEST: OnceLock<PathBuf> = OnceLock::new();
-    MANIFEST.get_or_init(|| {
-        // Tests run from workspace root, so Cargo.toml is in current directory
-        std::env::current_dir()
-            .expect("Failed to get current directory")
-            .join("Cargo.toml")
-    })
-}
 
 /// Map shell display names to actual binaries.
 pub fn get_shell_binary(shell: &str) -> &str {
@@ -27,12 +13,17 @@ pub fn get_shell_binary(shell: &str) -> &str {
 }
 
 /// Build a command to execute a shell script via dev-detach.
-/// Uses `cargo run --manifest-path <workspace>/Cargo.toml -p dev-detach` so cargo
-/// can find the workspace manifest while the shell executes in the test repo directory.
+/// Uses `cargo run --manifest-path <workspace>/Cargo.toml -p dev-detach` so cargo can
+/// find the workspace manifest while the shell executes in the test repo directory.
 fn build_shell_command(repo: &TestRepo, shell: &str, script: &str) -> Command {
+    // Get absolute path to workspace Cargo.toml (tests run from workspace root)
+    let manifest = std::env::current_dir()
+        .expect("Failed to get current directory")
+        .join("Cargo.toml");
+
     let mut cmd = Command::new("cargo");
     cmd.args(["run", "--manifest-path"])
-        .arg(workspace_manifest())
+        .arg(&manifest)
         .args(["-p", "dev-detach", "--"]);
     repo.clean_cli_env(&mut cmd);
 
