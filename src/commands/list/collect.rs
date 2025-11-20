@@ -118,7 +118,7 @@ pub(super) fn detect_worktree_state(repo: &Repository) -> Option<String> {
 /// It will recompute with the latest available data.
 ///
 /// Branches get a subset of status symbols (no working tree, git operation, or worktree attrs).
-fn compute_item_status_symbols(item: &mut ListItem, primary: &Worktree) {
+fn compute_item_status_symbols(item: &mut ListItem, base_branch: Option<&str>) {
     // Common fields for both worktrees and branches
     let default_counts = AheadBehind::default();
     let default_upstream = UpstreamStatus::default();
@@ -130,10 +130,7 @@ fn compute_item_status_symbols(item: &mut ListItem, primary: &Worktree) {
     match &item.kind {
         ItemKind::Worktree(data) => {
             // Full status computation for worktrees
-            let base_branch = primary
-                .branch
-                .as_deref()
-                .filter(|_| data.path != primary.path);
+            // Use base_branch directly (None for primary worktree)
 
             // Worktree attributes (used directly from data instead of separate Worktree)
             let mut worktree_attrs = String::new();
@@ -410,53 +407,6 @@ pub fn collect(
         Vec::new()
     };
 
-    let branch_names: Vec<String> = branches_without_worktrees
-        .iter()
-        .map(|(name, _sha)| name.clone())
-        .collect();
-
-    // Calculate layout from basic worktree info + branch names
-    let layout = super::layout::calculate_layout_from_basics(
-        &sorted_worktrees,
-        &branch_names,
-        show_full,
-        fetch_ci,
-    );
-
-    // Single-line invariant: use safe width to prevent line wrapping
-    // (which breaks indicatif's line-based cursor math).
-    let max_width = super::layout::get_safe_list_width();
-
-    let clamp = |s: &str| -> String {
-        if console::measure_text_width(s) > max_width {
-            console::truncate_str(s, max_width, "…").into_owned()
-        } else {
-            s.to_owned()
-        }
-    };
-
-    // Create MultiProgress with explicit draw target and cursor mode
-    // Use stderr for progress bars so they don't interfere with stdout directives
-    let multi = if show_progress {
-        let mp = MultiProgress::with_draw_target(indicatif::ProgressDrawTarget::stderr_with_hz(10));
-        mp.set_move_cursor(true); // Stable since bar count is fixed
-        mp
-    } else {
-        MultiProgress::new()
-    };
-
-    let message_style = ProgressStyle::with_template("{msg}").unwrap();
-
-    // Create header progress bar (part of transient UI, cleared with finish_and_clear)
-    let header_pb = if show_progress {
-        let pb = multi.add(ProgressBar::hidden());
-        pb.set_style(message_style.clone());
-        pb.set_message(clamp(&layout.format_header_line()));
-        Some(pb)
-    } else {
-        None
-    };
-
     // Initialize worktree items with identity fields and None for computed fields
     let mut all_items: Vec<super::model::ListItem> = sorted_worktrees
         .iter()
@@ -501,27 +451,61 @@ pub fn collect(
         });
     }
 
+    // Calculate layout from items (both worktrees and branches)
+    let layout = super::layout::calculate_layout_from_basics(&all_items, show_full, fetch_ci);
+
+    // Single-line invariant: use safe width to prevent line wrapping
+    // (which breaks indicatif's line-based cursor math).
+    let max_width = super::layout::get_safe_list_width();
+
+    let clamp = |s: &str| -> String {
+        if console::measure_text_width(s) > max_width {
+            console::truncate_str(s, max_width, "…").into_owned()
+        } else {
+            s.to_owned()
+        }
+    };
+
+    // Create MultiProgress with explicit draw target and cursor mode
+    // Use stderr for progress bars so they don't interfere with stdout directives
+    let multi = if show_progress {
+        let mp = MultiProgress::with_draw_target(indicatif::ProgressDrawTarget::stderr_with_hz(10));
+        mp.set_move_cursor(true); // Stable since bar count is fixed
+        mp
+    } else {
+        MultiProgress::new()
+    };
+
+    let message_style = ProgressStyle::with_template("{msg}").unwrap();
+
+    // Create header progress bar (part of transient UI, cleared with finish_and_clear)
+    let header_pb = if show_progress {
+        let pb = multi.add(ProgressBar::hidden());
+        pb.set_style(message_style.clone());
+        pb.set_message(clamp(&layout.format_header_line()));
+        Some(pb)
+    } else {
+        None
+    };
+
     // Create progress bars for all items (worktrees + branches)
     let progress_bars: Vec<_> = all_items
         .iter()
-        .enumerate()
-        .map(|(idx, item)| {
+        .map(|item| {
             let pb = multi.add(ProgressBar::new_spinner());
             if show_progress {
                 pb.set_style(message_style.clone());
 
                 // Render skeleton immediately with clamping
-                let skeleton = if idx < sorted_worktrees.len() {
-                    // Worktree skeleton
-                    let wt = &sorted_worktrees[idx];
-                    let is_primary = wt.path == primary.path;
-                    let is_current = current_worktree_path
-                        .as_ref()
-                        .map(|cp| &wt.path == cp)
+                let skeleton = if item.worktree_data().is_some() {
+                    // Worktree skeleton - show known data (branch, path, commit)
+                    let is_current = item
+                        .worktree_path()
+                        .and_then(|p| current_worktree_path.as_ref().map(|cp| p == cp))
                         .unwrap_or(false);
-                    layout.format_skeleton_row(wt, is_primary, is_current)
+                    layout.format_skeleton_row(item, is_current)
                 } else {
-                    // Branch skeleton
+                    // Branch skeleton - use full item rendering
                     layout.format_list_item_line(item, current_worktree_path.as_ref())
                 };
                 pb.set_message(clamp(&skeleton));
@@ -537,8 +521,11 @@ pub fn collect(
     // Footer progress bar with loading status
     // Uses determinate bar (no spinner) with {wide_msg} to prevent clearing artifacts
     let total_cells = all_items.len() * layout.columns.len();
-    let num_worktrees = sorted_worktrees.len();
-    let num_branches = branches_without_worktrees.len();
+    let num_worktrees = all_items
+        .iter()
+        .filter(|item| item.worktree_data().is_some())
+        .count();
+    let num_branches = all_items.len() - num_worktrees;
     let footer_base = if show_branches && num_branches > 0 {
         format!(
             "Showing {} worktrees, {} branches",
@@ -632,10 +619,13 @@ pub fn collect(
     let mut completed_cells = 0;
 
     // Drain cell updates with conditional progressive rendering
+    let base_branch = primary.branch.as_deref();
     drain_cell_updates(rx, &mut all_items, |item_idx, info| {
         // Compute/recompute status symbols as data arrives (both modes)
         // This is idempotent and updates status as new data (like upstream) arrives
-        compute_item_status_symbols(info, &primary);
+        // Base branch is None for primary worktree, Some(primary.branch) for others
+        let item_base_branch = if info.is_primary() { None } else { base_branch };
+        compute_item_status_symbols(info, item_base_branch);
 
         // Progressive mode only: update UI
         if show_progress {

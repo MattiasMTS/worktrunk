@@ -360,17 +360,16 @@ impl LayoutConfig {
     }
 
     /// Render a skeleton row showing known data (branch, path) with placeholders for other columns
-    pub fn format_skeleton_row(
-        &self,
-        wt: &worktrunk::git::Worktree,
-        is_primary: bool,
-        is_current: bool,
-    ) -> String {
+    pub fn format_skeleton_row(&self, item: &super::model::ListItem, is_current: bool) -> String {
         use crate::display::shorten_path;
         use unicode_width::UnicodeWidthStr;
 
-        let branch = wt.branch.as_deref().unwrap_or("(detached)");
-        let shortened_path = shorten_path(&wt.path, &self.common_prefix);
+        let branch = item.branch_name();
+        let is_primary = item.is_primary();
+        let shortened_path = item
+            .worktree_path()
+            .map(|p| shorten_path(p, &self.common_prefix))
+            .unwrap_or_default();
 
         let dim = Style::new().dimmed();
         let spinner = "⋯"; // Placeholder character
@@ -417,7 +416,8 @@ impl LayoutConfig {
                 }
                 ColumnKind::Commit => {
                     // Show actual commit hash (always available)
-                    let short_head = &wt.head[..8.min(wt.head.len())];
+                    let head = item.head();
+                    let short_head = &head[..8.min(head.len())];
                     cell.push_styled(short_head, dim);
                 }
                 _ => {

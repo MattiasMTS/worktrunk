@@ -120,13 +120,13 @@ pub struct CommitDetails {
     pub commit_message: String,
 }
 
-#[derive(serde::Serialize, Default, Clone, Debug)]
+#[derive(serde::Serialize, Default, Copy, Clone, Debug)]
 pub struct AheadBehind {
     pub ahead: usize,
     pub behind: usize,
 }
 
-#[derive(serde::Serialize, Default, Clone, Debug)]
+#[derive(serde::Serialize, Default, Copy, Clone, Debug)]
 pub struct BranchDiffTotals {
     #[serde(rename = "branch_diff")]
     pub diff: LineDiff,
@@ -226,11 +226,11 @@ impl ListItem {
     }
 
     pub fn counts(&self) -> AheadBehind {
-        self.counts.clone().unwrap_or_default()
+        self.counts.unwrap_or_default()
     }
 
     pub fn branch_diff(&self) -> BranchDiffTotals {
-        self.branch_diff.clone().unwrap_or_default()
+        self.branch_diff.unwrap_or_default()
     }
 
     pub fn upstream(&self) -> UpstreamStatus {

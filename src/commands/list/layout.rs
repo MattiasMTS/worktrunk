@@ -840,38 +840,37 @@ pub fn calculate_responsive_layout(
 ///
 /// Note: This is work-in-progress for improved progressive rendering.
 pub fn calculate_layout_from_basics(
-    worktrees: &[worktrunk::git::Worktree],
-    branch_names: &[String],
+    items: &[super::model::ListItem],
     show_full: bool,
     fetch_ci: bool,
 ) -> LayoutConfig {
     let terminal_width = get_safe_list_width();
 
-    // Calculate common prefix from paths
-    let paths: Vec<&Path> = worktrees.iter().map(|wt| wt.path.as_path()).collect();
+    // Calculate common prefix from worktree paths
+    let paths: Vec<&Path> = items
+        .iter()
+        .filter_map(|item| item.worktree_path())
+        .map(|p| p.as_path())
+        .collect();
     let common_prefix = find_common_prefix(&paths);
 
     // Calculate actual widths for things we know
-    // Include both worktree branch names AND branch names without worktrees
-    let max_worktree_branch = worktrees
+    // Include branch names from both worktrees and standalone branches
+    let max_branch = items
         .iter()
-        .filter_map(|wt| wt.branch.as_deref())
+        .filter_map(|item| item.branch.as_deref())
         .map(|b| b.width())
         .max()
         .unwrap_or(0);
 
-    let max_standalone_branch = branch_names.iter().map(|b| b.width()).max().unwrap_or(0);
+    let max_branch = fit_header(HEADER_BRANCH, max_branch);
 
-    let max_branch = fit_header(
-        HEADER_BRANCH,
-        max_worktree_branch.max(max_standalone_branch),
-    );
-
-    let path_data_width = worktrees
+    let path_data_width = items
         .iter()
-        .map(|wt| {
+        .filter_map(|item| item.worktree_path())
+        .map(|path| {
             use crate::display::shorten_path;
-            shorten_path(wt.path.as_path(), &common_prefix).width()
+            shorten_path(path.as_path(), &common_prefix).width()
         })
         .max()
         .unwrap_or(0);
