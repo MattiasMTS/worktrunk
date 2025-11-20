@@ -361,7 +361,7 @@ Displays worktrees in a table format with status information, commit details, an
 
 ## STATUS SYMBOLS
 
-Order: `=≠ ≡∅ ↻⋈ ⎇⊠⚠ ↑↓ ⇡⇣ ?!+»✘`
+Order: `=≠ ≡∅ ↻⋈ ⎇⌫⊠ ↑↓ ⇡⇣ ?!+»✘`
 
 - `·` Branch without worktree (no working directory to check)
 - `=` **Merge conflicts** (unmerged paths in working tree)
@@ -371,8 +371,8 @@ Order: `=≠ ≡∅ ↻⋈ ⎇⊠⚠ ↑↓ ⇡⇣ ?!+»✘`
 - `↻` Rebase in progress
 - `⋈` Merge in progress
 - `⎇` Branch indicator (shown for branches without worktrees)
-- `⊠` Locked worktree
-- `⚠` Prunable worktree
+- `⌫` Prunable worktree (directory missing, can be pruned)
+- `⊠` Locked worktree (protected from auto-removal)
 - `↑` Ahead of main branch
 - `↓` Behind main branch
 - `⇡` Ahead of remote tracking branch
@@ -387,11 +387,14 @@ Order: `=≠ ≡∅ ↻⋈ ⎇⊠⚠ ↑↓ ⇡⇣ ?!+»✘`
 
 ## JSON OUTPUT
 
-Use `--format=json` for structured data. The `status_symbols` field contains two maps:
+Use `--format=json` for structured data. Each object contains two status maps:
 
 **`status` (variant names for querying):**
 - `branch_state`: \"\" | \"Conflicts\" | \"PotentialConflicts\" | \"MatchesMain\" | \"NoCommits\"
 - `git_operation`: \"\" | \"Rebase\" | \"Merge\"
+- `worktree_attrs`: object (worktrees only) with:
+  - `locked`: null | \"reason string\"
+  - `prunable`: null | \"reason string\"
 - `main_divergence`: \"\" | \"Ahead\" | \"Behind\" | \"Diverged\"
 - `upstream_divergence`: \"\" | \"Ahead\" | \"Behind\" | \"Diverged\"
 - `working_tree`: object with booleans
@@ -405,6 +408,7 @@ Use `--format=json` for structured data. The `status_symbols` field contains two
 **`status_symbols` (display symbols for rendering):**
 - `branch_state`: \"\" | \"=\" | \"≠\" | \"≡\" | \"∅\"
 - `git_operation`: \"\" | \"↻\" | \"⋈\"
+- `worktree_attrs`: \"⎇\" (branch) | \"⌫\" (prunable) | \"⊠\" (locked) | \"\"
 - `main_divergence`: \"\" | \"↑\" | \"↓\" | \"↕\"
 - `upstream_divergence`: \"\" | \"⇡\" | \"⇣\" | \"⇅\"
 - `working_tree`: string - combination of \"?!+»✘\"
@@ -413,16 +417,19 @@ Use `--format=json` for structured data. The `status_symbols` field contains two
 **Query examples:**
 
   # Find worktrees with conflicts
-  jq '.[] | select(.status_symbols.status.branch_state == \"Conflicts\")'
+  jq '.[] | select(.status.branch_state == \"Conflicts\")'
+
+  # Find locked worktrees
+  jq '.[] | select(.status.worktree_attrs.locked != null)'
 
   # Find worktrees with untracked files
-  jq '.[] | select(.status_symbols.status.working_tree.untracked == true)'
+  jq '.[] | select(.status.working_tree.untracked == true)'
 
   # Find worktrees in rebase or merge
-  jq '.[] | select(.status_symbols.status.git_operation != \"\")'
+  jq '.[] | select(.status.git_operation != \"\")'
 
   # Get branches ahead of main
-  jq '.[] | select(.status_symbols.status.main_divergence == \"Ahead\")'")]
+  jq '.[] | select(.status.main_divergence == \"Ahead\")'")]
     List {
         /// Output format
         #[arg(long, value_enum, default_value = "table")]
