@@ -276,6 +276,11 @@ fn test_force_flag_saves_to_new_config_file() {
 /// are denied. The higher-level `approve_command_batch()` catches this error and
 /// displays a warning (see src/commands/command_approval.rs:82-85), allowing
 /// commands to execute even when the approval can't be saved.
+///
+/// TODO: Find a way to test permission errors without skipping when running as root.
+/// Currently skips in containerized environments (Claude Code web, Docker) where
+/// root can write to read-only files. Consider using capabilities or other mechanisms
+/// to test permission handling in all environments.
 #[test]
 fn test_permission_error_prevents_save() {
     use std::fs::Permissions;
@@ -295,6 +300,21 @@ fn test_permission_error_prevents_save() {
     {
         let readonly_perms = Permissions::from_mode(0o444);
         fs::set_permissions(config_dir, readonly_perms).unwrap();
+    }
+
+    // Test if permissions actually restrict us (skip if running as root)
+    // Root can write to read-only directories, so the test would be meaningless
+    let test_file = config_dir.join("test_write");
+    if fs::write(&test_file, "test").is_ok() {
+        // Running as root or permissions don't work
+        // Restore write permissions and skip test
+        #[cfg(unix)]
+        {
+            let writable_perms = Permissions::from_mode(0o755);
+            fs::set_permissions(config_dir, writable_perms).unwrap();
+        }
+        eprintln!("Skipping permission test - running with elevated privileges");
+        return;
     }
 
     // Try to save a new approval - this should fail
