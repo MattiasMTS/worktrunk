@@ -540,7 +540,7 @@ Use `wt list --format=json` for structured data access. The output is an array o
 
 ### Branch-Specific Fields
 
-- `name`: branch name
+Branches use the same `branch` field as worktrees (no additional fields).
 
 ### JSON Field Documentation
 

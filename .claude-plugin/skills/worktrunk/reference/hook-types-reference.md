@@ -46,7 +46,7 @@ post-create-command = [
 
 ### post-start-command
 
-**When it runs**: After switching to an existing worktree (not on creation).
+**When it runs**: After creating a new worktree (not when switching to existing).
 
 **Behavior**:
 - Runs in background, doesn't block user
@@ -69,7 +69,7 @@ post-start-command = [
 ]
 ```
 
-**What happens**: User runs `wt switch feature-x`. All three commands start immediately in parallel. User can work while they run. Check `.wt-logs/` for output.
+**What happens**: User runs `wt switch --create feature-x`. After creation completes, all three commands start immediately in parallel in background. User can work while they run. Check `.wt-logs/` for output.
 
 ### pre-commit-command
 

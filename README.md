@@ -547,6 +547,9 @@ Options:
       --branches
           Include branches without worktrees
 
+      --remotes
+          Include remote branches from primary remote
+
   -v, --verbose
           Show git commands and debug info
 
@@ -661,7 +664,7 @@ jq '.[] | select(.locked != null)'
 Usage: wt config [OPTIONS] <COMMAND>
 
 Commands:
-  init           Initialize global configuration file with examples
+  create         Create global configuration file
   list           List configuration files & locations
   refresh-cache  Refresh default branch from remote
   shell          Configure shell integration
@@ -696,7 +699,7 @@ Enable AI-generated commit messages
    llm install llm-anthropic
    llm keys set anthropic
    # Paste your API key from: https://console.anthropic.com/settings/keys
-   llm models default claude-3.5-sonnet
+   llm models default claude-sonnet-4-5
    ```
 
    For OpenAI:
@@ -735,6 +738,7 @@ These commands are subject to change:
 - `wt beta push [target]` - Push changes to target branch (auto-stashes non-conflicting edits)
 - `wt beta rebase [target]` - Rebase current branch onto target
 - `wt beta ask-approvals` - Approve commands in project config
+- `wt beta clear-approvals` - Clear approved commands from config
 - `wt beta run-hook <hook-type>` - Run a project hook for testing
 - `wt beta select` - Interactive worktree selector (Unix only, WIP)
 
@@ -754,6 +758,7 @@ wt config --help  # Show LLM setup guide
 **Global config** (`~/.config/worktrunk/config.toml`):
 
 - `worktree-path` - Path template for new worktrees
+- `[list]` - Default display options for `wt list` (full, branches, remotes)
 - `[commit-generation]` - LLM command and prompt templates
 - `[projects."project-id"]` - Per-project approved commands (auto-populated)
 
@@ -783,7 +788,7 @@ approved-commands = ["npm install", "npm test"]
 
 **Example project config** (`.config/wt.toml`): See Project Hooks section above.
 
-**Path template defaults:** `../repo.branch/` (siblings to main repo). Available variables: `{{ main_worktree }}`, `{{ branch }}`, `{{ repo }}`.
+**Path template defaults:** `../{{ main_worktree }}.{{ branch }}` (siblings to main repo). Available variables: `{{ main_worktree }}`, `{{ branch }}`, `{{ repo }}`.
 
 </details>
 
