@@ -268,6 +268,13 @@ path. See [Project Hooks](#project-hooks) for details:
 "setup" = "uv sync && nvm install"
 ```
 
+**Use hooks to reduce iteration times** - [Project hooks](#project-hooks) can
+dramatically speed up your workflow. For example, use `post-start-command` to
+bootstrap new worktrees with pre-compiled dependencies from main via
+copy-on-write, eliminating cold compiles while keeping caches isolated (see
+[worktrunk's own config](.config/wt.toml)). Or use `post-merge-command` to
+automatically deploy to a staging server after every merge.
+
 **Delegate to task runners** - Reference existing Justfile/Makefile commands instead of duplicating logic:
 
 ```toml
