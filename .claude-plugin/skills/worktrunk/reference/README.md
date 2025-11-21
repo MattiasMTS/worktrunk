@@ -237,6 +237,20 @@ $ wt merge
 
 </details>
 
+### Shell Integration
+
+Worktrunk can automatically configure the shell:
+
+```bash
+wt config shell
+```
+
+This adds shell integration to config files (supports Bash, Zsh, and Fish). The
+integration enables `wt switch` to change directories and `wt remove` to return
+to the previous location.
+
+For manual setup instructions, see `wt config shell --help`.
+
 ## Tips
 
 **Create an alias for an agent** - Shell aliases streamline common workflows. For example, to create a worktree and immediately start Claude:
@@ -887,20 +901,6 @@ worktree-path = ".worktrees/{{ branch }}"
 # Shared directory with multiple repos
 worktree-path = "../worktrees/{{ main_worktree }}/{{ branch }}"
 ```
-
-### Shell Integration
-
-Worktrunk can automatically configure the shell:
-
-```bash
-wt config shell
-```
-
-This adds shell integration to config files (supports Bash, Zsh, and Fish). The
-integration enables `wt switch` to change directories and `wt remove` to return
-to the previous location.
-
-For manual setup instructions, see `wt config shell --help`.
 
 ## Status
 
