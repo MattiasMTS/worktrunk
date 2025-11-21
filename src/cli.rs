@@ -640,6 +640,8 @@ Removes worktree directory, git metadata, and branch. Requires clean working tre
 - Logs: `.git/wt-logs/{branch}-remove.log`
 - Use `--no-background` for foreground (blocking)
 
+**Cleanup**: Stops any git fsmonitor daemon for the worktree before removal. This prevents orphaned processes when using builtin fsmonitor (`core.fsmonitor=true`). No effect on Watchman users.
+
 ## EXAMPLES
 
 Remove current worktree and branch:

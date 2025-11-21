@@ -164,15 +164,25 @@ fn build_remove_command(
     let worktree_escaped = escape(worktree_path_str.as_ref().into());
     let branch_escaped = escape(branch_name.into());
 
+    // Stop fsmonitor daemon first (best effort - ignore errors)
+    // This prevents zombie daemons from accumulating when using builtin fsmonitor
+    let stop_fsmonitor = format!(
+        "git -C {} fsmonitor--daemon stop 2>/dev/null || true",
+        worktree_escaped
+    );
+
     if should_delete_branch {
-        // Remove worktree and delete branch
+        // Stop fsmonitor, remove worktree, and delete branch
         format!(
-            "git worktree remove {} && git branch -D {}",
-            worktree_escaped, branch_escaped
+            "{} && git worktree remove {} && git branch -D {}",
+            stop_fsmonitor, worktree_escaped, branch_escaped
         )
     } else {
-        // Just remove the worktree
-        format!("git worktree remove {}", worktree_escaped)
+        // Stop fsmonitor and remove the worktree
+        format!(
+            "{} && git worktree remove {}",
+            stop_fsmonitor, worktree_escaped
+        )
     }
 }
 
@@ -251,6 +261,12 @@ pub fn handle_remove_output(
         Ok(())
     } else {
         // Synchronous mode: remove immediately and report actual results
+
+        // Stop fsmonitor daemon first (best effort - ignore errors)
+        // This prevents zombie daemons from accumulating when using builtin fsmonitor
+        let target_repo = worktrunk::git::Repository::at(worktree_path);
+        let _ = target_repo.run_command(&["fsmonitor--daemon", "stop"]);
+
         // Track whether branch was actually deleted (will be computed based on deletion attempt)
         if let Err(err) = repo.remove_worktree(worktree_path) {
             anyhow::bail!(

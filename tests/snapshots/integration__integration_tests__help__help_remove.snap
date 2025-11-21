@@ -61,6 +61,10 @@ Background removal (default):
 - Logs: .git/wt-logs/{branch}-remove.log
 - Use --no-background for foreground (blocking)
 
+Cleanup: Stops any git fsmonitor daemon for the worktree before removal. This 
+prevents orphaned processes when using builtin fsmonitor (core.fsmonitor=true). 
+No effect on Watchman users.
+
 [38;5;10mEXAMPLES[39m
 
 Remove current worktree and branch:
