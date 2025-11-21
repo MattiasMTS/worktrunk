@@ -310,11 +310,17 @@ fn spawn_ci_status<'scope>(
     fetch_ci: bool,
     tx: Sender<CellUpdate>,
 ) {
+    let item_idx = ctx.item_idx;
+
     if !fetch_ci {
+        // Send None to indicate "loaded but not fetched" (shows empty, not "⋯")
+        let _ = tx.send(CellUpdate::CiStatus {
+            item_idx,
+            pr_status: None,
+        });
         return;
     }
 
-    let item_idx = ctx.item_idx;
     let branch = ctx.branch.clone();
     let sha = ctx.commit_sha.clone();
     let path = ctx.repo_path.clone();

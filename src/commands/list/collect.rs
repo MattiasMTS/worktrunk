@@ -756,6 +756,15 @@ pub fn collect(
 
         if is_tty {
             // Interactive: morph footer → summary, keep rows in place
+            // Do a final render pass to ensure all data is displayed
+            // (progressive updates may have been clamped or timing-delayed)
+            for (item_idx, pb) in progress_bars.iter().enumerate() {
+                let rendered = layout
+                    .format_list_item_line(&all_items[item_idx], current_worktree_path.as_ref());
+                let clamped = clamp(&rendered);
+                pb.set_message(clamped);
+            }
+
             if let Some(pb) = spacer_pb.as_ref() {
                 pb.finish(); // leave the blank line
             }
