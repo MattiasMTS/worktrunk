@@ -138,9 +138,7 @@ $ wt merge
 ✅ Squashed @ a1b2c3d
 ```
 
-For more details: `wt config --help`
-
-**Custom prompt templates:** Run `wt config create` to generate an example config with minijinja template variables.
+For more details, including custom prompt templates: `wt config --help`
 
 ### Project Hooks
 
@@ -752,7 +750,7 @@ Docs: https://llm.datasette.io/ | https://github.com/sigoden/aichat
 </details>
 
 <details>
-<summary><strong>Step commands</strong> - Building blocks for workflows</summary>
+<summary><strong><code>wt step</code></strong> - Building blocks for workflows</summary>
 
 Primitive operations that can be composed into custom workflows:
 
