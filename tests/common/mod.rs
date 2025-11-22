@@ -84,6 +84,9 @@ pub fn configure_cli_command(cmd: &mut Command) {
             cmd.env_remove(&key);
         }
     }
+    // Set to non-existent path to prevent loading user's real config
+    // Tests that need config should use TestRepo::clean_cli_env() which overrides this
+    cmd.env("WORKTRUNK_CONFIG_PATH", "/nonexistent/test/config.toml");
     cmd.env("CLICOLOR_FORCE", "1");
     if std::env::var("COLUMNS").is_err() {
         cmd.env("COLUMNS", "150");

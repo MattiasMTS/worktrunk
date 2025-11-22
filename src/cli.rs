@@ -556,7 +556,10 @@ Note: `locked` and `prunable` are top-level fields on worktree objects, not in s
         #[arg(long)]
         full: bool,
 
-        /// Force progressive (or --no-progressive)
+        /// Show fast info immediately, update with slow info
+        ///
+        /// Displays local data (branches, paths, status) first, then updates
+        /// with remote data (CI, upstream) as it arrives. Auto-enabled for TTY.
         #[arg(long, overrides_with = "no_progressive")]
         progressive: bool,
 

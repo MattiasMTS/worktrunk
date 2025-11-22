@@ -571,7 +571,7 @@ json\:"JSON output"))' \
 '--branches[Include branches without worktrees]' \
 '--remotes[Include remote branches]' \
 '--full[Show CI, conflicts, diffs]' \
-'--progressive[Force progressive (or --no-progressive)]' \
+'--progressive[Show fast info immediately, update with slow info]' \
 '--no-progressive[Force buffered rendering]' \
 '-v[Show commands and debug info]' \
 '--verbose[Show commands and debug info]' \

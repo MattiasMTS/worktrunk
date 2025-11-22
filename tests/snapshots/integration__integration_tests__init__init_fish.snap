@@ -319,7 +319,7 @@ complete -c wt -n "__fish_wt_using_subcommand list" -l config -d 'User config fi
 complete -c wt -n "__fish_wt_using_subcommand list" -l branches -d 'Include branches without worktrees'
 complete -c wt -n "__fish_wt_using_subcommand list" -l remotes -d 'Include remote branches'
 complete -c wt -n "__fish_wt_using_subcommand list" -l full -d 'Show CI, conflicts, diffs'
-complete -c wt -n "__fish_wt_using_subcommand list" -l progressive -d 'Force progressive (or --no-progressive)'
+complete -c wt -n "__fish_wt_using_subcommand list" -l progressive -d 'Show fast info immediately, update with slow info'
 complete -c wt -n "__fish_wt_using_subcommand list" -l no-progressive -d 'Force buffered rendering'
 complete -c wt -n "__fish_wt_using_subcommand list" -s v -l verbose -d 'Show commands and debug info'
 complete -c wt -n "__fish_wt_using_subcommand list" -s h -l help -d 'Print help (see more with \'--help\')'
