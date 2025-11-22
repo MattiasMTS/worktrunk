@@ -1,2 +1,0 @@
-# Treat snapshot test files as text for proper diffs
-*.snap text diff
