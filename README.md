@@ -285,9 +285,9 @@ and gating the merge on tests passing is very freeing — `main` is protected fr
 one agent forgetting to run all tests, without you having to babysit it.
 
 **View Claude Code status from `wt list`** — The Claude Code integration shows
-which branches have active sessions in `wt list`. When Claude starts working,
-the branch shows `🤖`; hen waiting for input, it shows `💬`. Setup instructions:
-[Custom Worktree Status](#custom-worktree-status).
+which branches have active sessions in `wt list`. When the agent is working, the
+branch shows `🤖`; when it's waiting for the user, it shows `💬`. Setup
+instructions: [Custom Worktree Status](#custom-worktree-status).
 
 **Delegate to task runners** — Reference existing Taskfile/Justfile/Makefile commands
 instead of duplicating logic:
@@ -791,10 +791,12 @@ wt config --help  # Show LLM setup guide
 <summary>Configuration details</summary>
 
 **Global config** (loaded in order of precedence):
+
 1. `WORKTRUNK_CONFIG_PATH` environment variable
 2. `~/.config/worktrunk/config.toml` (Linux/macOS) or `%APPDATA%\worktrunk\config.toml` (Windows)
 
 Contents:
+
 - `worktree-path` - Path template for new worktrees
 - `[list]` - Default display options for `wt list` (full, branches, remotes)
 - `[commit-generation]` - LLM command and prompt templates
