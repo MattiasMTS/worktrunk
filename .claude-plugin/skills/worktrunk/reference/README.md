@@ -33,7 +33,9 @@ $ wt switch --create fix-auth
 ✅ Created new worktree for fix-auth from main at ../repo.fix-auth/
 ```
 
-**After making changes, merge it back:**
+...then do work / have an agent do work. Then, when ready...
+
+**Merge it:**
 
 <!-- Output from: tests/snapshots/integration__integration_tests__merge__readme_example_simple.snap -->
 
@@ -50,7 +52,7 @@ $ wt merge
 
 See [`wt merge`](#wt-merge) for all options.
 
-**See all active worktrees:**
+**List worktrees:**
 
 <!-- Output from: tests/snapshots/integration__integration_tests__list__readme_example_simple_list.snap -->
 
@@ -77,19 +79,26 @@ See [Shell Integration](#shell-integration) for details.
 
 ## Design Philosophy
 
-Worktrunk is opinionated! It's not designed to be all things to all people. The choices optimize for agent workflows:
+Worktrunk is opinionated! It's not designed to be all things to all people. Its
+choices optimize for parallel AI agent workflow:
 
 - Trunk-based development
 - Lots of short-lived worktrees
-- Terminal-based coding agents
-- Inner dev loops are local
-- Shell navigation
 - Commits are squashed into linear histories
-- Maximum automation
-- Branches as handles, one branch per worktree
+- Terminal-based coding agents, shell navigation
+- Inner dev loops are local
 
-Adopting Worktrunk for a portion of a workflow doesn't require adopting it for
-everything — standard `git worktree` commands continue working fine.
+...and that means...
+
+- Total focus on zero cost of an additional agent
+- Fairly small surface area: three core commands
+- Maximum automation: LLM commit messages, lifecycle hooks, Claude Code hooks
+  - A robust "run auto-merge when 'local-CI' passes" command
+- Worktrees are addressed by their branch
+- Extreme UI responsiveness; slow ops can't delay fast ones
+- Pluggable; adopting Worktrunk for a portion of a workflow doesn't require
+  adopting it for everything. standard `git worktree` commands continue working
+  fine!
 
 ## Automation Features
 
@@ -239,61 +248,56 @@ $ wt merge
 
 ### Shell Integration
 
-Worktrunk can automatically configure the shell:
+Worktrunk requires shell integration in order to switch directories, during `wt
+switch` & `wt merge`/`wt remove`. To add automatic setup to shell config files
+(supports Bash, Zsh, and Fish):
 
 ```bash
 wt config shell
 ```
 
-This adds shell integration to config files (supports Bash, Zsh, and Fish). The
-integration enables `wt switch` to change directories and `wt remove` to return
-to the previous location.
-
 For manual setup instructions, see `wt config shell --help`.
 
 ## Tips
 
-**Create an alias for an agent** - Shell aliases streamline common workflows. For example, to create a worktree and immediately start Claude:
+**Create an alias for an agent** — Start a new agent-in-worktree in a couple of seconds. For example, to create a worktree and immediately start Claude:
 
 ```bash
 alias wsl='wt switch --create --execute=claude'
 ```
 
-Now `wsl new-feature` creates a branch, sets up the worktree, runs initialization hooks, and launches Claude in that directory.
+Then:
 
-**Automatic branch status in Claude Code** - The Claude Code integration shows
-which branches have active sessions. When Claude starts working, the branch
-shows `🤖` in `wt list`. When waiting for input, it shows `💬`. Setup
-instructions: [Custom Worktree Status](#custom-worktree-status).
-
-**Auto-generated commit messages** - Simon Willison's
-[llm](https://llm.datasette.io/) tool works with worktrunk's
-commit generation. Install it, configure the command, and `wt merge` will
-automatically generate contextual commit messages. Setup guide: [LLM Commit
-Messages](#llm-commit-messages).
-
-**Environment setup with hooks** - Use `post-create-command` (or
-`post-start-command` for non-blocking) to run setup for that
-path. See [Project Hooks](#project-hooks) for details:
-
-```toml
-# In .config/wt.toml
-[post-create-command]
-"setup" = "uv sync && nvm install"
+```bash
+wsl new-feature
 ```
 
-**Use hooks to reduce iteration times** - [Project hooks](#project-hooks) can
-dramatically speed up your workflow. For example, use `post-start-command` to
-bootstrap new worktrees with pre-compiled dependencies from main via
-copy-on-write, eliminating cold compiles while keeping caches isolated (see
-[worktrunk's own config](.config/wt.toml)). Or use `post-merge-command` to
-automatically deploy to a staging server after every merge.
+...creates a branch, sets up the worktree, runs initialization hooks, and launches Claude in that directory.
 
-**Delegate to task runners** - Reference existing Justfile/Makefile commands instead of duplicating logic:
+**View Claude Code status from `wt list`** — The Claude Code integration shows
+which branches have active sessions in `wt list`. When Claude starts working,
+the branch shows `🤖`; hen waiting for input, it shows `💬`. Setup instructions:
+[Custom Worktree Status](#custom-worktree-status).
+
+**Auto-generate commit messages** — Configure an LLM to generate commit
+messages during merge. See [LLM Commit Messages](#llm-commit-messages).
+
+**Automate startup with hooks** — Use `post-create-command` for environment
+setup, `post-start-command` for non-blocking tasks. For example, worktrunk uses
+`post-start-command` to bootstrap build caches from main via copy-on-write,
+eliminating cold compiles (see [worktrunk's config](.config/wt.toml)). See
+[Project Hooks](#project-hooks) for details.
+
+**Use `post-merge-command` as a "local CI"** — Running `wt merge` on a worktree
+and knowing it'll get merged iff passes tests — means `main` is protected from
+an agent forgetting to run all tests (without having to babysit it).
+
+**Delegate to task runners** — Reference existing Taskfile/Justfile/Makefile commands
+instead of duplicating logic:
 
 ```toml
 [post-create-command]
-"setup" = "just install"
+"setup" = "task install"
 
 [pre-merge-command]
 "validate" = "just test lint"
@@ -395,6 +399,7 @@ wt remove @                              # Remove current worktree
 </details>
 
 <a id="wt-merge"></a>
+
 <details>
 <summary><strong><code>wt merge [target]</code></strong> - Merge, push, and cleanup</summary>
 
@@ -557,6 +562,7 @@ wt remove  # (when already in main worktree)
 </details>
 
 <a id="wt-list"></a>
+
 <details>
 <summary><strong><code>wt list</code></strong> - Show all worktrees and branches</summary>
 

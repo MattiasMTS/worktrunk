@@ -19,6 +19,7 @@ Env DEMO_REPO "{{DEMO_REPO}}"
 Env RUSTUP_HOME "{{REAL_HOME}}/.rustup"
 Env CARGO_HOME "{{REAL_HOME}}/.cargo"
 Env HOME "{{DEMO_HOME}}"
+Env XDG_CONFIG_HOME "{{DEMO_HOME}}/.config"
 Env STARSHIP_CONFIG "{{STARSHIP_CONFIG}}"
 
 Hide
