@@ -437,22 +437,18 @@ fn parse_status_for_symbols(status_output: &str) -> (String, bool, bool) {
         }
     }
 
-    // Build working tree string
+    // Build working tree string (priority order: staged > modified > untracked)
+    // Only show top 3 most actionable symbols to save space
+    // Renamed (») and deleted (✘) are still detected for is_dirty but not displayed
     let mut working_tree = String::new();
-    if has_untracked {
-        working_tree.push('?');
+    if has_staged {
+        working_tree.push('+');
     }
     if has_modified {
         working_tree.push('!');
     }
-    if has_staged {
-        working_tree.push('+');
-    }
-    if has_renamed {
-        working_tree.push('»');
-    }
-    if has_deleted {
-        working_tree.push('✘');
+    if has_untracked {
+        working_tree.push('?');
     }
 
     let is_dirty = has_untracked || has_modified || has_staged || has_renamed || has_deleted;

@@ -45,18 +45,17 @@ exit_code: 0
         "renamed": false,
         "deleted": false
       },
-      "branch_state": "",
-      "git_operation": "",
+      "branch_op_state": "",
       "main_divergence": "IsMain",
-      "upstream_divergence": ""
+      "upstream_divergence": "",
+      "worktree_state": ""
     },
     "status_symbols": {
       "working_tree": "",
-      "branch_state": "",
-      "git_operation": "",
+      "branch_op_state": "",
       "main_divergence": "^",
       "upstream_divergence": "",
-      "worktree_attrs": ""
+      "worktree_state": ""
     },
     "type": "worktree",
     "path": "[REPO]",
@@ -96,18 +95,17 @@ exit_code: 0
         "renamed": false,
         "deleted": false
       },
-      "branch_state": "",
-      "git_operation": "",
+      "branch_op_state": "",
       "main_divergence": "Diverged",
-      "upstream_divergence": ""
+      "upstream_divergence": "",
+      "worktree_state": ""
     },
     "status_symbols": {
-      "working_tree": "?!",
-      "branch_state": "",
-      "git_operation": "",
+      "working_tree": "!?",
+      "branch_op_state": "",
       "main_divergence": "↕",
       "upstream_divergence": "",
-      "worktree_attrs": ""
+      "worktree_state": ""
     },
     "commits_display": "/u001b[32m↑2/u001b[0m /u001b[2m/u001b[31m↓2/u001b[0m",
     "branch_diff_display": "/u001b[32m+1/u001b[0m",
@@ -147,18 +145,17 @@ exit_code: 0
         "renamed": false,
         "deleted": false
       },
-      "branch_state": "NoCommits",
-      "git_operation": "",
+      "branch_op_state": "NoCommits",
       "main_divergence": "Behind",
-      "upstream_divergence": ""
+      "upstream_divergence": "",
+      "worktree_state": ""
     },
     "status_symbols": {
       "working_tree": "",
-      "branch_state": "∅",
-      "git_operation": "",
+      "branch_op_state": "∅",
       "main_divergence": "↓",
       "upstream_divergence": "",
-      "worktree_attrs": ""
+      "worktree_state": ""
     },
     "commits_display": "/u001b[2m/u001b[31m↓2/u001b[0m",
     "type": "worktree",

@@ -26,7 +26,7 @@ use worktrunk::styling::INFO_EMOJI;
 
 use super::ci_status::PrStatus;
 use super::model::{
-    AheadBehind, BranchDiffTotals, BranchState, CommitDetails, GitOperation, ItemKind, ListItem,
+    AheadBehind, BranchDiffTotals, BranchOpState, CommitDetails, ItemKind, ListItem,
     MainDivergence, StatusSymbols, UpstreamDivergence, UpstreamStatus,
 };
 
@@ -167,36 +167,37 @@ fn compute_divergences(
 /// Determine branch state for a worktree.
 ///
 /// Returns:
-/// - `BranchState::None` if main worktree or no base branch
-/// - `BranchState::MatchesMain` if working tree matches main exactly (no commits, no diff)
-/// - `BranchState::NoCommits` if no commits and working tree is clean
-/// - `BranchState::None` otherwise
-fn determine_worktree_branch_state(
+/// - `BranchOpState::None` if main worktree or no base branch
+/// - `BranchOpState::NoCommits` if no commits ahead and working tree is clean
+/// - `BranchOpState::MatchesMain` if ahead == 0 but dirty tree happens to match main (rare)
+/// - `BranchOpState::None` otherwise
+fn determine_worktree_base_state(
     is_main: bool,
     default_branch: Option<&str>,
     ahead: usize,
     working_tree_diff: Option<&LineDiff>,
     working_tree_diff_with_main: &Option<Option<LineDiff>>,
-) -> BranchState {
+) -> BranchOpState {
     if is_main || default_branch.is_none() {
-        return BranchState::None;
+        return BranchOpState::None;
     }
 
     let is_clean = working_tree_diff.map(|d| d.is_empty()).unwrap_or(true);
 
+    // Check if no commits and clean working tree (most common removable state)
+    if ahead == 0 && is_clean {
+        return BranchOpState::NoCommits;
+    }
+
     // Check if working tree matches main exactly (requires diff with main to be computed)
+    // This is rare - only when ahead == 0, tree is dirty, but dirty changes happen to match main
     if let Some(Some(mdiff)) = working_tree_diff_with_main.as_ref()
         && mdiff.is_empty()
         && ahead == 0
     {
-        return BranchState::MatchesMain;
-    }
-
-    // Check if no commits and clean working tree
-    if ahead == 0 && is_clean {
-        BranchState::NoCommits
+        BranchOpState::MatchesMain
     } else {
-        BranchState::None
+        BranchOpState::None
     }
 }
 
@@ -205,7 +206,7 @@ fn determine_worktree_branch_state(
 /// This is idempotent and can be called multiple times as new data arrives.
 /// It will recompute with the latest available data.
 ///
-/// Branches get a subset of status symbols (no working tree, git operation, or worktree attrs).
+/// Branches get a subset of status symbols (no working tree changes or worktree attrs).
 // TODO(status-indicator): show a status glyph when a worktree's checked-out branch
 // differs from the branch name we associate with it (e.g., worktree exists but on another branch).
 fn compute_item_status_symbols(
@@ -228,8 +229,8 @@ fn compute_item_status_symbols(
             // Full status computation for worktrees
             // Use default_branch directly (None for main worktree)
 
-            // Item attributes - priority: prunable > locked (1 char max)
-            let item_attrs = if data.prunable.is_some() {
+            // Worktree state - priority: prunable > locked (1 char max)
+            let worktree_state = if data.prunable.is_some() {
                 "⌫".to_string() // Prunable (directory missing)
             } else if data.locked.is_some() {
                 "⊠".to_string() // Locked (protected)
@@ -237,8 +238,8 @@ fn compute_item_status_symbols(
                 String::new()
             };
 
-            // Determine branch state (only for non-main worktrees with base branch)
-            let branch_state = determine_worktree_branch_state(
+            // Determine base branch state (only for non-main worktrees with base branch)
+            let base_state = determine_worktree_base_state(
                 data.is_main,
                 default_branch,
                 counts.ahead,
@@ -246,20 +247,17 @@ fn compute_item_status_symbols(
                 &data.working_tree_diff_with_main,
             );
 
-            // Determine git operation
-            let git_operation = match data.worktree_state.as_deref() {
-                Some("rebase") => GitOperation::Rebase,
-                Some("merge") => GitOperation::Merge,
-                _ => GitOperation::None,
-            };
-
-            // Combine conflicts and branch state (mutually exclusive)
-            let branch_state = if has_conflicts {
-                BranchState::Conflicts
+            // Apply priority: Conflicts > Rebase > Merge > MergeTreeConflicts > base_state
+            let branch_op_state = if has_conflicts {
+                BranchOpState::Conflicts
+            } else if data.worktree_state.as_deref() == Some("rebase") {
+                BranchOpState::Rebase
+            } else if data.worktree_state.as_deref() == Some("merge") {
+                BranchOpState::Merge
             } else if has_merge_tree_conflicts {
-                BranchState::MergeTreeConflicts
+                BranchOpState::MergeTreeConflicts
             } else {
-                branch_state
+                base_state
             };
 
             // Override main_divergence for the main worktree
@@ -270,9 +268,8 @@ fn compute_item_status_symbols(
             };
 
             item.status_symbols = Some(StatusSymbols {
-                branch_state,
-                git_operation,
-                item_attrs,
+                branch_op_state,
+                worktree_state,
                 main_divergence,
                 upstream_divergence,
                 working_tree: working_tree_symbols.unwrap_or("").to_string(),
@@ -283,24 +280,23 @@ fn compute_item_status_symbols(
             // Simplified status computation for branches
             // Only compute symbols that apply to branches (no working tree, git operation, or worktree attrs)
 
-            // Branch state - branches can only show Conflicts or NoCommits
+            // Branch op state - branches can only show MergeTreeConflicts or NoCommits
             // (MatchesMain only applies to worktrees since branches don't have working trees)
-            let branch_state = if has_merge_tree_conflicts {
-                BranchState::MergeTreeConflicts
+            let branch_op_state = if has_merge_tree_conflicts {
+                BranchOpState::MergeTreeConflicts
             } else if let Some(ref c) = item.counts {
                 if c.ahead == 0 {
-                    BranchState::NoCommits
+                    BranchOpState::NoCommits
                 } else {
-                    BranchState::None
+                    BranchOpState::None
                 }
             } else {
-                BranchState::None
+                BranchOpState::None
             };
 
             item.status_symbols = Some(StatusSymbols {
-                branch_state,
-                git_operation: GitOperation::None,
-                item_attrs: "⎇".to_string(), // Branch indicator
+                branch_op_state,
+                worktree_state: "⎇".to_string(), // Branch indicator
                 main_divergence,
                 upstream_divergence,
                 working_tree: String::new(),
