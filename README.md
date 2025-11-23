@@ -302,25 +302,35 @@ instead of duplicating logic:
 <details>
 <summary><strong><code>wt switch [branch]</code></strong> - Switch to existing worktree or create a new one</summary>
 
+<!-- README:help:wt switch --help-md -->
 ```
-Usage: wt switch [OPTIONS] <BRANCH>
+wt switch - Switch to a worktree
+Usage: switch [OPTIONS] <BRANCH>
 
 Arguments:
-  <BRANCH>  Branch, path, '@' (HEAD), '-' (previous), or '^' (main)
+  <BRANCH>
+          Branch, path, '@' (HEAD), '-' (previous), or '^' (main)
 
 Options:
-  -c, --create             Create a new branch
-  -b, --base <BASE>        Base branch (defaults to default branch)
-  -x, --execute <EXECUTE>  Command to run after switch
-  -f, --force              Skip approval prompts
-      --no-verify          Skip all project hooks
-  -h, --help               Print help
+  -c, --create
+          Create a new branch
 
-Global Options:
-  -C <path>                Change working directory
-      --config <path>      User config file path
-  -v, --verbose            Show commands and debug info
-```
+  -b, --base <BASE>
+          Base branch
+
+          Defaults to default branch.
+
+  -x, --execute <EXECUTE>
+          Command to run after switch
+
+  -f, --force
+          Skip approval prompts
+
+      --no-verify
+          Skip all project hooks
+
+  -h, --help
+          Print help (see a summary with '-h')
 
 ## Operation
 
@@ -331,7 +341,6 @@ Global Options:
 - No branch creation
 
 ### Creating New Worktree (`--create`)
-
 1. Creates new branch (defaults to current default branch as base)
 2. Creates worktree in configured location (default: `../{{ main_worktree }}.{{ branch }}`)
 3. Runs post-create hooks sequentially (blocking)
@@ -349,62 +358,62 @@ Global Options:
 - Skip with `--no-verify`
 
 ### post-start (parallel, background)
-
 - Spawned after success message shown
 - Typically: dev servers, file watchers, editors
 - Run in background, failures logged but don't block
 - Logs: `.git/wt-logs/{branch}-post-start-{name}.log`
 - Skip with `--no-verify`
 
+**Template variables:** `{{ repo }}`, `{{ branch }}`, `{{ worktree }}`, `{{ repo_root }}`
+
+**Security:** Commands from project hooks require approval on first run.
+Approvals are saved to user config. Use `--force` to bypass prompts.
+See `wt config approvals --help`.
+
 ## Examples
 
 Switch to existing worktree:
-
-```
+```bash
 wt switch feature-branch
 ```
 
 Create new worktree from main:
-
-```
+```bash
 wt switch --create new-feature
 ```
 
 Switch to previous worktree:
-
-```
+```bash
 wt switch -
 ```
 
 Create from specific base:
-
-```
+```bash
 wt switch --create hotfix --base production
 ```
 
 Create and run command:
-
-```
+```bash
 wt switch --create docs --execute "code ."
 ```
 
 Skip hooks during creation:
-
-```
+```bash
 wt switch --create temp --no-verify
 ```
 
 ## Shortcuts
 
 Use `@` for current HEAD, `-` for previous, `^` for main:
-
-```
+```bash
 wt switch @                              # Switch to current branch's worktree
 wt switch -                              # Switch to previous worktree
 wt switch --create new-feature --base=^  # Branch from main (default)
 wt switch --create bugfix --base=@       # Branch from current HEAD
 wt remove @                              # Remove current worktree
 ```
+```
+<!-- README:end -->
 
 </details>
 
@@ -413,26 +422,43 @@ wt remove @                              # Remove current worktree
 <details>
 <summary><strong><code>wt merge [target]</code></strong> - Merge, push, and cleanup</summary>
 
+<!-- README:help:wt merge --help-md -->
 ```
-Usage: wt merge [OPTIONS] [TARGET]
+wt merge - Merge worktree into target branch
+Usage: merge [OPTIONS] [TARGET]
 
 Arguments:
-  [TARGET]  Target branch (defaults to default branch)
+  [TARGET]
+          Target branch
+
+          Defaults to default branch.
 
 Options:
-      --no-squash      Skip commit squashing
-      --no-commit      Skip commit, squash, and rebase
-      --no-remove      Keep worktree after merge
-      --no-verify      Skip all project hooks
-  -f, --force          Skip approval prompts
-      --stage <STAGE>  What to stage before committing [default: all] [possible values: all, tracked, none]
-  -h, --help           Print help
+      --no-squash
+          Skip commit squashing
 
-Global Options:
-  -C <path>            Change working directory
-      --config <path>  User config file path
-  -v, --verbose        Show commands and debug info
-```
+      --no-commit
+          Skip commit, squash, and rebase
+
+      --no-remove
+          Keep worktree after merge
+
+      --no-verify
+          Skip all project hooks
+
+  -f, --force
+          Skip approval prompts
+
+      --stage <STAGE>
+          What to stage before committing [default: all]
+
+          Possible values:
+          - all:     Stage everything: untracked files + unstaged tracked changes
+          - tracked: Stage tracked changes only (like git add -u)
+          - none:    Stage nothing, commit only what's already in the index
+
+  -h, --help
+          Print help (see a summary with '-h')
 
 ## Operation
 
@@ -465,54 +491,62 @@ Fast-forward push to local target branch. Non-fast-forward pushes are rejected.
 
 Worktree and branch are removed. Skip with `--no-remove`.
 
+**Template variables:** `{{ repo }}`, `{{ branch }}`, `{{ worktree }}`, `{{ repo_root }}`, `{{ target }}`
+
+**Security:** Commands from project hooks require approval on first run.
+Approvals are saved to user config. Use `--force` to bypass prompts.
+See `wt config approvals --help`.
+
 ## Examples
 
 Basic merge to main:
-
-```
+```bash
 wt merge
 ```
 
 Merge without squashing:
-
-```
+```bash
 wt merge --no-squash
 ```
 
 Keep worktree after merging:
-
-```
+```bash
 wt merge --no-remove
 ```
 
 Skip all hooks:
-
-```
+```bash
 wt merge --no-verify
 ```
+```
+<!-- README:end -->
 
 </details>
 
 <details>
 <summary><strong><code>wt remove [worktree]</code></strong> - Remove worktree and branch</summary>
 
+<!-- README:help:wt remove --help-md -->
 ```
-Usage: wt remove [OPTIONS] [WORKTREES]...
+wt remove - Remove worktree and branch
+Usage: remove [OPTIONS] [WORKTREES]...
 
 Arguments:
-  [WORKTREES]...  Worktree or branch (@ for current)
+  [WORKTREES]...
+          Worktree or branch (@ for current)
 
 Options:
-      --no-delete-branch  Keep branch after removal
-  -D, --force-delete      Delete unmerged branches
-      --no-background     Run removal in foreground
-  -h, --help              Print help
+      --no-delete-branch
+          Keep branch after removal
 
-Global Options:
-  -C <path>               Change working directory
-      --config <path>     User config file path
-  -v, --verbose           Show commands and debug info
-```
+  -D, --force-delete
+          Delete unmerged branches
+
+      --no-background
+          Run removal in foreground
+
+  -h, --help
+          Print help (see a summary with '-h')
 
 ## Operation
 
@@ -541,40 +575,36 @@ Stops any git fsmonitor daemon for the worktree before removal. This prevents or
 ## Examples
 
 Remove current worktree and branch:
-
-```
+```bash
 wt remove
 ```
 
 Remove specific worktree and branch:
-
-```
+```bash
 wt remove feature-branch
 ```
 
 Remove worktree but keep branch:
-
-```
+```bash
 wt remove --no-delete-branch feature-branch
 ```
 
 Remove multiple worktrees:
-
-```
+```bash
 wt remove old-feature another-branch
 ```
 
 Remove in foreground (blocking):
-
-```
+```bash
 wt remove --no-background feature-branch
 ```
 
 Switch to default in main:
-
-```
+```bash
 wt remove  # (when already in main worktree)
 ```
+```
+<!-- README:end -->
 
 </details>
 
@@ -583,45 +613,56 @@ wt remove  # (when already in main worktree)
 <details>
 <summary><strong><code>wt list</code></strong> - Show all worktrees and branches</summary>
 
+<!-- README:help:wt list --help-md -->
 ```
-Usage: wt list [OPTIONS]
+wt list - List worktrees and optionally branches
+Usage: list [OPTIONS]
 
 Options:
-      --format <FORMAT>  Output format (table, json) [default: table]
-      --branches         Include branches without worktrees
-      --remotes          Include remote branches
-      --full             Show CI, conflicts, diffs
-      --progressive      Force progressive (or --no-progressive)
-  -h, --help             Print help
+      --format <FORMAT>
+          Output format (table, json)
 
-Global Options:
-  -C <path>              Change working directory
-      --config <path>    User config file path
-  -v, --verbose          Show commands and debug info
-```
+          [default: table]
+
+      --branches
+          Include branches without worktrees
+
+      --remotes
+          Include remote branches
+
+      --full
+          Show CI, conflicts, diffs
+
+      --progressive
+          Show fast info immediately, update with slow info
+
+          Displays local data (branches, paths, status) first, then updates with remote data (CI, upstream) as it arrives. Auto-enabled for TTY.
+
+  -h, --help
+          Print help (see a summary with '-h')
 
 ## Columns
 
 - **Branch:** Branch name
-- **Status:** Quick status symbols (see STATUS SYMBOLS below)
+- **Status:** Quick status symbols (see Status Symbols below)
 - **HEAD±:** Uncommitted changes vs HEAD (+added -deleted lines, staged + unstaged)
 - **main↕:** Commit count ahead↑/behind↓ relative to main (commits in HEAD vs main)
-- **main…± (--full):** Line diffs in commits ahead of main (+added -deleted)
+- **main…±** (`--full`): Line diffs in commits ahead of main (+added -deleted)
 - **Path:** Worktree directory location
-- **Remote⇅:** Commits ahead↑/behind↓ relative to tracking branch (e.g. origin/branch)
-- **CI (--full):** CI pipeline status (tries PR/MR checks first, falls back to branch workflows)
-  - ● passed (green) - All checks passed
-  - ● running (blue) - Checks in progress
-  - ● failed (red) - Checks failed
-  - ● conflicts (yellow) - Merge conflicts with base
-  - ● no-ci (gray) - PR/MR or workflow found but no checks configured
-  - (blank) - No PR/MR or workflow found, or gh/glab CLI unavailable
+- **Remote⇅:** Commits ahead↑/behind↓ relative to tracking branch (e.g. `origin/branch`)
+- **CI** (`--full`): CI pipeline status (tries PR/MR checks first, falls back to branch workflows)
+  - `●` **passed** (green) - All checks passed
+  - `●` **running** (blue) - Checks in progress
+  - `●` **failed** (red) - Checks failed
+  - `●` **conflicts** (yellow) - Merge conflicts with base
+  - `●` **no-ci** (gray) - PR/MR or workflow found but no checks configured
+  - (blank) - No PR/MR or workflow found, or `gh`/`glab` CLI unavailable
   - (dimmed) - Stale: unpushed local changes differ from PR/MR head
 - **Commit:** Short commit hash (8 chars)
 - **Age:** Time since last commit (relative)
 - **Message:** Last commit message (truncated)
 
-**STATUS SYMBOLS:**
+## Status Symbols
 
 Order: `?!+»✘ ✖⚠≡∅ ↻⋈ ↑↓↕ ⇡⇣⇅ ⎇⌫⊠`
 
@@ -646,15 +687,14 @@ Order: `?!+»✘ ✖⚠≡∅ ↻⋈ ↑↓↕ ⇡⇣⇅ ⎇⌫⊠`
 - `⌫` Prunable worktree (directory missing, can be pruned)
 - `⊠` Locked worktree (protected from auto-removal)
 
-_Rows are dimmed when no unique work (≡ matches main OR ∅ no commits)._
+*Rows are dimmed when no unique work (≡ matches main OR ∅ no commits).*
 
-**JSON OUTPUT:**
+## JSON Output
 
 Use `--format=json` for structured data. Each object contains two status maps
-with the same fields in the same order as STATUS SYMBOLS above:
+with the same fields in the same order as Status Symbols above:
 
 **`status`** - variant names for querying:
-
 - `working_tree`: `{untracked, modified, staged, renamed, deleted}` booleans
 - `branch_state`: `""` | `"Conflicts"` | `"MergeTreeConflicts"` | `"MatchesMain"` | `"NoCommits"`
 - `git_operation`: `""` | `"Rebase"` | `"Merge"`
@@ -684,14 +724,18 @@ jq '.[] | select(.status.main_divergence == "Ahead")'
 # Find locked worktrees
 jq '.[] | select(.locked != null)'
 ```
+```
+<!-- README:end -->
 
 </details>
 
 <details>
 <summary><strong><code>wt config</code></strong> - Manage configuration</summary>
 
+<!-- README:help:wt config --help-md -->
 ```
-Usage: wt config [OPTIONS] <COMMAND>
+wt config - Manage configuration and shell integration
+Usage: config <COMMAND>
 
 Commands:
   shell          Shell integration setup
@@ -700,79 +744,97 @@ Commands:
   refresh-cache  Refresh default branch from remote
   status         Manage branch status markers
   approvals      Manage command approvals
+  help           Print this message or the help of the given subcommand(s)
 
 Options:
-  -h, --help             Print help
+  -h, --help
+          Print help (see a summary with '-h')
 
-Global Options:
-  -C <path>              Change working directory
-      --config <path>    User config file path
-  -v, --verbose          Show commands and debug info
-```
+## Setup Guide
 
-**LLM SETUP GUIDE:**
-
-Enable LLM commit messages
-
-1. Install an LLM tool (llm, aichat)
-
+1. Set up shell integration
    ```bash
-   uv tool install -U llm
+   wt config shell install
    ```
 
-2. Configure a model
-
-   For Claude:
-
+   Or manually add to your shell config:
    ```bash
-   llm install llm-anthropic
-   llm keys set anthropic
-   # Paste your API key from: https://console.anthropic.com/settings/keys
-   llm models default claude-sonnet-4-5
+   eval "$(wt config shell init bash)"
    ```
 
-   For OpenAI:
-
+2. (Optional) Create config file
    ```bash
-   llm keys set openai
-   # Paste your API key from: https://platform.openai.com/api-keys
+   wt config create
    ```
 
-3. Test it works
+   This creates ~/.config/worktrunk/config.toml with examples.
 
-   ```bash
-   llm "say hello"
-   ```
+3. (Optional) Enable LLM commit messages
 
-4. Configure worktrunk
-
-   Add to `~/.config/worktrunk/config.toml`:
-
+   Install: `uv tool install -U llm`
+   Configure: `llm keys set anthropic`
+   Add to config.toml:
    ```toml
    [commit-generation]
    command = "llm"
-   ```
+   ```bash
 
+## LLM Setup Details
+
+For Claude:
+```bash
+llm install llm-anthropic
+llm keys set anthropic
+llm models default claude-3.5-sonnet
+```
+
+For OpenAI:
+```bash
+llm keys set openai
+```
+
+Use `wt config list` to view your current configuration.
 Docs: https://llm.datasette.io/ | https://github.com/sigoden/aichat
+
+## Configuration Files
+
+**Global config** (user settings):
+- Location: `~/.config/worktrunk/config.toml` (or `WORKTRUNK_CONFIG_PATH`)
+- Run `wt config create` to generate with documented examples
+
+**Project config** (repository hooks):
+- Location: `.config/wt.toml` in repository root
+- Contains: post-create, post-start, pre-commit, pre-merge, post-merge hooks
+```
+<!-- README:end -->
 
 </details>
 
 <details>
 <summary><strong><code>wt step</code></strong> - Building blocks for workflows</summary>
 
-Primitive operations that can be composed into custom workflows:
+<!-- README:help:wt step --help-md -->
+```
+wt step - Primitive operations (building blocks for workflows)
+Usage: step <COMMAND>
 
-- `wt step commit` - Commit changes with LLM message
-- `wt step squash [target]` - Squash commits with LLM message
-- `wt step push [target]` - Push changes to local target branch
-- `wt step rebase [target]` - Rebase onto target
-- `wt step post-create` - Run post-create hook
-- `wt step post-start` - Run post-start hook
-- `wt step pre-commit` - Run pre-commit hook
-- `wt step pre-merge` - Run pre-merge hook
-- `wt step post-merge` - Run post-merge hook
+Commands:
+  commit       Commit changes with LLM message
+  squash       Squash commits with LLM message
+  push         Push changes to local target branch
+  rebase       Rebase onto target
+  post-create  Run post-create hook
+  post-start   Run post-start hook
+  pre-commit   Run pre-commit hook
+  pre-merge    Run pre-merge hook
+  post-merge   Run post-merge hook
+  help         Print this message or the help of the given subcommand(s)
 
-See `wt step --help` for details.
+Options:
+  -h, --help
+          Print help
+```
+<!-- README:end -->
 
 </details>
 

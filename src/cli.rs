@@ -158,7 +158,7 @@ wt config shell init fish | source
 Zsh (~/.zshrc):
 ```zsh
 eval "$(wt config shell init zsh)"
-```
+```bash
 
 ## Auto Setup
 
@@ -177,17 +177,17 @@ Use `wt config shell install` to automatically add to your shell config."#)]
     #[command(after_long_help = r#"## Auto Setup
 
 Detects existing shell config files and adds integration:
-```
+```bash
 wt config shell install
 ```
 
 Install for specific shell only:
-```
+```bash
 wt config shell install zsh
 ```
 
 Skip confirmation prompt:
-```
+```bash
 wt config shell install --force
 ```"#)]
     Install {
@@ -303,17 +303,17 @@ commands.
 ## Examples
 
 Pre-approve all commands for current project:
-```
+```bash
 wt config approvals ask
 ```
 
 Clear approvals for current project:
-```
+```bash
 wt config approvals clear
 ```
 
 Clear global approvals:
-```
+```bash
 wt config approvals clear --global
 ```"#)]
     Approvals {
@@ -474,17 +474,17 @@ pub enum Commands {
         after_long_help = r#"## Setup Guide
 
 1. Set up shell integration
-   ```
+   ```bash
    wt config shell install
    ```
 
    Or manually add to your shell config:
-   ```
+   ```bash
    eval "$(wt config shell init bash)"
    ```
 
 2. (Optional) Create config file
-   ```
+   ```bash
    wt config create
    ```
 
@@ -498,19 +498,19 @@ pub enum Commands {
    ```toml
    [commit-generation]
    command = "llm"
-   ```
+   ```bash
 
 ## LLM Setup Details
 
 For Claude:
-```
+```bash
 llm install llm-anthropic
 llm keys set anthropic
 llm models default claude-3.5-sonnet
 ```
 
 For OpenAI:
-```
+```bash
 llm keys set openai
 ```
 
@@ -702,39 +702,39 @@ See `wt config approvals --help`.
 ## Examples
 
 Switch to existing worktree:
-```
+```bash
 wt switch feature-branch
 ```
 
 Create new worktree from main:
-```
+```bash
 wt switch --create new-feature
 ```
 
 Switch to previous worktree:
-```
+```bash
 wt switch -
 ```
 
 Create from specific base:
-```
+```bash
 wt switch --create hotfix --base production
 ```
 
 Create and run command:
-```
+```bash
 wt switch --create docs --execute "code ."
 ```
 
 Skip hooks during creation:
-```
+```bash
 wt switch --create temp --no-verify
 ```
 
 ## Shortcuts
 
 Use `@` for current HEAD, `-` for previous, `^` for main:
-```
+```bash
 wt switch @                              # Switch to current branch's worktree
 wt switch -                              # Switch to previous worktree
 wt switch --create new-feature --base=^  # Branch from main (default)
@@ -797,32 +797,32 @@ Stops any git fsmonitor daemon for the worktree before removal. This prevents or
 ## Examples
 
 Remove current worktree and branch:
-```
+```bash
 wt remove
 ```
 
 Remove specific worktree and branch:
-```
+```bash
 wt remove feature-branch
 ```
 
 Remove worktree but keep branch:
-```
+```bash
 wt remove --no-delete-branch feature-branch
 ```
 
 Remove multiple worktrees:
-```
+```bash
 wt remove old-feature another-branch
 ```
 
 Remove in foreground (blocking):
-```
+```bash
 wt remove --no-background feature-branch
 ```
 
 Switch to default in main:
-```
+```bash
 wt remove  # (when already in main worktree)
 ```"#)]
     Remove {
@@ -884,22 +884,22 @@ See `wt config approvals --help`.
 ## Examples
 
 Basic merge to main:
-```
+```bash
 wt merge
 ```
 
 Merge without squashing:
-```
+```bash
 wt merge --no-squash
 ```
 
 Keep worktree after merging:
-```
+```bash
 wt merge --no-remove
 ```
 
 Skip all hooks:
-```
+```bash
 wt merge --no-verify
 ```"#)]
     Merge {

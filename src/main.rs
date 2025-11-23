@@ -44,12 +44,34 @@ fn maybe_handle_help_with_pager() -> bool {
     use clap::ColorChoice;
     use clap::error::ErrorKind;
 
+    let args: Vec<String> = std::env::args().collect();
+
+    // Check for --help-md flag (output raw markdown without ANSI rendering)
+    if args.iter().any(|a| a == "--help-md") {
+        let mut cmd = cli::build_command();
+        // Filter out --help-md and add --help for clap
+        let filtered_args: Vec<String> = args
+            .iter()
+            .map(|a| {
+                if a == "--help-md" {
+                    "--help".to_string()
+                } else {
+                    a.clone()
+                }
+            })
+            .collect();
+        let target = help_resolver::resolve_target_command(&mut cmd, filtered_args);
+        let help = target.render_long_help().to_string(); // Raw markdown, no ANSI
+        println!("{}", help);
+        process::exit(0);
+    }
+
     let mut cmd = cli::build_command();
     cmd = cmd.color(ColorChoice::Always); // Force clap to always emit ANSI codes
 
     // DON'T render markdown yet - let clap generate help first
 
-    match cmd.try_get_matches_from_mut(std::env::args()) {
+    match cmd.try_get_matches_from_mut(args) {
         Ok(_) => false, // Normal args, not help
         Err(err) => {
             match err.kind() {

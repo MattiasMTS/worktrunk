@@ -12,14 +12,21 @@
 use regex::Regex;
 use std::fs;
 use std::path::Path;
+use std::process::Command;
 use std::sync::LazyLock;
 
 /// Regex to find README snapshot markers
-static MARKER_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+static SNAPSHOT_MARKER_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
         r"(?s)<!-- README:snapshot:([^\s]+) -->\n```\w*\n(?:\$ [^\n]+\n)?(.*?)```\n<!-- README:end -->",
     )
     .expect("Invalid marker regex")
+});
+
+/// Regex to find README help markers
+static HELP_MARKER_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?s)<!-- README:help:(.+?) -->\n```\n(.*?)```\n<!-- README:end -->")
+        .expect("Invalid help marker regex")
 });
 
 /// Regex to strip ANSI escape codes (actual escape sequences)
@@ -112,12 +119,77 @@ fn normalize_for_readme(content: &str) -> String {
     let content = TMPDIR_REGEX.replace_all(&content, "../repo.$1");
     let content = REPO_REGEX.replace_all(&content, "../repo");
 
-    // Trim trailing whitespace from each line (matches pre-commit behavior)
+    // Trim trailing whitespace from each line and overall (matches pre-commit behavior)
     content
         .lines()
         .map(|line| line.trim_end())
         .collect::<Vec<_>>()
         .join("\n")
+        .trim()
+        .to_string()
+}
+
+/// Normalize README content for comparison
+fn normalize_readme_content(content: &str) -> String {
+    content
+        .lines()
+        .map(|line| line.trim_end())
+        .collect::<Vec<_>>()
+        .join("\n")
+        .trim()
+        .to_string()
+}
+
+/// Get help output for a command
+///
+/// Expected format: `wt <subcommand> --help-md`
+fn get_help_output(command: &str, project_root: &Path) -> Result<String, String> {
+    let args: Vec<&str> = command.split_whitespace().collect();
+    if args.is_empty() {
+        return Err("Empty command".to_string());
+    }
+
+    // Validate command format
+    if args.first() != Some(&"wt") {
+        return Err(format!("Command must start with 'wt': {}", command));
+    }
+
+    // Validate it ends with --help-md
+    if args.last() != Some(&"--help-md") {
+        return Err(format!("Command must end with '--help-md': {}", command));
+    }
+
+    // Build the cargo run command
+    let output = Command::new("cargo")
+        .args(["run", "-q", "--"])
+        .args(&args[1..]) // Skip "wt" prefix
+        .current_dir(project_root)
+        .output()
+        .map_err(|e| format!("Failed to run command: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    // Help goes to stdout
+    let help_output = if !stdout.is_empty() {
+        stdout.to_string()
+    } else {
+        stderr.to_string()
+    };
+
+    // Strip ANSI codes
+    let help_output = strip_ansi(&help_output);
+
+    // Trim trailing whitespace from each line and join
+    let result = help_output
+        .lines()
+        .map(|line| line.trim_end())
+        .collect::<Vec<_>>()
+        .join("\n")
+        .trim()
+        .to_string();
+
+    Ok(result)
 }
 
 #[test]
@@ -130,18 +202,10 @@ fn test_readme_examples_are_in_sync() {
     let mut errors = Vec::new();
     let mut checked = 0;
 
-    for cap in MARKER_PATTERN.captures_iter(&readme_content) {
+    // Check snapshot markers
+    for cap in SNAPSHOT_MARKER_PATTERN.captures_iter(&readme_content) {
         let snap_path = cap.get(1).unwrap().as_str();
-        // Normalize README content: trim trailing whitespace from each line
-        let current_content = cap
-            .get(2)
-            .unwrap()
-            .as_str()
-            .lines()
-            .map(|line| line.trim_end())
-            .collect::<Vec<_>>()
-            .join("\n");
-        let current_content = current_content.trim();
+        let current_content = normalize_readme_content(cap.get(2).unwrap().as_str());
         checked += 1;
 
         let full_path = project_root.join(snap_path);
@@ -155,8 +219,6 @@ fn test_readme_examples_are_in_sync() {
             }
         };
 
-        let expected = expected.trim();
-
         // Compare
         if current_content != expected {
             errors.push(format!(
@@ -166,13 +228,37 @@ fn test_readme_examples_are_in_sync() {
         }
     }
 
+    // Check help markers
+    for cap in HELP_MARKER_PATTERN.captures_iter(&readme_content) {
+        let command = cap.get(1).unwrap().as_str();
+        let current_content = normalize_readme_content(cap.get(2).unwrap().as_str());
+        checked += 1;
+
+        // Get help output for the command
+        let expected = match get_help_output(command, project_root) {
+            Ok(content) => content,
+            Err(e) => {
+                errors.push(format!("❌ {}: {}", command, e));
+                continue;
+            }
+        };
+
+        // Compare
+        if current_content != expected {
+            errors.push(format!(
+                "❌ {} is out of sync\n\n--- Current (in README) ---\n{}\n\n--- Expected (from --help) ---\n{}\n",
+                command, current_content, expected
+            ));
+        }
+    }
+
     if checked == 0 {
-        panic!("No README:snapshot markers found in README.md");
+        panic!("No README markers found in README.md");
     }
 
     if !errors.is_empty() {
         panic!(
-            "README examples are out of sync with snapshots:\n\n{}\n\n\
+            "README examples are out of sync:\n\n{}\n\n\
             To fix: Update the README sections with the expected content above.\n\
             Checked {} markers, {} out of sync.",
             errors.join("\n"),
