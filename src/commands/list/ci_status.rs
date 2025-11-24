@@ -1,6 +1,100 @@
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::process::Command;
 
+/// Extract owner from a git remote URL (works for GitHub, GitLab, Bitbucket, etc.)
+///
+/// Supports formats:
+/// - `https://<host>/<owner>/<repo>.git`
+/// - `git@<host>:<owner>/<repo>.git`
+fn parse_remote_owner(url: &str) -> Option<&str> {
+    let url = url.trim();
+
+    let owner = if let Some(rest) = url.strip_prefix("https://") {
+        // https://github.com/owner/repo.git -> owner
+        rest.split('/').nth(1)
+    } else if let Some(rest) = url.strip_prefix("git@") {
+        // git@github.com:owner/repo.git -> owner
+        rest.split(':').nth(1)?.split('/').next()
+    } else {
+        None
+    }?;
+
+    if owner.is_empty() { None } else { Some(owner) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_remote_owner() {
+        // GitHub HTTPS
+        assert_eq!(
+            parse_remote_owner("https://github.com/owner/repo.git"),
+            Some("owner")
+        );
+        assert_eq!(
+            parse_remote_owner("  https://github.com/owner/repo\n"),
+            Some("owner")
+        );
+
+        // GitHub SSH
+        assert_eq!(
+            parse_remote_owner("git@github.com:owner/repo.git"),
+            Some("owner")
+        );
+
+        // GitLab HTTPS
+        assert_eq!(
+            parse_remote_owner("https://gitlab.com/owner/repo.git"),
+            Some("owner")
+        );
+        assert_eq!(
+            parse_remote_owner("https://gitlab.example.com/owner/repo.git"),
+            Some("owner")
+        );
+
+        // GitLab SSH
+        assert_eq!(
+            parse_remote_owner("git@gitlab.com:owner/repo.git"),
+            Some("owner")
+        );
+
+        // Bitbucket
+        assert_eq!(
+            parse_remote_owner("https://bitbucket.org/owner/repo.git"),
+            Some("owner")
+        );
+        assert_eq!(
+            parse_remote_owner("git@bitbucket.org:owner/repo.git"),
+            Some("owner")
+        );
+
+        // Malformed URLs
+        assert_eq!(parse_remote_owner("https://github.com/"), None);
+        assert_eq!(parse_remote_owner("git@github.com:"), None);
+        assert_eq!(parse_remote_owner(""), None);
+
+        // Unsupported protocols
+        assert_eq!(parse_remote_owner("http://github.com/owner/repo.git"), None);
+    }
+}
+
+/// Get the owner of the origin remote (for fork detection)
+fn get_origin_owner(repo_root: &str) -> Option<String> {
+    let output = Command::new("git")
+        .args(["remote", "get-url", "origin"])
+        .current_dir(repo_root)
+        .output()
+        .ok()?;
+    if output.status.success() {
+        let url = String::from_utf8(output.stdout).ok()?;
+        parse_remote_owner(&url).map(|s| s.to_string())
+    } else {
+        None
+    }
+}
+
 /// Configure command to disable color output
 fn disable_color_output(cmd: &mut Command) {
     cmd.env_remove("CLICOLOR_FORCE");
@@ -101,7 +195,7 @@ impl PrStatus {
         }
 
         // Try GitLab MR
-        if let Some(status) = Self::detect_gitlab(branch, local_head) {
+        if let Some(status) = Self::detect_gitlab(branch, local_head, repo_root) {
             return Some(status);
         }
 
@@ -127,6 +221,9 @@ impl PrStatus {
         // Use `gh pr list --head` instead of `gh pr view` to handle numeric branch names correctly.
         // When branch name is all digits (e.g., "4315"), `gh pr view` interprets it as a PR number,
         // but `gh pr list --head` correctly treats it as a branch name.
+        //
+        // Use --author to filter to PRs from the origin remote owner, avoiding false matches
+        // with other forks that have branches with the same name (e.g., everyone's fork has "master")
         let mut cmd = Command::new("gh");
         cmd.args([
             "pr",
@@ -138,6 +235,9 @@ impl PrStatus {
             "--json",
             "state,headRefOid,mergeStateStatus,statusCheckRollup,url",
         ]);
+        if let Some(origin_owner) = get_origin_owner(repo_root) {
+            cmd.args(["--author", &origin_owner]);
+        }
 
         disable_color_output(&mut cmd);
         cmd.current_dir(repo_root);
@@ -186,20 +286,35 @@ impl PrStatus {
         })
     }
 
-    fn detect_gitlab(branch: &str, local_head: &str) -> Option<Self> {
+    fn detect_gitlab(branch: &str, local_head: &str, repo_root: &str) -> Option<Self> {
         if !tool_available("glab", &["--version"]) {
             return None;
         }
 
-        // Get MR info for the branch
-        let output = match Command::new("glab")
-            .args(["mr", "view", branch, "--output", "json"])
-            .output()
-        {
+        // Use glab mr list with --source-branch and --author to filter to MRs from the origin
+        // remote owner, avoiding false matches with other forks that have branches with the
+        // same name (similar to the GitHub --author fix)
+        let mut cmd = Command::new("glab");
+        cmd.args([
+            "mr",
+            "list",
+            "--source-branch",
+            branch,
+            "--state=opened",
+            "--per-page=1",
+            "--output",
+            "json",
+        ]);
+        if let Some(origin_owner) = get_origin_owner(repo_root) {
+            cmd.args(["--author", &origin_owner]);
+        }
+        cmd.current_dir(repo_root);
+
+        let output = match cmd.output() {
             Ok(output) => output,
             Err(e) => {
                 log::warn!(
-                    "glab mr view failed to execute for branch {}: {}",
+                    "glab mr list failed to execute for branch {}: {}",
                     branch,
                     e
                 );
@@ -209,16 +324,13 @@ impl PrStatus {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            log::debug!("glab mr view failed for {}: {}", branch, stderr.trim());
+            log::debug!("glab mr list failed for {}: {}", branch, stderr.trim());
             return None;
         }
 
-        let mr_info: GitLabMrInfo = parse_json(&output.stdout, "glab mr view", branch)?;
-
-        // Only process open MRs
-        if mr_info.state != "opened" {
-            return None;
-        }
+        // glab mr list returns an array, take the first item
+        let mr_list: Vec<GitLabMrInfo> = parse_json(&output.stdout, "glab mr list", branch)?;
+        let mr_info = mr_list.first()?;
 
         // Determine CI status using priority: conflicts > running > failed > passed > no_ci
         let ci_status = if mr_info.has_conflicts
@@ -429,7 +541,6 @@ impl GitHubWorkflowRun {
 
 #[derive(Debug, Deserialize)]
 struct GitLabMrInfo {
-    state: String,
     sha: String,
     has_conflicts: bool,
     detailed_merge_status: Option<String>,
