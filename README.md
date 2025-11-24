@@ -844,7 +844,7 @@ For Claude:
 ```bash
 llm install llm-anthropic
 llm keys set anthropic
-llm models default claude-haiku-4-5
+llm models default claude-3.5-sonnet
 ```
 
 For OpenAI:
@@ -867,6 +867,7 @@ Docs: <https://llm.datasette.io/> | <https://github.com/sigoden/aichat>
 
 - Location: `.config/wt.toml` in repository root
 - Contains: post-create, post-start, pre-commit, pre-merge, post-merge hooks
+
 <!-- README:end -->
 
 </details>
