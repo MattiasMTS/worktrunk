@@ -36,7 +36,7 @@ $ wt switch --create fix-auth
 ```
 <!-- README:end -->
 
-...then do work. When ready...
+...then do work. When ready:
 
 **Merge it:**
 
@@ -838,6 +838,8 @@ Options:
 
 ## Configuration
 
+By default, worktrees live as siblings to the main repo (`myapp.feature-x/`).
+
 ```bash
 wt config list    # Show all config files and locations
 wt config create  # Create global config with examples
@@ -910,13 +912,7 @@ $ wt list
 
 </details>
 
-### Customization
-
-By default, worktrees live as siblings to the main repo (`myapp.feature-x/`).
-
-Run `wt config --help` for details on customizing paths, commit templates, and more.
-
-## Status
+## Project Status
 
 Worktrunk is in active development. The core features are stable and ready for
 use. There may be backward-incompatible changes.
@@ -951,7 +947,8 @@ Run without `--execute` to preview changes first.
 
 ## FAQ
 
-### What commands does Worktrunk execute?
+<details>
+<summary><strong>What commands does Worktrunk execute?</strong></summary>
 
 Worktrunk executes commands in three contexts:
 
@@ -982,7 +979,10 @@ Commands from project hooks and LLM configuration require approval on first run.
 
 Use `--force` to bypass prompts (useful for CI/automation).
 
-### How does Worktrunk compare to alternatives?
+</details>
+
+<details>
+<summary><strong>How does Worktrunk compare to alternatives?</strong></summary>
 
 #### vs. Branch Switching
 
@@ -1035,7 +1035,10 @@ These tools can be used together—run git-machete or git-town inside individual
 
 Git TUIs operate on a single repository. Worktrunk manages multiple worktrees, runs automation hooks, and aggregates status across branches (`wt list --full`). Use your preferred TUI inside each worktree directory.
 
-### Installation fails with C compilation errors
+</details>
+
+<details>
+<summary><strong>Installation fails with C compilation errors</strong></summary>
 
 If you encounter errors related to tree-sitter or C compilation (like "error: 'for' loop initial declarations are only allowed in C99 mode" or "undefined reference to le16toh"), install without syntax highlighting:
 
@@ -1044,3 +1047,5 @@ cargo install worktrunk --no-default-features
 ```
 
 This disables bash syntax highlighting in command output but keeps all core functionality. The syntax highlighting feature requires C99 compiler support and can fail on older systems or minimal Docker images.
+
+</details>
