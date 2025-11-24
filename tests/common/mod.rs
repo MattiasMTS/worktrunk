@@ -848,6 +848,64 @@ pub fn validate_ansi_codes(text: &str) -> Vec<String> {
     warnings
 }
 
+// ============================================================================
+// Timing utilities for background command tests
+// ============================================================================
+
+/// Poll with exponential backoff: 10ms → 20ms → 40ms → ... → 500ms max.
+/// Fast initial checks catch quick completions; backs off to reduce CPU on slow CI.
+fn exponential_sleep(attempt: u32) {
+    let ms = (10 * (1 << attempt)).min(500);
+    std::thread::sleep(std::time::Duration::from_millis(ms));
+}
+
+/// Wait for a file to exist, polling with exponential backoff.
+/// Use this instead of fixed sleeps for background commands to avoid flaky tests.
+pub fn wait_for_file(path: &Path, timeout: std::time::Duration) {
+    let start = std::time::Instant::now();
+    let mut attempt = 0;
+    while start.elapsed() < timeout {
+        if path.exists() {
+            return;
+        }
+        exponential_sleep(attempt);
+        attempt += 1;
+    }
+    panic!(
+        "File was not created within {:?}: {}",
+        timeout,
+        path.display()
+    );
+}
+
+/// Wait for a directory to contain at least `expected_count` files with a given extension.
+pub fn wait_for_file_count(
+    dir: &Path,
+    extension: &str,
+    expected_count: usize,
+    timeout: std::time::Duration,
+) {
+    let start = std::time::Instant::now();
+    let mut attempt = 0;
+    while start.elapsed() < timeout {
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            let count = entries
+                .filter_map(|e| e.ok())
+                .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some(extension))
+                .count();
+            if count >= expected_count {
+                return;
+            }
+        }
+        exponential_sleep(attempt);
+        attempt += 1;
+    }
+    panic!(
+        "Expected {} .{} files in {:?} within {:?}",
+        expected_count, extension, dir, timeout
+    );
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

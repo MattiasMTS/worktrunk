@@ -506,6 +506,29 @@ Users can clean up old logs manually or use a git hook. No automatic cleanup is 
 
 ## Testing Guidelines
 
+### Timing Tests: Poll with Long Timeouts
+
+Tests waiting for background operations must **poll with long timeouts**, never use fixed sleeps. Use the helpers in `tests/common/mod.rs`:
+
+```rust
+use crate::common::{wait_for_file, wait_for_file_count};
+
+// ✅ Poll for file existence with 5+ second timeout
+wait_for_file(&log_file, Duration::from_secs(5));
+
+// ✅ Poll for multiple files
+wait_for_file_count(&log_dir, "log", 3, Duration::from_secs(5));
+```
+
+These use exponential backoff (10ms → 500ms cap) for fast initial checks that back off on slow CI.
+
+**Exception - testing absence:** When verifying something did NOT happen, polling doesn't work. Use a fixed 500ms+ sleep:
+
+```rust
+thread::sleep(Duration::from_millis(500));
+assert!(!marker_file.exists(), "Command should NOT have run");
+```
+
 ### Testing with --execute Commands
 
 Use `--force` to skip interactive prompts in tests. Don't pipe input to stdin.

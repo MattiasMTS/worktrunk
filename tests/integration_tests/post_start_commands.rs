@@ -1,33 +1,17 @@
-use crate::common::{TestRepo, make_snapshot_cmd, resolve_git_common_dir, setup_snapshot_settings};
+use crate::common::{
+    TestRepo, make_snapshot_cmd, resolve_git_common_dir, setup_snapshot_settings, wait_for_file,
+    wait_for_file_count,
+};
 use insta::assert_snapshot;
 use insta_cmd::assert_cmd_snapshot;
 use std::fs;
-use std::path::Path;
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-// Sleep duration constants for background command tests
-// These allow time for background processes to complete and write output files
-
-/// Short wait for fast commands (simple echo statements) - used when checking for file absence
-const SLEEP_FAST_COMMAND: Duration = Duration::from_millis(100);
-
-/// Wait for a file to exist, polling with a timeout
-/// Use this instead of fixed sleeps for background commands to avoid flaky tests
-fn wait_for_file(path: &Path, timeout: Duration) {
-    let start = Instant::now();
-    while start.elapsed() < timeout {
-        if path.exists() {
-            return;
-        }
-        thread::sleep(Duration::from_millis(50));
-    }
-    panic!(
-        "File was not created within {:?}: {}",
-        timeout,
-        path.display()
-    );
-}
+/// Wait duration when checking file absence (testing command did NOT run).
+/// Must be long enough that a background command would have started and created
+/// the file if it were going to. 500ms gives CI systems breathing room.
+const SLEEP_FOR_ABSENCE_CHECK: Duration = Duration::from_millis(500);
 
 /// Helper to create snapshot with normalized paths and SHAs
 ///
@@ -513,26 +497,17 @@ approved-commands = [
 
     snapshot_switch("post_start_separate_logs", &repo, &["--create", "feature"]);
 
-    // Wait for log directory to be created
+    // Wait for all 3 log files to be created (poll, don't use fixed sleep)
     let worktree_path = repo.root_path().parent().unwrap().join("test-repo.feature");
     let git_common_dir = resolve_git_common_dir(&worktree_path);
     let log_dir = git_common_dir.join("wt-logs");
-    wait_for_file(log_dir.as_path(), Duration::from_secs(5));
+    wait_for_file_count(&log_dir, "log", 3, Duration::from_secs(5));
 
-    // Wait briefly for all log files to be written
-    thread::sleep(Duration::from_millis(100));
     let log_files: Vec<_> = fs::read_dir(&log_dir)
         .unwrap()
         .filter_map(|e| e.ok())
         .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("log"))
         .collect();
-
-    assert_eq!(
-        log_files.len(),
-        3,
-        "Should have 3 separate log files, found: {}",
-        log_files.len()
-    );
 
     // Read all log files and verify no cross-contamination
     let mut found_outputs = vec![false, false, false];
@@ -800,8 +775,8 @@ approved-commands = ["echo 'POST-START-RAN' > post_start_marker.txt"]
     // Second: Switch to EXISTING worktree - post-start should NOT run
     snapshot_switch("post_start_skip_existing", &repo, &["feature"]);
 
-    // Wait briefly to ensure no background command starts
-    thread::sleep(SLEEP_FAST_COMMAND);
+    // Wait to ensure no background command starts (testing absence requires fixed wait)
+    thread::sleep(SLEEP_FOR_ABSENCE_CHECK);
 
     // Verify post-start did NOT run when switching to existing worktree
     assert!(
