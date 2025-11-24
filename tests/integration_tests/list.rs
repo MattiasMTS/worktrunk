@@ -101,8 +101,8 @@ fn run_snapshot(settings: Settings, test_name: &str, mut cmd: Command) {
 /// Creates worktrees with specific timestamps for ordering tests.
 /// Returns the path to feature-current (the worktree to run tests from).
 ///
-/// Expected order: main (00:00), feature-current (01:00), feature-newest (03:00),
-/// feature-middle (02:00), feature-oldest (00:30)
+/// Expected order: main (^), feature-current (@), then by timestamp descending:
+/// feature-newest (03:00), feature-middle (02:00), feature-oldest (00:30)
 fn setup_timestamped_worktrees(repo: &mut TestRepo) -> std::path::PathBuf {
     // Create main with earliest timestamp (00:00)
     repo.commit("Initial commit on main");
@@ -1019,7 +1019,7 @@ fn test_list_task_dag_ordering_stability() {
     let current_path = setup_timestamped_worktrees(&mut repo);
 
     // Run from feature-current worktree
-    // Expected order: main, feature-current, feature-newest, feature-middle, feature-oldest
+    // Expected order: main, feature-current, then by timestamp: feature-newest, feature-middle, feature-oldest
     run_snapshot(
         list_snapshots::standard_settings(&repo),
         "task_dag_ordering_stability",

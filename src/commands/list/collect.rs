@@ -464,23 +464,27 @@ pub fn collect(
         .unwrap_or_else(|| worktrees.main().clone());
     let current_worktree_path = repo.worktree_root().ok();
 
-    // Sort worktrees for display order
+    // Sort worktrees: main first, current second, then by timestamp descending
     let sorted_worktrees = sort_worktrees(
-        &worktrees.worktrees,
+        worktrees.worktrees.clone(),
         &main_worktree,
         current_worktree_path.as_ref(),
     );
 
     // Get branches early for layout calculation and skeleton creation (when --branches is used)
+    // Sort by timestamp (most recent first)
     let branches_without_worktrees = if show_branches {
-        get_branches_without_worktrees(repo, &worktrees.worktrees)?
+        let branches = get_branches_without_worktrees(repo, &worktrees.worktrees)?;
+        sort_by_timestamp_desc(branches, |(_, sha)| repo.commit_timestamp(sha).unwrap_or(0))
     } else {
         Vec::new()
     };
 
     // Get remote branches (when --remotes is used)
+    // Sort by timestamp (most recent first)
     let remote_branches = if show_remotes {
-        get_remote_branches(repo, &worktrees.worktrees)?
+        let branches = get_remote_branches(repo, &worktrees.worktrees)?;
+        sort_by_timestamp_desc(branches, |(_, sha)| repo.commit_timestamp(sha).unwrap_or(0))
     } else {
         Vec::new()
     };
@@ -799,9 +803,22 @@ pub fn collect(
     Ok(Some(super::model::ListData { items }))
 }
 
-/// Sort worktrees for display (main first, then current, then by timestamp descending).
+/// Sort items by timestamp descending (most recent first).
+/// Uses parallel timestamp collection for performance.
+fn sort_by_timestamp_desc<T, F>(items: Vec<T>, get_timestamp: F) -> Vec<T>
+where
+    T: Send + Sync,
+    F: Fn(&T) -> i64 + Send + Sync,
+{
+    let timestamps: Vec<i64> = items.par_iter().map(&get_timestamp).collect();
+    let mut indexed: Vec<_> = items.into_iter().enumerate().collect();
+    indexed.sort_by_key(|(idx, _)| std::cmp::Reverse(timestamps[*idx]));
+    indexed.into_iter().map(|(_, item)| item).collect()
+}
+
+/// Sort worktrees: main first, current second, then by timestamp descending.
 fn sort_worktrees(
-    worktrees: &[Worktree],
+    worktrees: Vec<Worktree>,
     main_worktree: &Worktree,
     current_path: Option<&std::path::PathBuf>,
 ) -> Vec<Worktree> {
@@ -814,21 +831,17 @@ fn sort_worktrees(
         })
         .collect();
 
-    let mut indexed: Vec<_> = worktrees.iter().enumerate().collect();
+    let mut indexed: Vec<_> = worktrees.into_iter().enumerate().collect();
     indexed.sort_by_key(|(idx, wt)| {
-        let is_main = wt.path == main_worktree.path;
-        let is_current = current_path.map(|cp| &wt.path == cp).unwrap_or(false);
-
-        let priority = if is_main {
-            0
-        } else if is_current {
-            1
+        let priority = if wt.path == main_worktree.path {
+            0 // Main first
+        } else if current_path.map(|cp| &wt.path == cp).unwrap_or(false) {
+            1 // Current second
         } else {
-            2
+            2 // Rest by timestamp
         };
-
         (priority, std::cmp::Reverse(timestamps[*idx]))
     });
 
-    indexed.into_iter().map(|(_, wt)| wt.clone()).collect()
+    indexed.into_iter().map(|(_, wt)| wt).collect()
 }
