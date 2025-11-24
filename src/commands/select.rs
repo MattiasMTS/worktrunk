@@ -132,8 +132,13 @@ impl WorktreeSkimItem {
             output.push_str(&stat);
             output.push_str("\n\n");
 
-            // Show full diff with pager (spawned via setsid to prevent TTY access)
-            if let Ok(diff) = repo.run_diff_with_pager(args) {
+            // TODO: Re-enable user pager (delta, diff-so-fancy, etc.) for diff preview
+            // Currently disabled because pagers can interfere with skim's TUI rendering.
+            // When re-implementing, test with: GIT_PAGER=delta cargo run -- beta select
+            // Consider: config option to disable pagers specifically for select preview
+            let mut diff_args = args.to_vec();
+            diff_args.push("--color=always");
+            if let Ok(diff) = repo.run_command(&diff_args) {
                 output.push_str(&diff);
             }
         } else {
