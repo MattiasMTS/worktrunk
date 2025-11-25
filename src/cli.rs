@@ -52,8 +52,7 @@ Usage: {usage}
 
 /// Build a clap Command for Cli with the shared help template applied recursively.
 pub fn build_command() -> Command {
-    let cmd = Cli::command();
-    apply_help_template_recursive(cmd, DEFAULT_COMMAND_NAME)
+    apply_help_template_recursive(Cli::command(), DEFAULT_COMMAND_NAME)
 }
 
 fn apply_help_template_recursive(mut cmd: Command, path: &str) -> Command {

@@ -142,6 +142,21 @@ pub struct AheadBehind {
     pub behind: usize,
 }
 
+impl AheadBehind {
+    /// Compute divergence states from ahead/behind counts and upstream status.
+    pub fn compute_divergences(
+        &self,
+        upstream: &UpstreamStatus,
+    ) -> (MainDivergence, UpstreamDivergence) {
+        let main_divergence = MainDivergence::from_counts(self.ahead, self.behind);
+        let (upstream_ahead, upstream_behind) =
+            upstream.active().map(|(_, a, b)| (a, b)).unwrap_or((0, 0));
+        let upstream_divergence = UpstreamDivergence::from_counts(upstream_ahead, upstream_behind);
+
+        (main_divergence, upstream_divergence)
+    }
+}
+
 #[derive(serde::Serialize, Default, Copy, Clone, Debug)]
 pub struct BranchDiffTotals {
     #[serde(rename = "branch_diff")]
@@ -375,6 +390,148 @@ impl ListItem {
             wt_data.working_diff_display = ColumnKind::WorkingDiff
                 .format_diff_plain(working_tree_diff.added, working_tree_diff.deleted);
         }
+    }
+
+    /// Compute status symbols for this item.
+    ///
+    /// This is idempotent and can be called multiple times as new data arrives.
+    /// It will recompute with the latest available data.
+    ///
+    /// Branches get a subset of status symbols (no working tree changes or worktree attrs).
+    // TODO(status-indicator): show a status glyph when a worktree's checked-out branch
+    // differs from the branch name we associate with it (e.g., worktree exists but on another branch).
+    pub(crate) fn compute_status_symbols(
+        &mut self,
+        default_branch: Option<&str>,
+        has_merge_tree_conflicts: bool,
+        user_status: Option<String>,
+        working_tree_symbols: Option<&str>,
+        has_conflicts: bool,
+    ) {
+        // Common fields for both worktrees and branches
+        let default_counts = AheadBehind::default();
+        let default_upstream = UpstreamStatus::default();
+        let counts = self.counts.as_ref().unwrap_or(&default_counts);
+        let upstream = self.upstream.as_ref().unwrap_or(&default_upstream);
+        let (main_divergence, upstream_divergence) = counts.compute_divergences(upstream);
+
+        match &self.kind {
+            ItemKind::Worktree(data) => {
+                // Full status computation for worktrees
+                // Use default_branch directly (None for main worktree)
+
+                // Worktree state - priority: prunable > locked (1 char max)
+                let worktree_state = if data.prunable.is_some() {
+                    "⌫".to_string() // Prunable (directory missing)
+                } else if data.locked.is_some() {
+                    "⊠".to_string() // Locked (protected)
+                } else {
+                    String::new()
+                };
+
+                // Determine base branch state (only for non-main worktrees with base branch)
+                let base_state = determine_worktree_base_state(
+                    data.is_main,
+                    default_branch,
+                    counts.ahead,
+                    data.working_tree_diff.as_ref(),
+                    &data.working_tree_diff_with_main,
+                );
+
+                // Apply priority: Conflicts > Rebase > Merge > MergeTreeConflicts > base_state
+                let branch_op_state = if has_conflicts {
+                    BranchOpState::Conflicts
+                } else if data.worktree_state.as_deref() == Some("rebase") {
+                    BranchOpState::Rebase
+                } else if data.worktree_state.as_deref() == Some("merge") {
+                    BranchOpState::Merge
+                } else if has_merge_tree_conflicts {
+                    BranchOpState::MergeTreeConflicts
+                } else {
+                    base_state
+                };
+
+                // Override main_divergence for the main worktree
+                let main_divergence = if data.is_main {
+                    MainDivergence::IsMain
+                } else {
+                    main_divergence
+                };
+
+                self.status_symbols = Some(StatusSymbols {
+                    branch_op_state,
+                    worktree_state,
+                    main_divergence,
+                    upstream_divergence,
+                    working_tree: working_tree_symbols.unwrap_or("").to_string(),
+                    user_status,
+                });
+            }
+            ItemKind::Branch => {
+                // Simplified status computation for branches
+                // Only compute symbols that apply to branches (no working tree, git operation, or worktree attrs)
+
+                // Branch op state - branches can only show MergeTreeConflicts or NoCommits
+                // (MatchesMain only applies to worktrees since branches don't have working trees)
+                let branch_op_state = if has_merge_tree_conflicts {
+                    BranchOpState::MergeTreeConflicts
+                } else if let Some(ref c) = self.counts {
+                    if c.ahead == 0 {
+                        BranchOpState::NoCommits
+                    } else {
+                        BranchOpState::None
+                    }
+                } else {
+                    BranchOpState::None
+                };
+
+                self.status_symbols = Some(StatusSymbols {
+                    branch_op_state,
+                    worktree_state: "⎇".to_string(), // Branch indicator
+                    main_divergence,
+                    upstream_divergence,
+                    working_tree: String::new(),
+                    user_status,
+                });
+            }
+        }
+    }
+}
+
+/// Determine branch state for a worktree.
+///
+/// Returns:
+/// - `BranchOpState::None` if main worktree or no base branch
+/// - `BranchOpState::NoCommits` if no commits ahead and working tree is clean
+/// - `BranchOpState::MatchesMain` if ahead == 0 but dirty tree happens to match main (rare)
+/// - `BranchOpState::None` otherwise
+fn determine_worktree_base_state(
+    is_main: bool,
+    default_branch: Option<&str>,
+    ahead: usize,
+    working_tree_diff: Option<&LineDiff>,
+    working_tree_diff_with_main: &Option<Option<LineDiff>>,
+) -> BranchOpState {
+    if is_main || default_branch.is_none() {
+        return BranchOpState::None;
+    }
+
+    let is_clean = working_tree_diff.map(|d| d.is_empty()).unwrap_or(true);
+
+    // Check if no commits and clean working tree (most common removable state)
+    if ahead == 0 && is_clean {
+        return BranchOpState::NoCommits;
+    }
+
+    // Check if working tree matches main exactly (requires diff with main to be computed)
+    // This is rare - only when ahead == 0, tree is dirty, but dirty changes happen to match main
+    if let Some(Some(mdiff)) = working_tree_diff_with_main.as_ref()
+        && mdiff.is_empty()
+        && ahead == 0
+    {
+        BranchOpState::MatchesMain
+    } else {
+        BranchOpState::None
     }
 }
 
