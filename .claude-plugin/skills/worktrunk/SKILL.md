@@ -71,7 +71,7 @@ Most common request. Follow this sequence:
    ```console
    llm install llm-anthropic
    llm keys set anthropic
-   llm models default claude-3.5-sonnet
+   llm models default claude-haiku-4-5-20251001
    ```
 
 4. **Propose config change**

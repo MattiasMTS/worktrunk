@@ -49,7 +49,7 @@ For Claude (via llm):
 llm install llm-anthropic
 llm keys set anthropic
 # User pastes API key from: https://console.anthropic.com/settings/keys
-llm models default claude-3.5-sonnet
+llm models default claude-haiku-4-5-20251001
 ```
 
 For OpenAI (via llm):

@@ -854,7 +854,7 @@ For Claude:
 ```console
 llm install llm-anthropic
 llm keys set anthropic
-llm models default claude-sonnet-4-5-20250929
+llm models default claude-haiku-4-5-20251001
 ```
 
 For OpenAI:

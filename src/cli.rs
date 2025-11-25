@@ -566,7 +566,7 @@ For Claude:
 ```console
 llm install llm-anthropic
 llm keys set anthropic
-llm models default claude-3.5-sonnet
+llm models default claude-haiku-4-5-20251001
 ```
 
 For OpenAI:
@@ -626,8 +626,8 @@ Docs: <https://llm.datasette.io/> | <https://github.com/sigoden/aichat>
   - `●` **failed** (red) - Checks failed
   - `●` **conflicts** (yellow) - Merge conflicts with base
   - `●` **no-ci** (gray) - PR/MR or workflow found but no checks configured
-  - (blank) - No PR/MR or workflow found, or `gh`/`glab` CLI unavailable
-  - (dimmed) - Stale: unpushed local changes differ from PR/MR head
+  - **(blank)** - No PR/MR or workflow found, or `gh`/`glab` CLI unavailable
+  - **(dimmed)** - Stale: unpushed local changes differ from PR/MR head
 - **Commit:** Short commit hash (8 chars)
 - **Age:** Time since last commit (relative)
 - **Message:** Last commit message (truncated)

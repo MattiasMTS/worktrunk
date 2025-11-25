@@ -65,8 +65,8 @@ Global Options:
   - [2m●[0m [1mfailed[0m (red) - Checks failed
   - [2m●[0m [1mconflicts[0m (yellow) - Merge conflicts with base
   - [2m●[0m [1mno-ci[0m (gray) - PR/MR or workflow found but no checks configured
-  - (blank) - No PR/MR or workflow found, or [2mgh[0m/[2mglab[0m CLI unavailable
-  - (dimmed) - Stale: unpushed local changes differ from PR/MR head
+  - [1m(blank)[0m - No PR/MR or workflow found, or [2mgh[0m/[2mglab[0m CLI unavailable
+  - [1m(dimmed)[0m - Stale: unpushed local changes differ from PR/MR head
 - [1mCommit:[0m Short commit hash (8 chars)
 - [1mAge:[0m Time since last commit (relative)
 - [1mMessage:[0m Last commit message (truncated)

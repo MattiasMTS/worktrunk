@@ -70,7 +70,7 @@ For Claude:
 
   [2mllm install llm-anthropic[0m
   [2mllm keys set anthropic[0m
-  [2mllm models default claude-3.5-sonnet[0m
+  [2mllm models default claude-haiku-4-5-20251001[0m
 
 For OpenAI:
 
