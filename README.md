@@ -111,7 +111,7 @@ Worktrunk is opinionated! It's designed for workflows which are:
 ### LLM Commit Messages
 
 Worktrunk can invoke external commands during merge operations to generate
-commit messages, by passing the diff & a configurable prompt, and reading back a
+commit messages. It passes the diff and a configurable prompt, then receives a
 formatted commit message. Simon Willison's [llm](https://llm.datasette.io/) tool
 is recommended.
 
@@ -738,7 +738,7 @@ Order: `?!+»✘ ✖⚠≡∅ ↻⋈ ↑↓↕ ⇡⇣⇅ ⎇⌫⊠`
 - `⌫` Prunable worktree (directory missing, can be pruned)
 - `⊠` Locked worktree (protected from auto-removal)
 
-*Rows are dimmed when no unique work (≡ matches main OR ∅ no commits).*
+*Rows are dimmed when there's no marginal contribution (≡ matches main OR ∅ no commits).*
 
 ## JSON Output
 
