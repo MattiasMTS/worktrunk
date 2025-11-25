@@ -24,39 +24,39 @@ use synoptic::{TokOpt, from_extension};
 /// - "embedded": embedded content
 #[cfg(feature = "syntax-highlighting")]
 pub(super) fn bash_token_style(kind: &str) -> Option<Style> {
-    // All tokens are dimmed for subdued appearance in gutter content.
-    // Previously unstyled tokens (embedded, unknown) now get dimmed too -
-    // this ensures the entire gutter block has consistent visual weight.
-    let base = match kind {
+    match kind {
         // Commands (npm, git, cargo, echo, cd, etc.) - bold blue
-        "function" => Style::new()
-            .fg_color(Some(Color::Ansi(AnsiColor::Blue)))
-            .bold(),
+        "function" => Some(
+            Style::new()
+                .fg_color(Some(Color::Ansi(AnsiColor::Blue)))
+                .bold(),
+        ),
 
         // Keywords (if, then, for, while, do, done, etc.) - bold magenta
-        "keyword" => Style::new()
-            .fg_color(Some(Color::Ansi(AnsiColor::Magenta)))
-            .bold(),
+        "keyword" => Some(
+            Style::new()
+                .fg_color(Some(Color::Ansi(AnsiColor::Magenta)))
+                .bold(),
+        ),
 
         // Strings (quoted values) - green
-        "string" => Style::new().fg_color(Some(Color::Ansi(AnsiColor::Green))),
+        "string" => Some(Style::new().fg_color(Some(Color::Ansi(AnsiColor::Green)))),
 
         // Operators (&&, ||, |, $, -, >, <, etc.) - cyan
-        "operator" => Style::new().fg_color(Some(Color::Ansi(AnsiColor::Cyan))),
+        "operator" => Some(Style::new().fg_color(Some(Color::Ansi(AnsiColor::Cyan)))),
 
         // Variables ($VAR, ${VAR}) - tree-sitter-bash 0.25 uses "property" not "variable"
-        "property" => Style::new().fg_color(Some(Color::Ansi(AnsiColor::Yellow))),
+        "property" => Some(Style::new().fg_color(Some(Color::Ansi(AnsiColor::Yellow)))),
 
         // Numbers - yellow
-        "number" => Style::new().fg_color(Some(Color::Ansi(AnsiColor::Yellow))),
+        "number" => Some(Style::new().fg_color(Some(Color::Ansi(AnsiColor::Yellow)))),
 
         // Constants/flags (--flag, -f) - cyan
-        "constant" => Style::new().fg_color(Some(Color::Ansi(AnsiColor::Cyan))),
+        "constant" => Some(Style::new().fg_color(Some(Color::Ansi(AnsiColor::Cyan)))),
 
-        // Comments, embedded content, and everything else - no additional styling
-        _ => Style::new(),
-    };
-    Some(base.dimmed())
+        // Comments, embedded content, and everything else - no styling
+        _ => None,
+    }
 }
 
 // ============================================================================

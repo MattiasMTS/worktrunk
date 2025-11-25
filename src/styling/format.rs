@@ -159,20 +159,18 @@ pub(super) fn wrap_styled_text(styled: &str, max_width: usize) -> Vec<String> {
 
 /// Formats bash/shell commands with syntax highlighting and gutter
 ///
-/// Similar to `format_with_gutter` but applies bash syntax highlighting using tree-sitter.
-/// Long lines are wrapped at word boundaries to fit terminal width.
+/// Highlights each original line first (preserving parsing context), then wraps
+/// the styled output. Long lines are wrapped at word boundaries to fit terminal width.
 ///
 /// # Example
 /// ```ignore
-/// print!("{}", format_bash_with_gutter("npm install --frozen-lockfile"));
+/// print!("{}", format_bash_with_gutter("npm install --frozen-lockfile", ""));
 /// ```
 #[cfg(feature = "syntax-highlighting")]
 pub fn format_bash_with_gutter(content: &str, left_margin: &str) -> String {
     use tree_sitter_highlight::{HighlightConfiguration, HighlightEvent, Highlighter};
 
     let gutter = super::GUTTER;
-    // Dimmed effect for unhighlighted content (reduces intensity while preserving default color)
-    let base_style = anstyle::Style::new().dimmed();
     let reset = anstyle::Reset;
     let mut output = String::new();
 
@@ -225,12 +223,10 @@ pub fn format_bash_with_gutter(content: &str, left_margin: &str) -> String {
     for line in content.lines() {
         // Step 1: Highlight the complete line with tree-sitter
         let mut styled_line = String::new();
-        styled_line.push_str(&format!("{base_style}"));
 
         let Ok(highlights) = highlighter.highlight(&config, line.as_bytes(), None, |_| None) else {
             // Fallback: just use the plain line
             styled_line.push_str(line);
-            styled_line.push_str(&format!("{reset}"));
 
             // Wrap and output with gutter
             for wrapped in wrap_styled_text(&styled_line, available_width) {
@@ -246,13 +242,13 @@ pub fn format_bash_with_gutter(content: &str, left_margin: &str) -> String {
         for event in highlights {
             match event.unwrap() {
                 HighlightEvent::Source { start, end } => {
-                    // Output the text for this source region (inherits current style)
+                    // Output the text for this source region
                     if let Ok(text) = std::str::from_utf8(&line_bytes[start..end]) {
                         styled_line.push_str(text);
                     }
                 }
                 HighlightEvent::HighlightStart(idx) => {
-                    // Start of a highlighted region - apply style (includes dimmed)
+                    // Start of a highlighted region - apply style
                     if let Some(name) = highlight_names.get(idx.0)
                         && let Some(style) = bash_token_style(name)
                     {
@@ -260,8 +256,8 @@ pub fn format_bash_with_gutter(content: &str, left_margin: &str) -> String {
                     }
                 }
                 HighlightEvent::HighlightEnd => {
-                    // End of highlighted region - return to base gray style
-                    styled_line.push_str(&format!("{base_style}"));
+                    // End of highlighted region - reset style
+                    styled_line.push_str(&format!("{reset}"));
                 }
             }
         }
@@ -283,27 +279,5 @@ pub fn format_bash_with_gutter(content: &str, left_margin: &str) -> String {
 /// It provides the same gutter formatting without tree-sitter dependencies.
 #[cfg(not(feature = "syntax-highlighting"))]
 pub fn format_bash_with_gutter(content: &str, left_margin: &str) -> String {
-    let gutter = super::GUTTER;
-    let dimmed = anstyle::Style::new().dimmed();
-    let reset = anstyle::Reset;
-    let mut output = String::new();
-
-    // Calculate available width for content
-    let term_width = get_terminal_width();
-    let left_margin_width = left_margin.width();
-    let available_width = term_width.saturating_sub(3 + left_margin_width);
-
-    for line in content.lines() {
-        // Apply dimmed style to the entire line
-        let styled_line = format!("{dimmed}{line}{reset}");
-
-        // Wrap and output with gutter
-        for wrapped in wrap_styled_text(&styled_line, available_width) {
-            output.push_str(&format!(
-                "{left_margin}{gutter} {gutter:#}  {wrapped}{reset}\n"
-            ));
-        }
-    }
-
-    output
+    format_with_gutter(content, left_margin, None)
 }
