@@ -16,7 +16,6 @@ if command -v {{ cmd_prefix }} >/dev/null 2>&1 || [[ -n "${WORKTRUNK_BIN:-}" ]];
 
         local use_source=false
         local args=()
-        local saved_bin="$WORKTRUNK_BIN"
 
         # Check for --source flag and strip it
         for arg in "$@"; do
@@ -27,27 +26,26 @@ if command -v {{ cmd_prefix }} >/dev/null 2>&1 || [[ -n "${WORKTRUNK_BIN:-}" ]];
             fi
         done
 
-        # If --source was specified, build and use local debug binary
-        if [[ "$use_source" == true ]]; then
-            if ! cargo build --quiet; then
-                return 1
-            fi
-            export WORKTRUNK_BIN="./target/debug/{{ cmd_prefix }}"
-        fi
-
         # Force colors if stderr is a TTY (directive mode outputs to stderr)
         # Respects NO_COLOR and explicit CLICOLOR_FORCE
         if [[ -z "${NO_COLOR:-}" && -z "${CLICOLOR_FORCE:-}" ]]; then
             if [[ -t 2 ]]; then export CLICOLOR_FORCE=1; fi
         fi
 
-        # Always use --internal mode for directive support
-        wt_exec --internal "${args[@]}"
+        # If --source was specified, use cargo run directly (builds and runs)
+        if [[ "$use_source" == true ]]; then
+            local script exit_code=0
+            script="$(cargo run --quiet -- --internal "${args[@]}" 2>&2)" || exit_code=$?
+            if [[ -n "$script" ]]; then
+                eval "$script"
+                if [[ $exit_code -eq 0 ]]; then
+                    exit_code=$?
+                fi
+            fi
+            return "$exit_code"
+        fi
 
-        # Restore original command
-        local result=$?
-        export WORKTRUNK_BIN="$saved_bin"
-        return $result
+        wt_exec --internal "${args[@]}"
     }
 
     # Lazy completions - generate on first TAB, then delegate to clap's completer

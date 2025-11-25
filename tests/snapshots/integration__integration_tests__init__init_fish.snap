@@ -57,7 +57,6 @@ if type -q wt; or set -q WORKTRUNK_BIN
     function wt
         set -l use_source false
         set -l args
-        set -l saved_bin $WORKTRUNK_BIN
 
         # Check for --source flag and strip it
         for arg in $argv
@@ -68,14 +67,6 @@ if type -q wt; or set -q WORKTRUNK_BIN
             end
         end
 
-        # If --source was specified, build and use local debug binary
-        if test $use_source = true
-            if not cargo build --quiet
-                return 1
-            end
-            set -gx WORKTRUNK_BIN ./target/debug/wt
-        end
-
         # Force colors if stderr is a TTY (directive mode outputs to stderr)
         # Respects NO_COLOR and explicit CLICOLOR_FORCE
         if not set -q NO_COLOR; and not set -q CLICOLOR_FORCE
@@ -84,13 +75,20 @@ if type -q wt; or set -q WORKTRUNK_BIN
             end
         end
 
-        # Always use --internal mode for directive support
-        wt_exec --internal $args
+        # If --source was specified, use cargo run directly (builds and runs)
+        if test $use_source = true
+            set -l script (cargo run --quiet -- --internal $args 2>&2 | string collect)
+            set -l exit_code $pipestatus[1]
+            if test -n "$script"
+                eval $script
+                if test $exit_code -eq 0
+                    set exit_code $status
+                end
+            end
+            return $exit_code
+        end
 
-        # Restore original command
-        set -l result $status
-        set -gx WORKTRUNK_BIN $saved_bin
-        return $result
+        wt_exec --internal $args
     end
 
     # Completions are in ~/.config/fish/completions/wt.fish (installed by `wt config shell install`)
