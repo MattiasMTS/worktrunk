@@ -78,20 +78,31 @@ pub fn handle_standalone_commit(
     options.commit()
 }
 
+/// Result of a squash operation
+#[derive(Debug, Clone)]
+pub enum SquashResult {
+    /// Squash or commit occurred
+    Squashed,
+    /// Nothing to squash: no commits ahead of target branch
+    NoCommitsAhead(String),
+    /// Nothing to squash: already a single commit
+    AlreadySingleCommit,
+    /// Squash attempted but resulted in no net changes (commits canceled out)
+    NoNetChanges,
+}
+
 /// Handle shared squash workflow (used by `wt step squash` and `wt merge`)
 ///
 /// # Arguments
 /// * `auto_trust` - If true, skip approval prompts for pre-commit commands (already approved in batch)
 /// * `stage_mode` - What to stage before committing (All or Tracked; None not supported for squash)
-///
-/// Returns true if a commit or squash operation occurred, false if nothing needed to be done
 pub fn handle_squash(
     target: Option<&str>,
     force: bool,
     skip_pre_commit: bool,
     auto_trust: bool,
     stage_mode: super::commit::StageMode,
-) -> anyhow::Result<bool> {
+) -> anyhow::Result<SquashResult> {
     use super::commit::StageMode;
 
     let env = CommandEnv::for_action("squash")?;
@@ -144,18 +155,18 @@ pub fn handle_squash(
     // Handle different scenarios
     if commit_count == 0 && !has_staged {
         // No commits and no staged changes - nothing to squash
-        return Ok(false);
+        return Ok(SquashResult::NoCommitsAhead(target_branch));
     }
 
     if commit_count == 0 && has_staged {
         // Just staged changes, no commits - commit them directly (no squashing needed)
         generator.commit_staged_changes(true, stage_mode)?;
-        return Ok(true);
+        return Ok(SquashResult::Squashed);
     }
 
     if commit_count == 1 && !has_staged {
-        // Single commit, no staged changes - nothing to do
-        return Ok(false);
+        // Single commit, no staged changes - already squashed
+        return Ok(SquashResult::AlreadySingleCommit);
     }
 
     // Either multiple commits OR single commit with staged changes - squash them
@@ -246,7 +257,7 @@ pub fn handle_squash(
         crate::output::info(format!(
             "{dim}No changes after squashing {commit_count} {commit_text}{dim:#}"
         ))?;
-        return Ok(false);
+        return Ok(SquashResult::NoNetChanges);
     }
 
     // Commit with the generated message
@@ -266,7 +277,7 @@ pub fn handle_squash(
         "{GREEN}Squashed @ {green_dim}{commit_hash}{green_dim:#}{GREEN:#}"
     ))?;
 
-    Ok(true)
+    Ok(SquashResult::Squashed)
 }
 
 /// Result of a rebase operation

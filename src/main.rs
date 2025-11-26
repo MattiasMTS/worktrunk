@@ -24,7 +24,7 @@ use commands::command_executor::CommandContext;
 use commands::handle_select;
 use commands::worktree::{SwitchResult, handle_push};
 use commands::{
-    ConfigAction, RebaseResult, handle_config_create, handle_config_refresh_cache,
+    ConfigAction, RebaseResult, SquashResult, handle_config_create, handle_config_refresh_cache,
     handle_config_show, handle_config_status_set, handle_config_status_unset,
     handle_configure_shell, handle_init, handle_list, handle_merge, handle_rebase, handle_remove,
     handle_squash, handle_standalone_add_approvals, handle_standalone_clear_approvals,
@@ -504,10 +504,16 @@ fn main() {
                     let stage_final = stage
                         .or_else(|| config.commit.and_then(|c| c.stage))
                         .unwrap_or_default();
-                    let did_work =
-                        handle_squash(target.as_deref(), force, !verify, false, stage_final)?;
-                    if !did_work {
-                        crate::output::info("Nothing to squash")?;
+                    match handle_squash(target.as_deref(), force, !verify, false, stage_final)? {
+                        SquashResult::Squashed | SquashResult::NoNetChanges => {}
+                        SquashResult::NoCommitsAhead(branch) => {
+                            crate::output::info(format!(
+                                "Nothing to squash; no commits ahead of {branch}"
+                            ))?;
+                        }
+                        SquashResult::AlreadySingleCommit => {
+                            crate::output::info("Nothing to squash; already a single commit")?;
+                        }
                     }
                     Ok(())
                 }),

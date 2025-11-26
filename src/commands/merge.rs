@@ -151,7 +151,16 @@ pub fn handle_merge(
 
     // Squash commits if enabled - track whether squashing occurred
     let squashed = if squash_enabled {
-        super::standalone::handle_squash(Some(&target_branch), force, !verify, true, stage_mode)?
+        matches!(
+            super::standalone::handle_squash(
+                Some(&target_branch),
+                force,
+                !verify,
+                true,
+                stage_mode
+            )?,
+            super::standalone::SquashResult::Squashed
+        )
     } else {
         false
     };

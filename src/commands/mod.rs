@@ -28,7 +28,7 @@ pub use merge::handle_merge;
 #[cfg(unix)]
 pub use select::handle_select;
 pub use standalone::{
-    RebaseResult, handle_rebase, handle_squash, handle_standalone_add_approvals,
+    RebaseResult, SquashResult, handle_rebase, handle_squash, handle_standalone_add_approvals,
     handle_standalone_clear_approvals, handle_standalone_commit, handle_standalone_run_hook,
 };
 pub use worktree::{handle_remove, handle_switch};

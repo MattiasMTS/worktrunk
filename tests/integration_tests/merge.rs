@@ -3235,6 +3235,52 @@ fn test_step_squash_with_both_flags() {
 }
 
 #[test]
+fn test_step_squash_no_commits() {
+    // Test "nothing to squash; no commits ahead" message
+    let mut repo = TestRepo::new();
+    repo.commit("Initial commit");
+    repo.setup_remote("main");
+
+    // Create a feature worktree but don't add any commits
+    let feature_wt = repo.add_worktree("feature", "feature");
+
+    snapshot_step_squash_with_env("step_squash_no_commits", &repo, &[], Some(&feature_wt), &[]);
+}
+
+#[test]
+fn test_step_squash_single_commit() {
+    // Test "nothing to squash; already a single commit" message
+    let mut repo = TestRepo::new();
+    repo.commit("Initial commit");
+    repo.setup_remote("main");
+
+    // Create a feature worktree with exactly one commit
+    let feature_wt = repo.add_worktree("feature", "feature");
+
+    fs::write(feature_wt.join("file1.txt"), "content 1").expect("Failed to write file");
+    let mut cmd = Command::new("git");
+    repo.configure_git_cmd(&mut cmd);
+    cmd.args(["add", "file1.txt"])
+        .current_dir(&feature_wt)
+        .output()
+        .expect("Failed to add file");
+    let mut cmd = Command::new("git");
+    repo.configure_git_cmd(&mut cmd);
+    cmd.args(["commit", "-m", "feat: single commit"])
+        .current_dir(&feature_wt)
+        .output()
+        .expect("Failed to commit");
+
+    snapshot_step_squash_with_env(
+        "step_squash_single_commit",
+        &repo,
+        &[],
+        Some(&feature_wt),
+        &[],
+    );
+}
+
+#[test]
 fn test_step_commit_with_no_verify_flag() {
     let repo = TestRepo::new();
     repo.commit("Initial commit");
