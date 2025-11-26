@@ -3,7 +3,7 @@ source: tests/integration_tests/select.rs
 expression: normalized
 ---
 > [QUERY]                                                     │[PREVIEW_HEADER]
-    Branch   Status         HEAD±    main↕  Path         Rem│ctrl-u/d: scroll | ctrl-p: preview
+    Branch   Status         HEAD±    main↕  Path         Rem│ctrl-u/d: scroll
 > + feature      ↑                  ↑2      ./feature     ..│
                                                             │ feature_code.rs | 6 ++++++
                                                             │ tests.rs        | 4 ++++

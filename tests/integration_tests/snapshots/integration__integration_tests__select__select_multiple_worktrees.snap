@@ -1,10 +1,9 @@
 ---
 source: tests/integration_tests/select.rs
-assertion_line: 268
 expression: normalized
 ---
 > [QUERY]                                                     │[PREVIEW_HEADER]
-    Branch       Status         HEAD±    main↕  Path        │ctrl-u/d: scroll | ctrl-p: preview
+    Branch       Status         HEAD±    main↕  Path        │ctrl-u/d: scroll
 > @ main             ^                          ./test-rep..│
   + feature-one     ∅                           ./feature-..│No uncommitted changes
   + feature-two     ∅                           ./feature-..│

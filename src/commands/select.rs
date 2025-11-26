@@ -302,7 +302,7 @@ impl WorktreeSkimItem {
         let tab1 = format_tab("1: HEAD±", mode == PreviewMode::WorkingTree);
         let tab2 = format_tab("2: history", mode == PreviewMode::History);
         let tab3 = format_tab("3: main…±", mode == PreviewMode::BranchDiff);
-        let controls = format_tab("ctrl-u/d: scroll | ctrl-p: preview", false);
+        let controls = format_tab("ctrl-u/d: scroll", false);
 
         format!("{} | {} | {}\n{}\n\n", tab1, tab2, tab3, controls)
     }
@@ -562,8 +562,6 @@ pub fn handle_select(is_directive_mode: bool) -> anyhow::Result<()> {
             // Preview scrolling
             "ctrl-u:preview-page-up".to_string(),
             "ctrl-d:preview-page-down".to_string(),
-            // Preview toggle (ctrl-p is universally supported, unlike ctrl-/)
-            "ctrl-p:toggle-preview".to_string(),
         ])
         // Legend/controls moved to preview window tabs (render_preview_tabs)
         .no_clear(true) // Prevent skim from clearing screen, we'll do it manually
