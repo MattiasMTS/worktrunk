@@ -1330,6 +1330,86 @@ deploy = "echo 'Deploying branch {{ branch }}' > deploy.txt"
 }
 
 #[test]
+fn test_merge_post_merge_runs_with_nothing_to_merge() {
+    // Verify post-merge hooks run even when there's nothing to merge
+    let mut repo = TestRepo::new();
+    repo.commit("Initial commit");
+    repo.setup_remote("main");
+
+    // Create project config with post-merge command
+    let config_dir = repo.root_path().join(".config");
+    fs::create_dir_all(&config_dir).unwrap();
+    fs::write(
+        config_dir.join("wt.toml"),
+        r#"post-merge = "echo 'post-merge ran' > post-merge-ran.txt""#,
+    )
+    .unwrap();
+
+    repo.commit("Add config");
+
+    // Create a worktree for main (destination for post-merge commands)
+    let main_wt = repo.root_path().parent().unwrap().join("test-repo.main-wt");
+    let mut cmd = Command::new("git");
+    repo.configure_git_cmd(&mut cmd);
+    cmd.args(["worktree", "add", main_wt.to_str().unwrap(), "main"])
+        .current_dir(repo.root_path())
+        .output()
+        .unwrap();
+
+    // Create a feature worktree with NO commits (already up-to-date with main)
+    let feature_wt = repo.add_worktree("feature", "feature");
+
+    // Merge with --force - nothing to merge but post-merge should still run
+    snapshot_merge(
+        "merge_post_merge_runs_with_nothing_to_merge",
+        &repo,
+        &["main", "--force"],
+        Some(&feature_wt),
+    );
+
+    // Verify the post-merge command ran in the main worktree
+    let marker_file = repo.root_path().join("post-merge-ran.txt");
+    assert!(
+        marker_file.exists(),
+        "Post-merge command should run even when nothing to merge"
+    );
+}
+
+#[test]
+fn test_merge_post_merge_runs_from_main_branch() {
+    // Verify post-merge hooks run when merging from main to main (nothing to do)
+    let mut repo = TestRepo::new();
+    repo.commit("Initial commit");
+    repo.setup_remote("main");
+
+    // Create project config with post-merge command
+    let config_dir = repo.root_path().join(".config");
+    fs::create_dir_all(&config_dir).unwrap();
+    fs::write(
+        config_dir.join("wt.toml"),
+        r#"post-merge = "echo 'post-merge ran from main' > post-merge-ran.txt""#,
+    )
+    .unwrap();
+
+    repo.commit("Add config");
+
+    // Run merge from main branch (repo root) - nothing to merge
+    snapshot_merge(
+        "merge_post_merge_runs_from_main_branch",
+        &repo,
+        &["--force"],
+        None, // cwd = repo root = main branch
+    );
+
+    // Verify the post-merge command ran
+    let marker_file = repo.root_path().join("post-merge-ran.txt");
+    assert!(
+        marker_file.exists(),
+        "Post-merge command should run even when on main branch"
+    );
+}
+
+#[test]
 fn test_merge_pre_commit_command_success() {
     let mut repo = TestRepo::new();
     repo.commit("Initial commit");
