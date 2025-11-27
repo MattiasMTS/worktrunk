@@ -630,11 +630,11 @@ fn exec_through_wrapper_with_env(
         ("GIT_AUTHOR_EMAIL", "test@example.com"),
         ("GIT_COMMITTER_NAME", "Test User"),
         ("GIT_COMMITTER_EMAIL", "test@example.com"),
-        ("GIT_AUTHOR_DATE", "2025-10-28T12:00:00Z"),
-        ("GIT_COMMITTER_DATE", "2025-10-28T12:00:00Z"),
+        ("GIT_AUTHOR_DATE", "2025-01-01T00:00:00Z"),
+        ("GIT_COMMITTER_DATE", "2025-01-01T00:00:00Z"),
         ("LANG", "C"),
         ("LC_ALL", "C"),
-        ("SOURCE_DATE_EPOCH", "1761609600"),
+        ("SOURCE_DATE_EPOCH", "1735776000"),
     ];
 
     // Add extra env vars (these can override defaults if needed)
@@ -1572,11 +1572,11 @@ approved-commands = ["echo 'fish background task'"]
             ("GIT_AUTHOR_EMAIL", "test@example.com"),
             ("GIT_COMMITTER_NAME", "Test User"),
             ("GIT_COMMITTER_EMAIL", "test@example.com"),
-            ("GIT_AUTHOR_DATE", "2025-10-28T12:00:00Z"),
-            ("GIT_COMMITTER_DATE", "2025-10-28T12:00:00Z"),
+            ("GIT_AUTHOR_DATE", "2025-01-01T00:00:00Z"),
+            ("GIT_COMMITTER_DATE", "2025-01-01T00:00:00Z"),
             ("LANG", "C"),
             ("LC_ALL", "C"),
-            ("SOURCE_DATE_EPOCH", "1761609600"),
+            ("SOURCE_DATE_EPOCH", "1735776000"),
         ];
 
         let (combined, exit_code) =

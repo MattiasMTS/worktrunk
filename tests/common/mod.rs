@@ -95,9 +95,9 @@ pub fn configure_cli_command(cmd: &mut Command) {
     // Tests that need config should use TestRepo::clean_cli_env() which overrides this
     cmd.env("WORKTRUNK_CONFIG_PATH", "/nonexistent/test/config.toml");
     cmd.env("CLICOLOR_FORCE", "1");
-    // Oct 28, 2025 - exactly 300 days (10 months) after default commit date (2025-01-01)
-    // for deterministic relative time display in Age column
-    cmd.env("SOURCE_DATE_EPOCH", "1761609600");
+    // Jan 2, 2025 - 1 day after default commit date (2025-01-01)
+    // for deterministic "1d" in Age column
+    cmd.env("SOURCE_DATE_EPOCH", "1735776000");
     if std::env::var("COLUMNS").is_err() {
         cmd.env("COLUMNS", "150");
     }
@@ -191,8 +191,8 @@ impl TestRepo {
         cmd.env("GIT_COMMITTER_DATE", "2025-01-01T00:00:00Z");
         cmd.env("LC_ALL", "C");
         cmd.env("LANG", "C");
-        // Oct 28, 2025 - exactly 300 days (10 months) after commit date for deterministic relative times
-        cmd.env("SOURCE_DATE_EPOCH", "1761609600");
+        // Jan 2, 2025 - 1 day after commit date for deterministic "1d" in Age column
+        cmd.env("SOURCE_DATE_EPOCH", "1735776000");
     }
 
     /// Get standard test environment variables as a vector
@@ -219,7 +219,7 @@ impl TestRepo {
             ),
             ("LC_ALL".to_string(), "C".to_string()),
             ("LANG".to_string(), "C".to_string()),
-            ("SOURCE_DATE_EPOCH".to_string(), "1761609600".to_string()),
+            ("SOURCE_DATE_EPOCH".to_string(), "1735776000".to_string()),
             (
                 "WORKTRUNK_CONFIG_PATH".to_string(),
                 self.test_config_path().display().to_string(),
@@ -357,7 +357,7 @@ impl TestRepo {
     /// ```
     pub fn commit_with_age(&self, message: &str, age_seconds: i64) {
         // SOURCE_DATE_EPOCH used in tests - must match configure_git_cmd/test_env_vars
-        const SOURCE_DATE_EPOCH: i64 = 1761609600;
+        const SOURCE_DATE_EPOCH: i64 = 1735776000;
         let commit_time = SOURCE_DATE_EPOCH - age_seconds;
         let timestamp = format!("@{}", commit_time);
 
@@ -393,7 +393,7 @@ impl TestRepo {
     /// ```
     pub fn commit_with_age_in(&self, message: &str, age_seconds: i64, dir: &Path) {
         // SOURCE_DATE_EPOCH used in tests - must match configure_git_cmd/test_env_vars
-        const SOURCE_DATE_EPOCH: i64 = 1761609600;
+        const SOURCE_DATE_EPOCH: i64 = 1735776000;
         let commit_time = SOURCE_DATE_EPOCH - age_seconds;
         let timestamp = format!("@{}", commit_time);
 

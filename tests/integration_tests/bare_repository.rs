@@ -147,7 +147,7 @@ impl BareRepoTest {
         )
         .env("GIT_CONFIG_GLOBAL", "/dev/null")
         .env("GIT_CONFIG_SYSTEM", "/dev/null")
-        .env("SOURCE_DATE_EPOCH", "1761609600")
+        .env("SOURCE_DATE_EPOCH", "1735776000")
         .env("LC_ALL", "C")
         .env("LANG", "C")
         .env_remove("NO_COLOR")

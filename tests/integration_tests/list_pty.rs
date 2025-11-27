@@ -56,7 +56,7 @@ fn exec_wt_list_in_pty(
     cmd.env("GIT_CONFIG_SYSTEM", "/dev/null");
     cmd.env("GIT_AUTHOR_DATE", "2025-01-01T00:00:00Z");
     cmd.env("GIT_COMMITTER_DATE", "2025-01-01T00:00:00Z");
-    cmd.env("SOURCE_DATE_EPOCH", "1761609600");
+    cmd.env("SOURCE_DATE_EPOCH", "1735776000");
 
     // Add test-specific environment variables
     for (key, value) in env_vars {
