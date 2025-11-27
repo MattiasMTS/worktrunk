@@ -21,12 +21,12 @@ wt config - Manage configuration and shell integration
 Usage: wt config [OPTIONS] <COMMAND>
 
 Commands:
-  shell          Shell integration setup
-  create         Create global configuration file
-  show           Show configuration files & locations
-  refresh-cache  Refresh default branch from remote
-  status         Manage branch status markers
-  approvals      Manage command approvals
+  shell      Shell integration setup
+  create     Create global configuration file
+  show       Show configuration files & locations
+  cache      Manage caches (CI status, default branch)
+  status     Manage branch status markers
+  approvals  Manage command approvals
 
 Options:
   -h, --help

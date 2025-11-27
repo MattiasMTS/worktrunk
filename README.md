@@ -799,13 +799,13 @@ wt config — Manage configuration and shell integration
 Usage: config <COMMAND>
 
 Commands:
-  shell          Shell integration setup
-  create         Create global configuration file
-  show           Show configuration files & locations
-  refresh-cache  Refresh default branch from remote
-  status         Manage branch status markers
-  approvals      Manage command approvals
-  help           Print this message or the help of the given subcommand(s)
+  shell      Shell integration setup
+  create     Create global configuration file
+  show       Show configuration files & locations
+  cache      Manage caches (CI status, default branch)
+  status     Manage branch status markers
+  approvals  Manage command approvals
+  help       Print this message or the help of the given subcommand(s)
 
 Options:
   -h, --help

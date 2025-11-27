@@ -74,14 +74,6 @@ fn help_config_show() {
 }
 
 #[test]
-fn help_config_refresh_cache() {
-    snapshot_help(
-        "help_config_refresh_cache",
-        &["config", "refresh-cache", "--help"],
-    );
-}
-
-#[test]
 fn help_config_status_set() {
     snapshot_help(
         "help_config_status_set",

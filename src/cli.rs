@@ -287,14 +287,11 @@ If a config file doesn't exist, shows defaults that would be used."#
     )]
     Show,
 
-    /// Refresh default branch from remote
-    #[command(
-        after_long_help = r#"Queries the remote to determine the default branch and caches the result.
-
-Use when the remote default branch has changed. The cached value is used by
-`wt merge`, `wt list`, and other commands that reference the default branch."#
-    )]
-    RefreshCache,
+    /// Manage caches (CI status, default branch)
+    Cache {
+        #[command(subcommand)]
+        action: CacheCommand,
+    },
 
     /// Manage branch status markers
     Status {
@@ -371,6 +368,34 @@ Stored in git config under `worktrunk.status.<branch>`."#
         #[arg(default_value = "", add = crate::completion::branch_value_completer())]
         target: String,
     },
+}
+
+#[derive(Subcommand)]
+pub enum CacheCommand {
+    /// Show cached data
+    #[command(after_long_help = r#"Shows all cached data including:
+
+- **Default branch**: Cached result of querying remote for default branch
+- **CI status**: Cached GitHub/GitLab CI status per branch (30s TTL)
+
+CI cache entries show status, age, and the commit SHA they were fetched for."#)]
+    Show,
+
+    /// Clear cached data
+    Clear {
+        /// Cache type: 'ci' or 'default-branch' (omit for all)
+        #[arg(value_parser = ["ci", "default-branch"])]
+        cache_type: Option<String>,
+    },
+
+    /// Refresh default branch from remote
+    #[command(
+        after_long_help = r#"Queries the remote to determine the default branch and caches the result.
+
+Use when the remote default branch has changed. The cached value is used by
+`wt merge`, `wt list`, and other commands that reference the default branch."#
+    )]
+    Refresh,
 }
 
 /// Workflow building blocks

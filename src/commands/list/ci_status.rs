@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::process::Command;
+use worktrunk::git::Repository;
 
 /// Extract owner from a git remote URL (works for GitHub, GitLab, Bitbucket, etc.)
 ///
@@ -186,6 +187,124 @@ pub struct PrStatus {
     pub url: Option<String>,
 }
 
+/// Cached CI status stored in git config
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct CachedCiStatus {
+    /// The cached CI status
+    pub status: PrStatus,
+    /// Unix timestamp when the status was fetched
+    pub checked_at: u64,
+    /// The HEAD commit SHA when the status was fetched
+    pub head: String,
+}
+
+impl CachedCiStatus {
+    /// Cache TTL in seconds.
+    ///
+    /// At 300ms polling interval, 30s TTL means ~100 polls per cache entry.
+    /// This reduces API calls by 99% while keeping status reasonably fresh.
+    pub const TTL_SECS: u64 = 30;
+
+    /// Escape branch name for use in git config key.
+    ///
+    /// Git config uses dots as section separators, so branch names like
+    /// "feature.test" would create subsections. We escape dots to avoid this.
+    pub(crate) fn escape_branch(branch: &str) -> String {
+        branch.replace('.', "%2E")
+    }
+
+    /// Unescape branch name from git config key.
+    pub(crate) fn unescape_branch(escaped: &str) -> String {
+        escaped.replace("%2E", ".")
+    }
+
+    /// Check if the cache is still valid
+    fn is_valid(&self, current_head: &str, now_secs: u64) -> bool {
+        // Cache is valid if:
+        // 1. HEAD hasn't changed (same commit)
+        // 2. TTL hasn't expired
+        self.head == current_head && now_secs.saturating_sub(self.checked_at) < Self::TTL_SECS
+    }
+
+    /// Read cached CI status from git config
+    fn read(branch: &str, repo_root: &str) -> Option<Self> {
+        let config_key = format!("worktrunk.ci.{}", Self::escape_branch(branch));
+        let output = Command::new("git")
+            .args(["config", "--get", &config_key])
+            .current_dir(repo_root)
+            .output()
+            .ok()?;
+
+        if !output.status.success() {
+            return None;
+        }
+
+        let json = String::from_utf8(output.stdout).ok()?;
+        serde_json::from_str(json.trim()).ok()
+    }
+
+    /// Write CI status to git config cache
+    fn write(&self, branch: &str, repo_root: &str) {
+        let config_key = format!("worktrunk.ci.{}", Self::escape_branch(branch));
+        let Ok(json) = serde_json::to_string(self) else {
+            log::debug!("Failed to serialize CI cache for {}", branch);
+            return;
+        };
+        if let Err(e) = Command::new("git")
+            .args(["config", &config_key, &json])
+            .current_dir(repo_root)
+            .output()
+        {
+            log::debug!("Failed to write CI cache for {}: {}", branch, e);
+        }
+    }
+
+    /// Clear cached CI status from git config
+    fn clear(branch: &str, repo_root: &str) {
+        let config_key = format!("worktrunk.ci.{}", Self::escape_branch(branch));
+        // Ignore errors - key may not exist, which is fine
+        let _ = Command::new("git")
+            .args(["config", "--unset", &config_key])
+            .current_dir(repo_root)
+            .output();
+    }
+
+    /// List all cached CI statuses as (branch_name, cached_status) pairs
+    pub(crate) fn list_all(repo: &Repository) -> Vec<(String, Self)> {
+        let output = repo
+            .run_command(&["config", "--get-regexp", r"^worktrunk\.ci\."])
+            .unwrap_or_default();
+
+        output
+            .lines()
+            .filter_map(|line| {
+                let (key, json) = line.split_once(' ')?;
+                let escaped = key.strip_prefix("worktrunk.ci.")?;
+                let branch = Self::unescape_branch(escaped);
+                let cached: Self = serde_json::from_str(json).ok()?;
+                Some((branch, cached))
+            })
+            .collect()
+    }
+
+    /// Clear all cached CI statuses, returns count cleared
+    pub(crate) fn clear_all(repo: &Repository) -> usize {
+        let output = repo
+            .run_command(&["config", "--get-regexp", r"^worktrunk\.ci\."])
+            .unwrap_or_default();
+
+        let mut cleared = 0;
+        for line in output.lines() {
+            if let Some(key) = line.split_whitespace().next()
+                && repo.run_command(&["config", "--unset", key]).is_ok()
+            {
+                cleared += 1;
+            }
+        }
+        cleared
+    }
+}
+
 impl CiStatus {
     /// Get the ANSI color for this CI status.
     ///
@@ -253,6 +372,10 @@ impl PrStatus {
     /// First tries to find PR/MR status, then falls back to workflow/pipeline runs
     /// Returns None if no CI found or CLI tools unavailable
     ///
+    /// # Caching
+    /// Results are cached in git config (`worktrunk.ci.{branch}`) for 30 seconds to avoid
+    /// hitting GitHub API rate limits. Cache is invalidated when HEAD changes (new commits).
+    ///
     /// # Fork Support
     /// Runs gh commands from the repository directory to enable auto-detection of
     /// upstream repositories for forks. This ensures PRs opened against upstream
@@ -265,6 +388,48 @@ impl PrStatus {
         // (including upstream repos for forks)
         let repo_root = repo_path.to_str().expect("repo path is not valid UTF-8");
 
+        // Check cache first to avoid hitting API rate limits
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let now_secs = SystemTime::now().duration_since(UNIX_EPOCH).ok()?.as_secs();
+
+        if let Some(cached) = CachedCiStatus::read(branch, repo_root) {
+            if cached.is_valid(local_head, now_secs) {
+                log::debug!(
+                    "Using cached CI status for {} (age={}s)",
+                    branch,
+                    now_secs - cached.checked_at
+                );
+                return Some(cached.status);
+            }
+            log::debug!(
+                "Cache expired for {} (age={}s, head_match={})",
+                branch,
+                now_secs - cached.checked_at,
+                cached.head == local_head
+            );
+        }
+
+        // Cache miss or expired - fetch fresh status
+        let status = Self::detect_uncached(branch, local_head, repo_root);
+
+        // Update cache
+        if let Some(ref status) = status {
+            let cached = CachedCiStatus {
+                status: status.clone(),
+                checked_at: now_secs,
+                head: local_head.to_string(),
+            };
+            cached.write(branch, repo_root);
+        } else {
+            // Clear stale cache if no CI found
+            CachedCiStatus::clear(branch, repo_root);
+        }
+
+        status
+    }
+
+    /// Detect CI status without caching (internal implementation)
+    fn detect_uncached(branch: &str, local_head: &str, repo_root: &str) -> Option<Self> {
         // Try GitHub PR first
         if let Some(status) = Self::detect_github(branch, local_head, repo_root) {
             return Some(status);

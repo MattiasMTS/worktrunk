@@ -323,7 +323,7 @@ impl Repository {
         // Fallback: No remote or remote query failed, try to infer locally
         // TODO: Show message to user when using inference fallback:
         //   "No remote configured. Using inferred default branch: {branch}"
-        //   "To cache the default branch, set up a remote and run: wt config refresh-cache"
+        //   "To cache the default branch, set up a remote and run: wt config cache refresh"
         // Problem: git.rs is in lib crate, output module is in binary.
         // Options: (1) Return info about whether fallback was used, let callers show message
         //          (2) Add messages in specific commands (merge.rs, worktree.rs)

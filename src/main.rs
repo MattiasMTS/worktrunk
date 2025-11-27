@@ -24,17 +24,18 @@ use commands::command_executor::CommandContext;
 use commands::handle_select;
 use commands::worktree::{SwitchResult, handle_push};
 use commands::{
-    ConfigAction, RebaseResult, SquashResult, handle_config_create, handle_config_refresh_cache,
-    handle_config_show, handle_config_status_set, handle_config_status_unset,
-    handle_configure_shell, handle_init, handle_list, handle_merge, handle_rebase, handle_remove,
-    handle_squash, handle_standalone_add_approvals, handle_standalone_clear_approvals,
-    handle_standalone_commit, handle_standalone_run_hook, handle_switch, handle_unconfigure_shell,
+    ConfigAction, RebaseResult, SquashResult, handle_cache_clear, handle_cache_refresh,
+    handle_cache_show, handle_config_create, handle_config_show, handle_config_status_set,
+    handle_config_status_unset, handle_configure_shell, handle_init, handle_list, handle_merge,
+    handle_rebase, handle_remove, handle_squash, handle_standalone_add_approvals,
+    handle_standalone_clear_approvals, handle_standalone_commit, handle_standalone_run_hook,
+    handle_switch, handle_unconfigure_shell,
 };
 use output::{execute_user_command, handle_remove_output, handle_switch_output};
 
 use cli::{
-    ApprovalsCommand, BetaCommand, Cli, Commands, ConfigCommand, ConfigShellCommand, StatusAction,
-    StepCommand,
+    ApprovalsCommand, BetaCommand, CacheCommand, Cli, Commands, ConfigCommand, ConfigShellCommand,
+    StatusAction, StepCommand,
 };
 use worktrunk::HookType;
 
@@ -473,7 +474,11 @@ fn main() {
             }
             ConfigCommand::Create => handle_config_create(),
             ConfigCommand::Show => handle_config_show(),
-            ConfigCommand::RefreshCache => handle_config_refresh_cache(),
+            ConfigCommand::Cache { action } => match action {
+                CacheCommand::Show => handle_cache_show(),
+                CacheCommand::Clear { cache_type } => handle_cache_clear(cache_type),
+                CacheCommand::Refresh => handle_cache_refresh(),
+            },
             ConfigCommand::Status { action } => match action {
                 StatusAction::Set { value, branch } => handle_config_status_set(value, branch),
                 StatusAction::Unset { target } => handle_config_status_unset(target),

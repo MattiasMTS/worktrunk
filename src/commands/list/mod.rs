@@ -16,7 +16,7 @@
 //! 2. **Default branch lookup** (~1-5ms)
 //!    - Reads cached value from `.git/refs/remotes/origin/HEAD`
 //!    - Falls back to `git remote show origin` if not cached (~100-300ms network)
-//!    - Refresh with `wt config refresh-cache`
+//!    - Refresh with `wt config cache refresh`
 //!
 //! 3. **Sort worktrees** (<1ms)
 //!    - Orders by: current → main → rest alphabetically
@@ -95,7 +95,7 @@
 //! This is a git-native cache stored in `.git/refs/remotes/origin/HEAD`. All other data is
 //! fetched fresh on each `wt list` invocation.
 //!
-//! Refresh with: `wt config refresh-cache`
+//! Refresh with: `wt config cache refresh`
 //!
 //! ## Performance Characteristics
 //!

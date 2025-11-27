@@ -12,6 +12,7 @@ use worktrunk::styling::{
 };
 
 use super::configure_shell::{ConfigAction, scan_shell_configs};
+use super::list::ci_status::CachedCiStatus;
 use crate::help_pager::show_help_in_pager;
 use crate::output;
 
@@ -363,26 +364,6 @@ fn get_global_config_path() -> Option<PathBuf> {
     Some(strategy.config_dir().join("worktrunk").join("config.toml"))
 }
 
-/// Handle the config refresh-cache command
-pub fn handle_config_refresh_cache() -> anyhow::Result<()> {
-    let repo = Repository::current();
-
-    // Display progress message
-    crate::output::progress(format!(
-        "{CYAN}Querying remote for default branch...{CYAN:#}"
-    ))?;
-
-    // Refresh the cache (this will make a network call)
-    let branch = repo.refresh_default_branch()?;
-
-    // Display success message
-    crate::output::success(format!(
-        "{GREEN}Cache refreshed: {GREEN_BOLD}{branch}{GREEN_BOLD:#}{GREEN:#}"
-    ))?;
-
-    Ok(())
-}
-
 /// Handle the config status set command
 pub fn handle_config_status_set(value: String, branch: Option<String>) -> anyhow::Result<()> {
     let repo = Repository::current();
@@ -451,6 +432,110 @@ pub fn handle_config_status_unset(target: String) -> anyhow::Result<()> {
             "{GREEN}Cleared status for {branch_bold}{branch_name}{branch_bold:#}{GREEN:#}"
         ))?;
     }
+
+    Ok(())
+}
+
+/// Handle the cache show command
+pub fn handle_cache_show() -> anyhow::Result<()> {
+    use worktrunk::styling::HINT;
+
+    let repo = Repository::current();
+
+    // Show default branch cache
+    crate::output::info(format!("{HINT}Default branch cache:{HINT:#}"))?;
+    match repo.default_branch() {
+        Ok(branch) => crate::output::raw(format!("  {branch}"))?,
+        Err(_) => crate::output::raw("  (not cached)")?,
+    }
+    crate::output::blank()?;
+
+    // Show CI status cache
+    crate::output::info(format!("{HINT}CI status cache:{HINT:#}"))?;
+
+    let entries = CachedCiStatus::list_all(&repo);
+    if entries.is_empty() {
+        crate::output::raw("  (no CI cache entries)")?;
+        return Ok(());
+    }
+
+    let now_secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
+    for (branch, cached) in entries {
+        let status = serde_json::to_string(&cached.status.ci_status)
+            .map(|s| s.trim_matches('"').to_string())
+            .unwrap_or_else(|_| "unknown".to_string());
+        let age = now_secs.saturating_sub(cached.checked_at);
+        let head: String = cached.head.chars().take(8).collect();
+
+        crate::output::raw(format!("  {branch}: {status} (age: {age}s, head: {head})"))?;
+    }
+
+    Ok(())
+}
+
+/// Handle the cache clear command
+pub fn handle_cache_clear(cache_type: Option<String>) -> anyhow::Result<()> {
+    let repo = Repository::current();
+
+    match cache_type.as_deref() {
+        Some("ci") => {
+            let cleared = CachedCiStatus::clear_all(&repo);
+            if cleared == 0 {
+                crate::output::info("No CI cache entries to clear")?;
+            } else {
+                crate::output::success(format!(
+                    "{GREEN}Cleared {GREEN_BOLD}{cleared}{GREEN_BOLD:#}{GREEN} CI cache entr{}{GREEN:#}",
+                    if cleared == 1 { "y" } else { "ies" }
+                ))?;
+            }
+        }
+        Some("default-branch") => {
+            if repo
+                .run_command(&["config", "--unset", "worktrunk.defaultBranch"])
+                .is_ok()
+            {
+                crate::output::success(format!("{GREEN}Cleared default branch cache{GREEN:#}"))?;
+            } else {
+                crate::output::info("No default branch cache to clear")?;
+            }
+        }
+        None => {
+            let cleared_default = repo
+                .run_command(&["config", "--unset", "worktrunk.defaultBranch"])
+                .is_ok();
+            let cleared_ci = CachedCiStatus::clear_all(&repo) > 0;
+
+            if cleared_default || cleared_ci {
+                crate::output::success(format!("{GREEN}Cleared all caches{GREEN:#}"))?;
+            } else {
+                crate::output::info("No caches to clear")?;
+            }
+        }
+        Some(unknown) => {
+            anyhow::bail!("Unknown cache type: {unknown}. Valid types: ci, default-branch");
+        }
+    }
+
+    Ok(())
+}
+
+/// Handle the cache refresh command (refreshes default branch)
+pub fn handle_cache_refresh() -> anyhow::Result<()> {
+    let repo = Repository::current();
+
+    crate::output::progress(format!(
+        "{CYAN}Querying remote for default branch...{CYAN:#}"
+    ))?;
+
+    let branch = repo.refresh_default_branch()?;
+
+    crate::output::success(format!(
+        "{GREEN}Cache refreshed: {GREEN_BOLD}{branch}{GREEN_BOLD:#}{GREEN:#}"
+    ))?;
 
     Ok(())
 }
