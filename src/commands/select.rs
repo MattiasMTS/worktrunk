@@ -602,13 +602,13 @@ pub fn handle_select(is_directive_mode: bool) -> anyhow::Result<()> {
         // Legend/controls moved to preview window tabs (render_preview_tabs)
         .no_clear(true) // Prevent skim from clearing screen, we'll do it manually
         .build()
-        .map_err(|e| anyhow::anyhow!(format!("Failed to build skim options: {}", e)))?;
+        .map_err(|e| anyhow::anyhow!("Failed to build skim options: {}", e))?;
 
     // Create item receiver
     let (tx, rx): (SkimItemSender, SkimItemReceiver) = unbounded();
     for item in items {
         tx.send(item)
-            .map_err(|e| anyhow::anyhow!(format!("Failed to send item to skim: {}", e)))?;
+            .map_err(|e| anyhow::anyhow!("Failed to send item to skim: {}", e))?;
     }
     drop(tx);
 

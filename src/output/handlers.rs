@@ -189,7 +189,6 @@ fn build_remove_command(
 pub fn handle_remove_output(
     result: &RemoveResult,
     branch: Option<&str>,
-    strict_branch_deletion: bool,
     background: bool,
 ) -> anyhow::Result<()> {
     match result {
@@ -210,19 +209,13 @@ pub fn handle_remove_output(
             *force_delete,
             target_branch.as_deref(),
             branch,
-            strict_branch_deletion,
             background,
         ),
         RemoveResult::BranchOnly {
             branch_name,
             no_delete_branch,
             force_delete,
-        } => handle_branch_only_output(
-            branch_name,
-            *no_delete_branch,
-            *force_delete,
-            strict_branch_deletion,
-        ),
+        } => handle_branch_only_output(branch_name, *no_delete_branch, *force_delete),
     }
 }
 
@@ -231,7 +224,6 @@ fn handle_branch_only_output(
     branch_name: &str,
     no_delete_branch: bool,
     force_delete: bool,
-    strict_branch_deletion: bool,
 ) -> anyhow::Result<()> {
     use worktrunk::styling::GRAY;
 
@@ -283,15 +275,7 @@ fn handle_branch_only_output(
             ))?;
         }
         Err(e) => {
-            if strict_branch_deletion {
-                return Err(GitError::BranchDeletionFailed {
-                    branch: branch_name.into(),
-                    error: e.to_string(),
-                }
-                .styled_err());
-            }
-
-            // If branch deletion fails in non-strict mode, show a warning but don't error
+            // Show a warning but don't error - branch still exists
             super::warning(format!(
                 "{WARNING}Could not delete branch {WARNING_BOLD}{branch_name}{WARNING_BOLD:#}{WARNING:#}"
             ))?;
@@ -316,7 +300,6 @@ fn handle_removed_worktree_output(
     force_delete: bool,
     target_branch: Option<&str>,
     branch: Option<&str>,
-    strict_branch_deletion: bool,
     background: bool,
 ) -> anyhow::Result<()> {
     // 1. Emit cd directive if needed - shell will execute this immediately
@@ -390,7 +373,7 @@ fn handle_removed_worktree_output(
                 path: worktree_path.to_path_buf(),
                 error: err.to_string(),
             }
-            .styled_err());
+            .into());
         }
 
         // Delete the branch (unless --no-delete-branch was specified)
@@ -423,15 +406,7 @@ fn handle_removed_worktree_output(
             match delete_result {
                 Ok(_) => true,
                 Err(e) => {
-                    if strict_branch_deletion {
-                        return Err(GitError::BranchDeletionFailed {
-                            branch: branch_name.into(),
-                            error: e.to_string(),
-                        }
-                        .styled_err());
-                    }
-
-                    // If branch deletion fails in non-strict mode, show a warning but don't error
+                    // Show a warning but don't error - branch still exists
                     super::warning(format!(
                         "{WARNING}Could not delete branch {WARNING_BOLD}{branch_name}{WARNING_BOLD:#}{WARNING:#}"
                     ))?;
@@ -506,18 +481,16 @@ pub(crate) fn execute_streaming(
         .env_remove("VERGEN_GIT_DESCRIBE")
         .spawn()
         .map_err(|e| {
-            worktrunk::git::GitError::Other {
+            anyhow::Error::from(worktrunk::git::GitError::Other {
                 message: format!("Failed to execute command: {}", e),
-            }
-            .styled_err()
+            })
         })?;
 
     // Wait for command to complete
     let status = child.wait().map_err(|e| {
-        worktrunk::git::GitError::Other {
+        anyhow::Error::from(worktrunk::git::GitError::Other {
             message: format!("Failed to wait for command: {}", e),
-        }
-        .styled_err()
+        })
     })?;
 
     // Check if child was killed by a signal (Unix only)

@@ -165,8 +165,20 @@ $ wt merge
 ✅ Squashed @ a1b2c3d
 🔄 Running pre-merge test:
    cargo test
+    Finished test [unoptimized + debuginfo] target(s) in 0.12s
+     Running unittests src/lib.rs (target/debug/deps/worktrunk-abc123)
+
+running 18 tests
+test auth::tests::test_jwt_decode ... ok
+test auth::tests::test_jwt_encode ... ok
+test auth::tests::test_token_refresh ... ok
+test auth::tests::test_token_validation ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
 🔄 Running pre-merge lint:
    cargo clippy
+    Checking worktrunk v0.1.0
+    Finished dev [unoptimized + debuginfo] target(s) in 1.23s
 🔄 Merging 1 commit to main @ a1b2c3d (no rebase needed)
    * a1b2c3d feat(auth): Implement JWT authentication system
     auth.rs      |  8 ++++++++
@@ -177,6 +189,11 @@ $ wt merge
 🔄 Removing feature-auth worktree & branch in background
 🔄 Running post-merge install:
    cargo install --path .
+  Installing worktrunk v0.1.0
+   Compiling worktrunk v0.1.0
+    Finished release [optimized] target(s) in 2.34s
+  Installing ~/.cargo/bin/wt
+   Installed package `worktrunk v0.1.0` (executable `wt`)
 ```
 
 <!-- END AUTO-GENERATED -->

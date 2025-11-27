@@ -16,19 +16,20 @@ info:
     GIT_EDITOR: ""
     LANG: C
     LC_ALL: C
-    SOURCE_DATE_EPOCH: "1761609600"
+    SOURCE_DATE_EPOCH: "1735776000"
+    WORKTRUNK_BIN: ""
     WORKTRUNK_CONFIG_PATH: "[TEST_CONFIG]"
 ---
 success: true
 exit_code: 0
 ----- stdout -----
 🔄 [36mMerging 2 commits to [1m[36mmain[0m[36m @ [2m[SHA][0m (no commit/squash/rebase needed)
+✅ [32mMerged to [1m[32mmain[0m[0m (2 commits, 2 files, [32m+2[0m)
+🔄 [36mRemoving [1m[36mfeature[0m[36m worktree & branch in background[0m
+
+----- stderr -----
 [107m [0m  * [SHA] feat: add file 2
 [107m [0m  * [SHA] feat: add file 1
 [107m [0m   file1.txt | 1 [32m+[m
 [107m [0m   file2.txt | 1 [32m+[m
 [107m [0m   2 files changed, 2 insertions(+)
-✅ [32mMerged to [1m[32mmain[0m[0m (2 commits, 2 files, [32m+2[0m)
-🔄 [36mRemoving [1m[36mfeature[0m[36m worktree & branch in background[0m
-
------ stderr -----
