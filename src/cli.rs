@@ -651,7 +651,7 @@ Order: `+!? ✖⚠≡_ ↻⋈ ↑↓↕ ⇡⇣⇅ ⎇⌫⊠`
 - `⌫` Prunable worktree (directory missing, can be pruned)
 - `⊠` Locked worktree (protected from auto-removal)
 
-Rows are dimmed when there's no marginal contribution (≡ matches main OR _ no commits).
+Rows are dimmed when there's no marginal contribution (`≡` matches main OR `_` no commits).
 
 ## JSON Output
 
