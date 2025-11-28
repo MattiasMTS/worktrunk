@@ -112,14 +112,14 @@ fn setup_repo_with_commits_ahead() -> TestRepo {
 fn test_statusline_basic() {
     let repo = setup_basic_repo();
     let output = run_statusline(&repo, &[], None);
-    assert_snapshot!(output, @"main");
+    assert_snapshot!(output, @"main  [2m^[22m");
 }
 
 #[test]
 fn test_statusline_with_changes() {
     let repo = setup_repo_with_changes();
     let output = run_statusline(&repo, &[], None);
-    assert_snapshot!(output, @"main  [36m?[39m");
+    assert_snapshot!(output, @"main  [36m?[39m[2m^[22m");
 }
 
 #[test]
@@ -128,7 +128,7 @@ fn test_statusline_commits_ahead() {
     // Run from the feature worktree to see commits ahead
     let feature_path = repo.worktree_path("feature");
     let output = run_statusline_from_dir(&repo, &[], None, feature_path);
-    assert_snapshot!(output, @"feature  [32m↑2[0m");
+    assert_snapshot!(output, @"feature  [2m↑[22m  [32m↑2[0m");
 }
 
 // --- Claude Code Mode Tests ---
@@ -169,7 +169,7 @@ fn test_statusline_claude_code_full_context() {
 
     let output = run_statusline(&repo, &["--claude-code"], Some(&json));
     claude_code_snapshot_settings(&repo).bind(|| {
-        assert_snapshot!(output, @"[PATH]  main  [36m?[39m  | Opus");
+        assert_snapshot!(output, @"[PATH]  main  [36m?[39m[2m^[22m  | Opus");
     });
 }
 
@@ -184,7 +184,7 @@ fn test_statusline_claude_code_minimal() {
 
     let output = run_statusline(&repo, &["--claude-code"], Some(&json));
     claude_code_snapshot_settings(&repo).bind(|| {
-        assert_snapshot!(output, @"[PATH]  main");
+        assert_snapshot!(output, @"[PATH]  main  [2m^[22m");
     });
 }
 
@@ -202,7 +202,7 @@ fn test_statusline_claude_code_with_model() {
 
     let output = run_statusline(&repo, &["--claude-code"], Some(&json));
     claude_code_snapshot_settings(&repo).bind(|| {
-        assert_snapshot!(output, @"[PATH]  main  | Haiku");
+        assert_snapshot!(output, @"[PATH]  main  [2m^[22m  | Haiku");
     });
 }
 

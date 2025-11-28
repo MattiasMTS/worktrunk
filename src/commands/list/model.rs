@@ -949,7 +949,6 @@ impl StatusSymbols {
     ///
     /// See [`StatusSymbols`] struct doc for symbol categories.
     pub fn render_with_mask(&self, mask: &PositionMask) -> String {
-        use color_print::cformat;
         use worktrunk::styling::StyledLine;
 
         let mut result = String::with_capacity(64);
@@ -958,87 +957,11 @@ impl StatusSymbols {
             return result;
         }
 
-        // Build list of (position_index, content, has_data) tuples
-        // Ordered by importance/actionability
-        // Apply colors based on semantic meaning:
-        // - Red (ERROR): Actual conflicts (blocking problems)
-        // - Yellow (WARNING): Git operations, locked/prunable (stuck states needing attention)
-        // - Cyan: Working tree changes (activity indicator)
-        // - Dimmed (HINT): Branch state symbols that indicate removability + divergence arrows (low urgency)
-        let (branch_op_state_str, has_branch_op_state) = self
-            .branch_op_state
-            .styled()
-            .map_or((String::new(), false), |s| (s, true));
-        let (main_divergence_str, has_main_divergence) = self
-            .main_divergence
-            .styled()
-            .map_or((String::new(), false), |s| (s, true));
-        let (upstream_divergence_str, has_upstream_divergence) = self
-            .upstream_divergence
-            .styled()
-            .map_or((String::new(), false), |s| (s, true));
-        // Working tree symbols split into 3 fixed columns for vertical alignment
-        let style_working = |sym: char| -> (String, bool) {
-            if self.working_tree.contains(sym) {
-                (cformat!("<cyan>{sym}</>"), true)
-            } else {
-                (String::new(), false)
-            }
-        };
-        let (staged_str, has_staged) = style_working('+');
-        let (modified_str, has_modified) = style_working('!');
-        let (untracked_str, has_untracked) = style_working('?');
-        let worktree_state_str = match self.worktree_state {
-            WorktreeState::None => String::new(),
-            // Branch indicator (⎇) is informational (dimmed)
-            WorktreeState::Branch => cformat!("<dim>{}</>", self.worktree_state),
-            // Worktree attrs (⚐⌫⊠) are warnings (yellow)
-            _ => cformat!("<yellow>{}</>", self.worktree_state),
-        };
-        let user_status_str = self.user_status.as_deref().unwrap_or("").to_string();
-
-        // Position data: (position_mask, styled_content, has_data)
-        // StyledLine handles width tracking automatically via .width()
-        //
-        // CRITICAL: Display order is working_tree first (staged, modified, untracked), then other symbols.
-        // NEVER change this order - it ensures progressive and final rendering match exactly.
-        // Tests will break if you change this, but that's expected - update the tests, not this order.
-        let positions_data: [(usize, String, bool); 8] = [
-            (PositionMask::STAGED, staged_str, has_staged),
-            (PositionMask::MODIFIED, modified_str, has_modified),
-            (PositionMask::UNTRACKED, untracked_str, has_untracked),
-            (
-                PositionMask::BRANCH_OP_STATE,
-                branch_op_state_str,
-                has_branch_op_state,
-            ),
-            (
-                PositionMask::MAIN_DIVERGENCE,
-                main_divergence_str,
-                has_main_divergence,
-            ),
-            (
-                PositionMask::UPSTREAM_DIVERGENCE,
-                upstream_divergence_str,
-                has_upstream_divergence,
-            ),
-            (
-                PositionMask::WORKTREE_STATE,
-                worktree_state_str,
-                self.worktree_state != WorktreeState::None,
-            ),
-            (
-                PositionMask::USER_STATUS,
-                user_status_str,
-                self.user_status.is_some(),
-            ),
-        ];
-
         // Grid-based rendering: each position gets a fixed width for vertical alignment.
         // CRITICAL: Always use PositionMask::FULL for consistent spacing between progressive and final rendering.
         // The mask provides the maximum width needed for each position across all rows.
         // Accept wider Status column with whitespace as tradeoff for perfect alignment.
-        for (pos, styled_content, has_data) in positions_data {
+        for (pos, styled_content, has_data) in self.styled_symbols() {
             let allocated_width = mask.width(pos);
 
             if has_data {
@@ -1069,36 +992,95 @@ impl StatusSymbols {
     }
 
     /// Render status symbols in compact form for statusline (no grid alignment).
+    ///
+    /// Uses the same styled symbols as `render_with_mask()`, just without padding.
     pub fn format_compact(&self) -> String {
+        self.styled_symbols()
+            .into_iter()
+            .filter_map(|(_, styled, has_data)| has_data.then_some(styled))
+            .collect()
+    }
+
+    /// Build styled symbols array with position indices.
+    ///
+    /// Returns: `[(position_mask, styled_string, has_data); 8]`
+    ///
+    /// Order: working_tree (+!?) → branch_op_state → main_divergence → upstream_divergence → worktree_state → user_status
+    ///
+    /// Styling follows semantic meaning:
+    /// - Cyan: Working tree changes (activity indicator)
+    /// - Yellow: Git operations, locked/prunable (stuck states needing attention)
+    /// - Dimmed: Branch state symbols + divergence arrows (low urgency)
+    fn styled_symbols(&self) -> [(usize, String, bool); 8] {
         use color_print::cformat;
 
-        let mut result = String::new();
+        // Working tree symbols split into 3 fixed columns for vertical alignment
+        let style_working = |sym: char| -> (String, bool) {
+            if self.working_tree.contains(sym) {
+                (cformat!("<cyan>{sym}</>"), true)
+            } else {
+                (String::new(), false)
+            }
+        };
+        let (staged_str, has_staged) = style_working('+');
+        let (modified_str, has_modified) = style_working('!');
+        let (untracked_str, has_untracked) = style_working('?');
 
-        // Working tree symbols (compact, no padding) - cyan for activity
-        if !self.working_tree.is_empty() {
-            result.push_str(&cformat!("<cyan>{}</>", self.working_tree));
-        }
+        let (branch_op_state_str, has_branch_op_state) = self
+            .branch_op_state
+            .styled()
+            .map_or((String::new(), false), |s| (s, true));
+        let (main_divergence_str, has_main_divergence) = self
+            .main_divergence
+            .styled()
+            .map_or((String::new(), false), |s| (s, true));
+        let (upstream_divergence_str, has_upstream_divergence) = self
+            .upstream_divergence
+            .styled()
+            .map_or((String::new(), false), |s| (s, true));
 
-        // Branch/op state
-        if let Some(styled) = self.branch_op_state.styled() {
-            result.push_str(&styled);
-        }
+        let worktree_state_str = match self.worktree_state {
+            WorktreeState::None => String::new(),
+            // Branch indicator (⎇) is informational (dimmed)
+            WorktreeState::Branch => cformat!("<dim>{}</>", self.worktree_state),
+            // Worktree attrs (⚐⌫⊠) are warnings (yellow)
+            _ => cformat!("<yellow>{}</>", self.worktree_state),
+        };
 
-        // Worktree state (path mismatch/locked/prunable) - skip branch indicator (⎇)
-        // Note: ⎇ only appears for branch-only items, never for worktrees (statusline context)
-        if matches!(
-            self.worktree_state,
-            WorktreeState::PathMismatch | WorktreeState::Prunable | WorktreeState::Locked
-        ) {
-            result.push_str(&cformat!("<yellow>{}</>", self.worktree_state));
-        }
+        let user_status_str = self.user_status.as_deref().unwrap_or("").to_string();
 
-        // User status
-        if let Some(ref user_status) = self.user_status {
-            result.push_str(user_status);
-        }
-
-        result
+        // CRITICAL: Display order is working_tree first (staged, modified, untracked), then other symbols.
+        // NEVER change this order - it ensures progressive and final rendering match exactly.
+        [
+            (PositionMask::STAGED, staged_str, has_staged),
+            (PositionMask::MODIFIED, modified_str, has_modified),
+            (PositionMask::UNTRACKED, untracked_str, has_untracked),
+            (
+                PositionMask::BRANCH_OP_STATE,
+                branch_op_state_str,
+                has_branch_op_state,
+            ),
+            (
+                PositionMask::MAIN_DIVERGENCE,
+                main_divergence_str,
+                has_main_divergence,
+            ),
+            (
+                PositionMask::UPSTREAM_DIVERGENCE,
+                upstream_divergence_str,
+                has_upstream_divergence,
+            ),
+            (
+                PositionMask::WORKTREE_STATE,
+                worktree_state_str,
+                self.worktree_state != WorktreeState::None,
+            ),
+            (
+                PositionMask::USER_STATUS,
+                user_status_str,
+                self.user_status.is_some(),
+            ),
+        ]
     }
 }
 

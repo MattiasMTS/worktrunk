@@ -58,7 +58,7 @@ exit_code: 0
       "upstream_divergence": "",
       "worktree_state": ""
     },
-    "status_line": "main",
+    "status_line": "main  /u001b[2m^/u001b[22m",
     "type": "worktree",
     "path": "[REPO]",
     "bare": false,
@@ -110,7 +110,7 @@ exit_code: 0
       "worktree_state": ""
     },
     "commits_display": "/u001b[32m↑2/u001b[0m",
-    "status_line": "feature-merged  /u001b[2m≡/u001b[22m  /u001b[32m↑2/u001b[0m",
+    "status_line": "feature-merged  /u001b[2m≡/u001b[22m/u001b[2m↑/u001b[22m  /u001b[32m↑2/u001b[0m",
     "type": "worktree",
     "path": "[REPO].feature-merged",
     "bare": false,

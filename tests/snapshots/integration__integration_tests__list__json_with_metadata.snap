@@ -58,7 +58,7 @@ exit_code: 0
       "upstream_divergence": "",
       "worktree_state": ""
     },
-    "status_line": "main",
+    "status_line": "main  /u001b[2m^/u001b[22m",
     "type": "worktree",
     "path": "[REPO]",
     "bare": false,
