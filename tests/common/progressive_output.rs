@@ -113,6 +113,13 @@ const OUTPUT_POLL_INTERVAL_MS: u64 = 10;
 /// Uses default exponential backoff (10ms → 500ms cap, 5s timeout) for reliability.
 const STABLE_READ_THRESHOLD: u32 = 4;
 
+/// Minimum time to wait during drain before accepting stable EOF.
+/// On slow CI systems (especially Ubuntu), the PTY may return spurious EOFs before
+/// all data has been flushed from the kernel buffer. This ensures we wait long enough
+/// for the kernel to complete its PTY buffer flush, regardless of how many EOFs we've seen.
+/// 500ms provides enough margin for slow CI runners under load.
+const MIN_DRAIN_WAIT_MS: u64 = 500;
+
 /// Strategy for capturing progressive output snapshots
 #[derive(Debug, Clone)]
 pub enum CaptureStrategy {
@@ -445,8 +452,12 @@ pub fn capture_progressive_output(
                         match reader.read(&mut temp_buf) {
                             Ok(0) => {
                                 // EOF - may be spurious on Linux, require consecutive confirmations
+                                // AND minimum wait time to allow kernel buffer flush
                                 consecutive_no_data += 1;
-                                if consecutive_no_data >= STABLE_READ_THRESHOLD {
+                                let min_wait_elapsed = drain_start.elapsed()
+                                    >= Duration::from_millis(MIN_DRAIN_WAIT_MS);
+                                if consecutive_no_data >= STABLE_READ_THRESHOLD && min_wait_elapsed
+                                {
                                     break;
                                 }
                                 backoff.sleep(attempt);
