@@ -41,13 +41,6 @@ Currently, Worktrunk:
 ...there's no need to use the more advanced features to get the simpler
 benefits, and everything is fully compatible with standard git worktrees.
 
-To contribute:
-
-- Star the repo
-- Tell a friend
-- Install it, use it, post feedback
-- Post about it on socials
-
 ## Demo
 
 ![Worktrunk Demo](dev/wt-demo/out/wt-demo.gif)
@@ -1304,6 +1297,18 @@ cargo install worktrunk --no-default-features
 ```
 
 This disables bash syntax highlighting in command output but keeps all core functionality. The syntax highlighting feature requires C99 compiler support and can fail on older systems or minimal Docker images.
+
+</details>
+
+<details>
+<summary><strong>How can I contribute?</strong></summary>
+
+- Star the repo
+- Try it out and [open an issue](https://github.com/max-sixty/worktrunk/issues) with feedback
+- Send to a friend
+- Post about it — [X](https://twitter.com/intent/tweet?text=Worktrunk%20%E2%80%94%20CLI%20for%20git%20worktree%20management&url=https%3A%2F%2Fgithub.com%2Fmax-sixty%2Fworktrunk) · [Reddit](https://www.reddit.com/submit?url=https%3A%2F%2Fgithub.com%2Fmax-sixty%2Fworktrunk&title=Worktrunk%20%E2%80%94%20CLI%20for%20git%20worktree%20management) · [LinkedIn](https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fgithub.com%2Fmax-sixty%2Fworktrunk)
+
+Thanks in advance!
 
 </details>
 
