@@ -144,10 +144,8 @@ examples:
 <tr>
 <td>Create + start Claude</td>
 <td><pre lang="bash">wt switch -c -x claude feature</pre>
-...or with an <a href="#alias">alias</a>:
-<pre lang="bash">
-wsc feature
-</pre></td>
+...or with an <a href="#alias">alias</a>: <code>wsc feature</code>
+</td>
 <td><pre lang="bash">git worktree add -b feature ../repo.feature main
 cd ../repo.feature
 claude</pre></td>
@@ -161,7 +159,7 @@ git worktree remove ../repo.feature
 git branch -d feature</pre></td>
 </tr>
 <tr>
-<td>List worktrees</td>
+<td>List</td>
 <td><pre lang="bash">wt list</pre>
 ...including diffstats & status
 </td>
@@ -172,7 +170,7 @@ git branch -d feature</pre></td>
 <tr>
 <td>List with CI status</td>
 <td><pre lang="bash">wt list --full</pre>
-...including CI status & diffstat downstream of <code>main</code>, add <code>--branches</code> or <code>--remotes</code> for more
+...including CI status & diffstat downstream of <code>main</code>. Optionally add <code>--branches</code> or <code>--remotes</code>.
 </td>
 <td>N/A</td>
 </tr>
