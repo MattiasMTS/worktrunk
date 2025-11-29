@@ -105,7 +105,7 @@ Say we merged via CI, our changes are on main, and we're finished with the workt
 
 ```console
 $ wt remove
-🔄 Removing feature-api worktree & branch in background
+🔄 Removing feature-api worktree & branch in background (ancestor of main)
 ```
 
 <!-- END AUTO-GENERATED -->

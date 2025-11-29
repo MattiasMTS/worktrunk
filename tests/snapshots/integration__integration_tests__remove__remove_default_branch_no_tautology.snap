@@ -4,6 +4,8 @@ info:
   program: wt
   args:
     - remove
+    - "--no-background"
+    - main
   env:
     CLICOLOR_FORCE: "1"
     COLUMNS: "150"
@@ -18,9 +20,10 @@ info:
     WORKTRUNK_BIN: ""
     WORKTRUNK_CONFIG_PATH: "[TEST_CONFIG]"
 ---
-success: false
-exit_code: 1
+success: true
+exit_code: 0
 ----- stdout -----
 
 ----- stderr -----
-❌ [31mThe main worktree cannot be removed[39m
+🔄 [36m[36mRemoving worktree for [1mmain[22m...[39m[39m
+✅ [32m[32mRemoved [1mmain[22m worktree & branch[39m[39m

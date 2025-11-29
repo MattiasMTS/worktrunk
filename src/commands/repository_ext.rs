@@ -111,11 +111,24 @@ impl RepositoryCliExt for Repository {
         let current_worktree = self.worktree_root()?;
         let removing_current = current_worktree == worktree_path;
 
+        // Cannot remove the main working tree (only linked worktrees can be removed)
+        if removing_current && !self.is_in_worktree()? {
+            return Err(GitError::CannotRemoveMainWorktree.into());
+        }
+
         let (main_path, changed_directory) = if removing_current {
             let worktrees = self.list_worktrees()?;
             (worktrees.main().path.clone(), true)
         } else {
             (current_worktree, false)
+        };
+
+        // Resolve default branch for integration reason display
+        // Skip if removing the default branch itself (avoids tautological "main (ancestor of main)")
+        let default_branch = self.default_branch().ok();
+        let target_branch = match &default_branch {
+            Some(db) if db == branch_name => None,
+            _ => default_branch,
         };
 
         Ok(RemoveResult::RemovedWorktree {
@@ -125,7 +138,7 @@ impl RepositoryCliExt for Repository {
             branch_name: Some(branch_name.to_string()),
             no_delete_branch,
             force_delete,
-            target_branch: None,
+            target_branch,
         })
     }
 
@@ -134,6 +147,11 @@ impl RepositoryCliExt for Repository {
         no_delete_branch: bool,
         force_delete: bool,
     ) -> anyhow::Result<RemoveResult> {
+        // Cannot remove the main working tree (only linked worktrees can be removed)
+        if !self.is_in_worktree()? {
+            return Err(GitError::CannotRemoveMainWorktree.into());
+        }
+
         // Get current worktree path
         let current_path = self.worktree_root()?;
 
@@ -153,6 +171,14 @@ impl RepositoryCliExt for Repository {
         // Get main worktree path (we're removing current, so we'll cd to main)
         let main_path = worktrees.main().path.clone();
 
+        // Resolve default branch for integration reason display
+        // Skip if removing the default branch itself (avoids tautological "main (ancestor of main)")
+        let default_branch = self.default_branch().ok();
+        let target_branch = match (&default_branch, &branch_name) {
+            (Some(db), Some(bn)) if db == bn => None,
+            _ => default_branch,
+        };
+
         Ok(RemoveResult::RemovedWorktree {
             main_path,
             worktree_path: current_path,
@@ -160,7 +186,7 @@ impl RepositoryCliExt for Repository {
             branch_name,
             no_delete_branch,
             force_delete,
-            target_branch: None,
+            target_branch,
         })
     }
 

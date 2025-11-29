@@ -80,6 +80,7 @@ pub enum GitError {
         path: PathBuf,
         error: String,
     },
+    CannotRemoveMainWorktree,
 
     // Merge/push errors
     ConflictingChanges {
@@ -236,6 +237,13 @@ impl std::fmt::Display for GitError {
                     "{ERROR_EMOJI} <red>Failed to remove worktree for <bold>{branch}</> at <bold>{path_display}</></>"
                 );
                 write!(f, "{}", format_error_block(header, error))
+            }
+
+            GitError::CannotRemoveMainWorktree => {
+                cwrite!(
+                    f,
+                    "{ERROR_EMOJI} <red>The main worktree cannot be removed</>"
+                )
             }
 
             GitError::ConflictingChanges {

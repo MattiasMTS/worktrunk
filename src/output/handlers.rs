@@ -159,14 +159,14 @@ fn get_flag_note(
     } else if force_delete && deletion_result.is_some() {
         " (--force-delete)".to_string()
     } else if let Some(target) = target_branch {
-        // After wt merge: show specific integration reason with target
+        // Show integration reason when branch is deleted (both wt merge and wt remove)
         match deletion_result {
             Some(Some(IntegrationReason::Merged)) => format!(" (ancestor of {target})"),
             Some(Some(IntegrationReason::ContentsMatch)) => format!(" (contents match {target})"),
             Some(None) | None => String::new(),
         }
     } else {
-        // Explicit wt remove: no reason needed, user requested it
+        // No target branch available (e.g., couldn't resolve default branch)
         String::new()
     }
 }
@@ -186,13 +186,6 @@ fn format_remove_worktree_message(
     deletion_result: Option<Option<IntegrationReason>>,
     target_branch: Option<&str>,
 ) -> String {
-    // Build the action description based on actual outcome
-    let action = if no_delete_branch || deletion_result.is_none() {
-        "Removed worktree"
-    } else {
-        "Removed worktree & branch"
-    };
-
     // Show flag acknowledgment when applicable
     let flag_note = get_flag_note(
         no_delete_branch,
@@ -202,21 +195,29 @@ fn format_remove_worktree_message(
     );
 
     let branch_display = branch.or(Some(branch_name));
-
     let path_display = format_path_for_display(main_path);
+
+    // Build message parallel to background format: "Removed {branch} worktree & branch{flag_note}"
+    let action_suffix = if no_delete_branch || deletion_result.is_none() {
+        "worktree"
+    } else {
+        "worktree & branch"
+    };
 
     if changed_directory {
         if let Some(b) = branch_display {
             cformat!(
-                "<green>{action} for <bold>{b}</>, changed directory to <bold>{path_display}</>{flag_note}</>"
+                "<green>Removed <bold>{b}</> {action_suffix}; changed directory to <bold>{path_display}</>{flag_note}</>"
             )
         } else {
-            cformat!("<green>{action}, changed directory to <bold>{path_display}</>{flag_note}</>")
+            cformat!(
+                "<green>Removed {action_suffix}; changed directory to <bold>{path_display}</>{flag_note}</>"
+            )
         }
     } else if let Some(b) = branch_display {
-        cformat!("<green>{action} for <bold>{b}</>{flag_note}</>")
+        cformat!("<green>Removed <bold>{b}</> {action_suffix}{flag_note}</>")
     } else {
-        cformat!("<green>{action}{flag_note}</>")
+        cformat!("<green>Removed {action_suffix}{flag_note}</>")
     }
 }
 

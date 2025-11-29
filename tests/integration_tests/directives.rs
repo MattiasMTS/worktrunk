@@ -85,13 +85,12 @@ fn test_remove_internal_directive() {
             .current_dir(repo.root_path());
 
         assert_cmd_snapshot!(cmd, @r"
-        success: true
-        exit_code: 0
+        success: false
+        exit_code: 1
         ----- stdout -----
-        cd '[PATH]'
 
         ----- stderr -----
-        🔄 [36m[36mRemoving [1mmain[22m worktree & branch in background[39m[39m
+        ❌ [31mThe main worktree cannot be removed[39m
         ");
     });
 }
@@ -111,12 +110,12 @@ fn test_remove_without_internal() {
         cmd.arg("remove").current_dir(repo.root_path());
 
         assert_cmd_snapshot!(cmd, @r"
-        success: true
-        exit_code: 0
+        success: false
+        exit_code: 1
         ----- stdout -----
 
         ----- stderr -----
-        🔄 [36m[36mRemoving [1mmain[22m worktree & branch in background[39m[39m
+        ❌ [31mThe main worktree cannot be removed[39m
         ");
     });
 }

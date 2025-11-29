@@ -1,6 +1,11 @@
-use crate::common::{TestRepo, make_snapshot_cmd_with_global_flags, setup_snapshot_settings};
+use crate::common::{
+    TestRepo, make_snapshot_cmd_with_global_flags, setup_snapshot_settings,
+    setup_temp_snapshot_settings, wt_command,
+};
 use insta_cmd::assert_cmd_snapshot;
+use std::path::PathBuf;
 use std::process::Command;
+use tempfile::TempDir;
 
 /// Helper to create snapshot with normalized paths
 fn snapshot_remove(test_name: &str, repo: &TestRepo, args: &[&str], cwd: Option<&std::path::Path>) {
@@ -446,4 +451,174 @@ fn test_remove_branch_matching_tree_content() {
         &["feature-squashed"],
         None,
     );
+}
+/// Test the explicit difference between removing main worktree (error) vs linked worktree (success).
+///
+/// This test documents the expected behavior:
+/// 1. Linked worktrees can be removed (whether from within them or from elsewhere)
+/// 2. The main worktree cannot be removed under any circumstances
+/// 3. This is true regardless of which branch is checked out in the main worktree
+#[test]
+fn test_remove_main_worktree_vs_linked_worktree() {
+    let mut repo = setup_remove_repo();
+
+    // Create a linked worktree
+    let linked_wt_path = repo.add_worktree("feature");
+
+    // Part 1: Verify linked worktree CAN be removed (from within it)
+    snapshot_remove(
+        "remove_main_vs_linked__from_linked_succeeds",
+        &repo,
+        &[],
+        Some(&linked_wt_path),
+    );
+
+    // Part 2: Recreate the linked worktree for the next test
+    let _linked_wt_path = repo.add_worktree("feature2");
+
+    // Part 3: Verify linked worktree CAN be removed (from main, by name)
+    snapshot_remove(
+        "remove_main_vs_linked__from_main_by_name_succeeds",
+        &repo,
+        &["feature2"],
+        None,
+    );
+
+    // Part 4: Verify main worktree CANNOT be removed (from main, on default branch)
+    snapshot_remove(
+        "remove_main_vs_linked__main_on_default_fails",
+        &repo,
+        &[],
+        None,
+    );
+
+    // Part 5: Create a feature branch IN the main worktree, verify STILL cannot remove
+    let mut cmd = std::process::Command::new("git");
+    repo.configure_git_cmd(&mut cmd);
+    cmd.args(["switch", "-c", "feature-in-main"])
+        .current_dir(repo.root_path())
+        .output()
+        .unwrap();
+
+    snapshot_remove(
+        "remove_main_vs_linked__main_on_feature_fails",
+        &repo,
+        &[],
+        None,
+    );
+}
+
+/// Test that removing a worktree for the default branch doesn't show tautological reason.
+///
+/// When removing a worktree for "main" branch, we should NOT show "(ancestor of main)"
+/// because that would be tautological. The message should just be "Removed main worktree & branch".
+///
+/// This requires a bare repo setup since you can't have a linked worktree for the default
+/// branch in a normal repo (the main worktree already has it checked out).
+#[test]
+fn test_remove_default_branch_no_tautology() {
+    // Create bare repository
+    let temp_dir = TempDir::new().unwrap();
+    let bare_repo_path = temp_dir.path().join("repo.git");
+    let test_config_path = temp_dir.path().join("test-config.toml");
+
+    let output = Command::new("git")
+        .args(["init", "--bare", "--initial-branch", "main"])
+        .current_dir(temp_dir.path())
+        .arg(&bare_repo_path)
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_CONFIG_SYSTEM", "/dev/null")
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "Failed to init bare repo");
+
+    let bare_repo_path: PathBuf = bare_repo_path.canonicalize().unwrap();
+
+    // Create worktree for main branch
+    let main_worktree = temp_dir.path().join("repo.main");
+    let output = Command::new("git")
+        .args([
+            "-C",
+            bare_repo_path.to_str().unwrap(),
+            "worktree",
+            "add",
+            "-b",
+            "main",
+            main_worktree.to_str().unwrap(),
+        ])
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_CONFIG_SYSTEM", "/dev/null")
+        .env("GIT_AUTHOR_DATE", "2025-01-01T00:00:00Z")
+        .env("GIT_COMMITTER_DATE", "2025-01-01T00:00:00Z")
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "Failed to create main worktree");
+
+    let main_worktree = main_worktree.canonicalize().unwrap();
+
+    // Create initial commit in main worktree
+    std::fs::write(main_worktree.join("file.txt"), "initial").unwrap();
+    let output = Command::new("git")
+        .args(["add", "file.txt"])
+        .current_dir(&main_worktree)
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_CONFIG_SYSTEM", "/dev/null")
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let output = Command::new("git")
+        .args(["commit", "-m", "Initial commit"])
+        .current_dir(&main_worktree)
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_CONFIG_SYSTEM", "/dev/null")
+        .env("GIT_AUTHOR_NAME", "Test User")
+        .env("GIT_AUTHOR_EMAIL", "test@example.com")
+        .env("GIT_AUTHOR_DATE", "2025-01-01T00:00:00Z")
+        .env("GIT_COMMITTER_NAME", "Test User")
+        .env("GIT_COMMITTER_EMAIL", "test@example.com")
+        .env("GIT_COMMITTER_DATE", "2025-01-01T00:00:00Z")
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+
+    // Create a second worktree (feature) so we have somewhere to run remove from
+    let feature_worktree = temp_dir.path().join("repo.feature");
+    let output = Command::new("git")
+        .args([
+            "-C",
+            bare_repo_path.to_str().unwrap(),
+            "worktree",
+            "add",
+            "-b",
+            "feature",
+            feature_worktree.to_str().unwrap(),
+        ])
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_CONFIG_SYSTEM", "/dev/null")
+        .env("GIT_AUTHOR_DATE", "2025-01-01T00:00:00Z")
+        .env("GIT_COMMITTER_DATE", "2025-01-01T00:00:00Z")
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "Failed to create feature worktree");
+
+    let feature_worktree = feature_worktree.canonicalize().unwrap();
+
+    // Remove main worktree by name from feature worktree (foreground for snapshot)
+    // Should NOT show "(ancestor of main)" - that would be tautological
+    let settings = setup_temp_snapshot_settings(temp_dir.path());
+    settings.bind(|| {
+        let mut cmd = wt_command();
+        cmd.args(["remove", "--no-background", "main"])
+            .current_dir(&feature_worktree)
+            .env("WORKTRUNK_CONFIG_PATH", test_config_path.to_str().unwrap())
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_CONFIG_SYSTEM", "/dev/null")
+            .env("GIT_AUTHOR_DATE", "2025-01-01T00:00:00Z")
+            .env("GIT_COMMITTER_DATE", "2025-01-01T00:00:00Z")
+            .env("GIT_EDITOR", "")
+            .env("LANG", "C")
+            .env("LC_ALL", "C");
+
+        assert_cmd_snapshot!("remove_default_branch_no_tautology", cmd);
+    });
 }

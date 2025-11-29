@@ -23,6 +23,4 @@ exit_code: 1
 ----- stdout -----
 
 ----- stderr -----
-❌ [31mCannot remove worktree: working tree has uncommitted changes[39m
-
-💡 [2mCommit or stash them first[22m
+❌ [31mThe main worktree cannot be removed[39m
