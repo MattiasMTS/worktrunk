@@ -51,7 +51,7 @@ server = "npm run dev"
         ----- stdout -----
 
         ----- stderr -----
-        ⚪ Global Config: [1m~/.config/worktrunk/config.toml[22m
+        ⚪ User Config: [1m~/.config/worktrunk/config.toml[22m
         [107m [0m  worktree-path = [32m"../{{ main_worktree }}.{{ branch }}"[0m
         [107m [0m  
         [107m [0m  [1m[36m[projects."test-project"][0m
@@ -99,7 +99,7 @@ fn test_config_show_no_project_config() {
         ----- stdout -----
 
         ----- stderr -----
-        ⚪ Global Config: [1m~/.config/worktrunk/config.toml[22m
+        ⚪ User Config: [1m~/.config/worktrunk/config.toml[22m
         [107m [0m  worktree-path = [32m"../{{ main_worktree }}.{{ branch }}"[0m
 
         ⚪ Project Config: [1m[REPO]/.config/wt.toml[22m
@@ -140,7 +140,7 @@ fn test_config_show_outside_git_repo() {
         ----- stdout -----
 
         ----- stderr -----
-        ⚪ Global Config: [1m~/.config/worktrunk/config.toml[22m
+        ⚪ User Config: [1m~/.config/worktrunk/config.toml[22m
         [107m [0m  worktree-path = [32m"../{{ main_worktree }}.{{ branch }}"[0m
 
         ⚪ [2mProject Config: Not in a git repository[22m
@@ -296,7 +296,7 @@ fn test_config_show_warns_unknown_project_keys() {
         ----- stdout -----
 
         ----- stderr -----
-        ⚪ Global Config: [1m~/.config/worktrunk/config.toml[22m
+        ⚪ User Config: [1m~/.config/worktrunk/config.toml[22m
         [107m [0m  worktree-path = [32m"../{{ main_worktree }}.{{ branch }}"[0m
 
         ⚪ Project Config: [1m[REPO]/.config/wt.toml[22m
@@ -339,7 +339,7 @@ fn test_config_show_warns_unknown_user_keys() {
         ----- stdout -----
 
         ----- stderr -----
-        ⚪ Global Config: [1m~/.config/worktrunk/config.toml[22m
+        ⚪ User Config: [1m~/.config/worktrunk/config.toml[22m
         🟡 [33mUnknown key [1mcommit-gen[22m will be ignored[39m
         [107m [0m  worktree-path = [32m"../{{ main_worktree }}.{{ branch }}"[0m
         [107m [0m  

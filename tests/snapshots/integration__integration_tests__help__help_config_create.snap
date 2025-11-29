@@ -19,7 +19,7 @@ exit_code: 0
 ----- stdout -----
 
 ----- stderr -----
-wt config create - Create global configuration file
+wt config create - Create user configuration file
 Usage: [1m[36mwt config create[0m [36m[OPTIONS][0m
 
 [1m[32mOptions:[0m

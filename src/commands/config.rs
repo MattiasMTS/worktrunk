@@ -42,7 +42,7 @@ fn comment_out_config(content: &str) -> String {
 
 /// Handle the config create command
 pub fn handle_config_create() -> anyhow::Result<()> {
-    let config_path = get_global_config_path().ok_or_else(|| {
+    let config_path = get_user_config_path().ok_or_else(|| {
         anyhow::anyhow!(
             "Cannot determine config directory. Set $HOME or $XDG_CONFIG_HOME environment variable"
         )
@@ -51,7 +51,7 @@ pub fn handle_config_create() -> anyhow::Result<()> {
     // Check if file already exists
     if config_path.exists() {
         output::info(cformat!(
-            "Global config already exists: <bold>{}</>",
+            "User config already exists: <bold>{}</>",
             format_path_for_display(&config_path)
         ))?;
         output::blank()?;
@@ -85,8 +85,8 @@ pub fn handle_config_show() -> anyhow::Result<()> {
     // Build the complete output as a string
     let mut output = String::new();
 
-    // Render global config
-    render_global_config(&mut output)?;
+    // Render user config
+    render_user_config(&mut output)?;
     output.push('\n');
 
     // Render project config if in a git repository
@@ -106,9 +106,9 @@ pub fn handle_config_show() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn render_global_config(out: &mut String) -> anyhow::Result<()> {
+fn render_user_config(out: &mut String) -> anyhow::Result<()> {
     // Get config path
-    let config_path = get_global_config_path().ok_or_else(|| {
+    let config_path = get_user_config_path().ok_or_else(|| {
         anyhow::anyhow!(
             "Cannot determine config directory. Set $HOME or $XDG_CONFIG_HOME environment variable"
         )
@@ -118,7 +118,7 @@ fn render_global_config(out: &mut String) -> anyhow::Result<()> {
         out,
         "{}",
         cformat!(
-            "{INFO_EMOJI} Global Config: <bold>{}</>",
+            "{INFO_EMOJI} User Config: <bold>{}</>",
             format_path_for_display(&config_path)
         )
     )?;
@@ -370,7 +370,7 @@ fn check_zsh_compinit_missing() -> bool {
     }
 }
 
-fn get_global_config_path() -> Option<PathBuf> {
+fn get_user_config_path() -> Option<PathBuf> {
     // Respect XDG_CONFIG_HOME environment variable for testing (Linux)
     if let Ok(xdg_config) = std::env::var("XDG_CONFIG_HOME") {
         let config_path = PathBuf::from(xdg_config);

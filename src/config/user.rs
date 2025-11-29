@@ -10,10 +10,10 @@ use std::sync::OnceLock;
 #[cfg(not(test))]
 use etcetera::base_strategy::{BaseStrategy, choose_base_strategy};
 
-/// Global override for config path, set via --config CLI flag
+/// Override for user config path, set via --config CLI flag
 static CONFIG_PATH: OnceLock<PathBuf> = OnceLock::new();
 
-/// Set the global config path override (called from CLI --config flag)
+/// Set the user config path override (called from CLI --config flag)
 pub fn set_config_path(path: PathBuf) {
     CONFIG_PATH.set(path).ok();
 }

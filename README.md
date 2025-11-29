@@ -193,6 +193,23 @@ wt config shell install  # Bash, Zsh, Fish
 
 or for manual setup: `wt config shell --help`.
 
+### LLM commit messages
+
+Worktrunk can invoke external commands to generate commit messages.
+[llm](https://llm.datasette.io/) is recommended.
+
+Add to user config (`~/.config/worktrunk/config.toml`):
+
+```toml
+[commit-generation]
+command = "llm"
+args = ["-m", "claude-haiku-4-5-20251001"]
+```
+
+`wt merge` generates commit messages automatically or `wt step commit` runs just the commit step.
+
+For custom prompt templates: `wt config --help`.
+
 ### Local merging with `wt merge`
 
 `wt merge` handles the full merge workflow: stage, commit, squash, rebase,
@@ -222,23 +239,6 @@ git branch -d feature
 cargo install --path .  </pre></td>
 </tr>
 </table>
-
-### LLM commit messages
-
-Worktrunk can invoke external commands to generate commit messages.
-[llm](https://llm.datasette.io/) is recommended.
-
-`~/.config/worktrunk/config.toml`:
-
-```toml
-[commit-generation]
-command = "llm"
-args = ["-m", "claude-haiku-4-5-20251001"]
-```
-
-`wt merge` generates commit messages automatically or `wt step commit` runs just the commit step.
-
-For custom prompt templates: `wt config --help`.
 
 <!-- ⚠️ AUTO-GENERATED from tests/snapshots/integration__integration_tests__merge__readme_example_complex.snap — edit source to update -->
 
@@ -293,7 +293,7 @@ test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
 
 ### Project hooks
 
-Configure hooks in `.config/wt.toml`:
+Configure hooks in project config (`.config/wt.toml`):
 
 | Hook            | When                                | Example                      |
 | --------------- | ----------------------------------- | ---------------------------- |
@@ -1103,19 +1103,19 @@ Global Options:
    eval "$(wt config shell init bash)"
    ```
 
-2. (Optional) Create config file
+2. (Optional) Create user config file
 
    ```console
    wt config create
    ```
 
-   This creates ~/.config/worktrunk/config.toml with examples.
+   This creates `~/.config/worktrunk/config.toml` with examples.
 
 3. (Optional) Enable LLM commit messages
 
    Install: `uv tool install -U llm`
    Configure: `llm keys set anthropic`
-   Add to config.toml:
+   Add to user config:
 
    ```toml
    [commit-generation]
@@ -1143,12 +1143,12 @@ Docs: <https://llm.datasette.io/> | <https://github.com/sigoden/aichat>
 
 ## Configuration Files
 
-**Global config** (user settings):
+**User config**:
 
 - Location: `~/.config/worktrunk/config.toml` (or `WORKTRUNK_CONFIG_PATH`)
 - Run `wt config create --help` to view documented examples
 
-**Project config** (repository hooks):
+**Project config**:
 
 - Location: `.config/wt.toml` in repository root
 - Contains: post-create, post-start, pre-commit, pre-merge, post-merge hooks
@@ -1197,11 +1197,11 @@ Global Options:
 
 Worktrunk executes commands in three contexts:
 
-1. **Project hooks** (`.config/wt.toml`) - Automation for worktree lifecycle
-2. **LLM commands** (`~/.config/worktrunk/config.toml`) - Commit message generation
+1. **Project hooks** (project config: `.config/wt.toml`) - Automation for worktree lifecycle
+2. **LLM commands** (user config: `~/.config/worktrunk/config.toml`) - Commit message generation
 3. **--execute flag** - Commands provided explicitly
 
-Commands from project hooks and LLM configuration require approval on first run. Approved commands are saved to `~/.config/worktrunk/config.toml` under the project's configuration. If a command changes, Worktrunk requires new approval.
+Commands from project hooks and LLM configuration require approval on first run. Approved commands are saved to user config under the project's configuration. If a command changes, Worktrunk requires new approval.
 
 **Example approval prompt:**
 

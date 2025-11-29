@@ -23,7 +23,7 @@ Usage: [1m[36mwt config[0m [36m[OPTIONS][0m [36m<COMMAND>[0m
 
 [1m[32mCommands:[0m
   [1m[36mshell[0m      Shell integration setup
-  [1m[36mcreate[0m     Create global configuration file
+  [1m[36mcreate[0m     Create user configuration file
   [1m[36mshow[0m       Show configuration files & locations
   [1m[36mcache[0m      Manage caches (CI status, default branch)
   [1m[36mstatus[0m     Manage branch status markers
@@ -53,17 +53,17 @@ Usage: [1m[36mwt config[0m [36m[OPTIONS][0m [36m<COMMAND>[0m
 
   [2m   eval "$(wt config shell init bash)"[0m
 
-2. (Optional) Create config file
+2. (Optional) Create user config file
 
   [2m   wt config create[0m
 
-   This creates ~/.config/worktrunk/config.toml with examples.
+   This creates [2m~/.config/worktrunk/config.toml[0m with examples.
 
 3. (Optional) Enable LLM commit messages
 
    Install: [2muv tool install -U llm[0m
    Configure: [2mllm keys set anthropic[0m
-   Add to config.toml:
+   Add to user config:
 
   [2m   [commit-generation][0m
   [2m   command = "llm"[0m
@@ -85,7 +85,7 @@ Docs: <https://llm.datasette.io/> | <https://github.com/sigoden/aichat>
 
 [32mConfiguration Files[0m
 
-[1mGlobal config[0m (user settings):
+[1mUser config[0m:
 
 - Location: [2m~/.config/worktrunk/config.toml[0m (or [2mWORKTRUNK_CONFIG_PATH[0m)
 - Run [2mwt config create --help[0m to view documented examples

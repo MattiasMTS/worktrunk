@@ -27,7 +27,7 @@ exit_code: 0
 ----- stdout -----
 
 ----- stderr -----
-⚪ Global Config: [1m~/.config/worktrunk/config.toml[22m
+⚪ User Config: [1m~/.config/worktrunk/config.toml[22m
 💡 [2mEmpty file (using defaults)[22m
 
 ⚪ Project Config: [1m[REPO]/.config/wt.toml[22m

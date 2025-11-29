@@ -269,7 +269,7 @@ pub enum ConfigCommand {
         action: ConfigShellCommand,
     },
 
-    /// Create global configuration file
+    /// Create user configuration file
     #[command(
         after_long_help = concat!(
             "Creates `~/.config/worktrunk/config.toml` with the following content:\n\n```\n",
@@ -281,7 +281,7 @@ pub enum ConfigCommand {
 
     /// Show configuration files & locations
     #[command(
-        after_long_help = r#"Shows location and contents of global config (`~/.config/worktrunk/config.toml`)
+        after_long_help = r#"Shows location and contents of user config (`~/.config/worktrunk/config.toml`)
 and project config (`.config/wt.toml`).
 
 If a config file doesn't exist, shows defaults that would be used."#
@@ -537,19 +537,19 @@ pub enum Commands {
    eval "$(wt config shell init bash)"
    ```
 
-2. (Optional) Create config file
+2. (Optional) Create user config file
 
    ```console
    wt config create
    ```
 
-   This creates ~/.config/worktrunk/config.toml with examples.
+   This creates `~/.config/worktrunk/config.toml` with examples.
 
 3. (Optional) Enable LLM commit messages
 
    Install: `uv tool install -U llm`
    Configure: `llm keys set anthropic`
-   Add to config.toml:
+   Add to user config:
 
    ```toml
    [commit-generation]
@@ -577,7 +577,7 @@ Docs: <https://llm.datasette.io/> | <https://github.com/sigoden/aichat>
 
 ## Configuration Files
 
-**Global config** (user settings):
+**User config**:
 
 - Location: `~/.config/worktrunk/config.toml` (or `WORKTRUNK_CONFIG_PATH`)
 - Run `wt config create --help` to view documented examples
