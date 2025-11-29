@@ -1067,7 +1067,7 @@ Usage: wt config [OPTIONS] <COMMAND>
 
 Commands:
   shell      Shell integration setup
-  create     Create global configuration file
+  create     Create user configuration file
   show       Show configuration files & locations
   cache      Manage caches (CI status, default branch)
   status     Manage branch status markers
@@ -1148,7 +1148,7 @@ Docs: <https://llm.datasette.io/> | <https://github.com/sigoden/aichat>
 - Location: `~/.config/worktrunk/config.toml` (or `WORKTRUNK_CONFIG_PATH`)
 - Run `wt config create --help` to view documented examples
 
-**Project config**:
+**Project config** (repository hooks):
 
 - Location: `.config/wt.toml` in repository root
 - Contains: post-create, post-start, pre-commit, pre-merge, post-merge hooks
