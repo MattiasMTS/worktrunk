@@ -106,7 +106,8 @@ fn maybe_handle_help_with_pager() -> bool {
                     process::exit(0);
                 }
                 ErrorKind::DisplayVersion => {
-                    println!("{}", err);
+                    // Print to stderr - stdout is reserved for data/scripts
+                    eprintln!("{}", err);
                     process::exit(0);
                 }
                 _ => {
