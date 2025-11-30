@@ -1,62 +1,45 @@
 // Benchmarks for `wt list` command
 //
-// This suite measures raw performance and scaling characteristics:
+// Benchmark groups (Criterion group names in parentheses):
 //
-// 1. Synthetic benchmarks (fast, deterministic):
-//    - bench_time_to_skeleton: Measures time until skeleton appears (progressive mode)
-//    - bench_time_to_skeleton_cold: Same as above but with packed-refs invalidated
-//    - bench_time_to_complete: Measures full `wt list` execution (when all data appears), warm caches
-//    - bench_time_to_complete_cold: Same as above but with packed-refs invalidated
-//    - bench_list_by_worktree_count: Measures scaling with worktree count (1-8), warm caches
-//    - bench_list_by_repo_profile: Measures scaling with repo size (minimal/typical/large), warm caches
-//    - bench_sequential_vs_parallel: Light comparison of sequential vs parallel (3 data points), warm caches
-//    - bench_list_cold_cache: Measures performance with all git caches invalidated (1, 4, 8 worktrees)
-//      Invalidates: index, commit-graph, packed-refs
+// 1. Progressive rendering (skeleton vs complete):
+//    - skeleton: Time until skeleton appears (progressive mode, warm cache)
+//    - skeleton_cold: Same with packed-refs invalidated
+//    - complete: Full execution time (warm cache)
+//    - complete_cold: Same with packed-refs invalidated
 //
-// 2. Real repository benchmarks (slower, more realistic):
-//    - bench_list_real_repo: Uses rust-lang/rust repo (cloned to target/bench-repos/), warm caches
-//    - bench_list_real_repo_cold_cache: Same as above but with all caches invalidated (1, 4, 8 worktrees)
+// 2. Scaling benchmarks:
+//    - worktree_scaling: Worktree count scaling (1-8 worktrees, warm cache)
+//    - worktree_scaling_cold: Same with all caches invalidated (index, commit-graph, packed-refs)
+//    - profile_scaling: Repo size scaling (minimal/typical/large profiles)
+//    - sequential_vs_parallel: Compare execution strategies
 //
-// 3. Many branches benchmarks:
-//    - bench_list_many_branches: 25/50/100 branches with unique commits, no worktrees, warm caches
-//    - bench_list_many_branches_cold: Same as above but with packed-refs invalidated
+// 3. Real repository (rust-lang/rust):
+//    - real_repo: Warm cache (1-8 worktrees)
+//    - real_repo_cold: All caches invalidated (1, 4, 8 worktrees)
 //
-// Run all benchmarks:
-//   cargo bench --bench list
+// 4. Many branches (`wt list --branches`):
+//    - many_branches: 25/50/100 branches (warm cache)
+//    - many_branches_cold: Same with packed-refs invalidated
 //
-// Run specific benchmark:
-//   cargo bench --bench list bench_time_to_skeleton
-//   cargo bench --bench list bench_list_by_worktree_count
-//   cargo bench --bench list bench_list_cold_cache
-//   cargo bench --bench list bench_list_real_repo
-//   cargo bench --bench list bench_list_real_repo_cold_cache
-//   cargo bench --bench list bench_list_many_branches
-//   cargo bench --bench list bench_list_many_branches_cold
+// Run examples:
+//   cargo bench --bench list                    # All benchmarks
+//   cargo bench --bench list skeleton           # Progressive rendering benchmarks
+//   cargo bench --bench list worktree_scaling   # Worktree scaling (warm + cold)
+//   cargo bench --bench list many_branches      # Many branches (no rust repo clone)
+//   cargo bench --bench list real_repo          # Real repo benchmarks only
+//   cargo bench --bench list -- --skip cold     # Skip all cold cache variants
 //
-// Run only specific benchmarks (expensive setup is skipped via Criterion's filter):
-//   cargo bench --bench list many_branches
-//   cargo bench --bench list real_repo
-//
-// Compare warm vs cold on real repo:
-//   cargo bench --bench list -- real_repo
-//
-// Note: Real repo benchmarks will clone rust-lang/rust on first run (~2-5 minutes).
+// Note: Real repo benchmarks clone rust-lang/rust on first run (~2-5 minutes).
 // The clone is cached in target/bench-repos/ and reused across runs.
 //
-// Cold cache benchmarks remove all git caches before each iteration to measure performance
-// without any git caching. This simulates first-run performance. Caches invalidated:
-// - Index (.git/index) - speeds up `git status` by ~10x
-// - Commit graph (.git/objects/info/commit-graph) - speeds up `git rev-list --count`
-// - Packed refs (.git/packed-refs) - speeds up ref resolution
+// Cold cache variants:
+// - "_cold" suffix means caches invalidated before each iteration
+// - skeleton_cold, complete_cold, many_branches_cold: Only packed-refs invalidated
+// - worktree_scaling_cold, real_repo_cold: All caches invalidated (index, commit-graph, packed-refs)
 //
 // Note: Filesystem cache (OS-level) and pack files are not invalidated. Pack files are
-// part of git's object storage, not a cache, so they remain for all benchmarks.
-//
-// CI benchmarks are not included because:
-// - The expensive operations (GitHub/GitLab API calls) are network-dependent
-// - CI detection (env var checking) is trivial (<1μs overhead)
-// - Output formatting differences are minimal
-// - Mocking APIs for reproducible benchmarks would be complex and not representative
+// part of git's object storage, not a cache.
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use std::path::{Path, PathBuf};
@@ -270,8 +253,8 @@ fn add_worktree_with_divergence(
 ///
 /// Uses WT_SKELETON_ONLY=1 to exit after skeleton is rendered.
 /// This measures the actual worktrunk code path: git I/O, parsing, layout, render skeleton.
-fn bench_time_to_skeleton(c: &mut Criterion) {
-    let mut group = c.benchmark_group("time_to_skeleton");
+fn bench_skeleton(c: &mut Criterion) {
+    let mut group = c.benchmark_group("skeleton");
 
     let binary = get_release_binary();
     let profile = &PROFILES[1];
@@ -321,10 +304,10 @@ fn bench_time_to_skeleton(c: &mut Criterion) {
     group.finish();
 }
 
-/// Cold cache variant of time_to_skeleton benchmark.
+/// Cold cache variant of skeleton benchmark.
 /// Invalidates packed-refs before each measurement.
-fn bench_time_to_skeleton_cold(c: &mut Criterion) {
-    let mut group = c.benchmark_group("time_to_skeleton_cold");
+fn bench_skeleton_cold(c: &mut Criterion) {
+    let mut group = c.benchmark_group("skeleton_cold");
 
     let binary = get_release_binary();
     let profile = &PROFILES[1];
@@ -389,8 +372,8 @@ fn bench_time_to_skeleton_cold(c: &mut Criterion) {
 ///
 /// This measures the actual worktrunk code path including git operations, parsing,
 /// layout calculation, and rendering - i.e., when all data is filled in.
-fn bench_time_to_complete(c: &mut Criterion) {
-    let mut group = c.benchmark_group("time_to_complete");
+fn bench_complete(c: &mut Criterion) {
+    let mut group = c.benchmark_group("complete");
 
     let binary = get_release_binary();
     let profile = &PROFILES[1];
@@ -439,10 +422,10 @@ fn bench_time_to_complete(c: &mut Criterion) {
     group.finish();
 }
 
-/// Cold cache variant of time_to_complete benchmark.
+/// Cold cache variant of complete benchmark.
 /// Invalidates packed-refs before each measurement.
-fn bench_time_to_complete_cold(c: &mut Criterion) {
-    let mut group = c.benchmark_group("time_to_complete_cold");
+fn bench_complete_cold(c: &mut Criterion) {
+    let mut group = c.benchmark_group("complete_cold");
 
     let binary = get_release_binary();
     let profile = &PROFILES[1];
@@ -502,8 +485,8 @@ fn bench_time_to_complete_cold(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_list_by_worktree_count(c: &mut Criterion) {
-    let mut group = c.benchmark_group("list_by_worktree_count");
+fn bench_worktree_scaling(c: &mut Criterion) {
+    let mut group = c.benchmark_group("worktree_scaling");
 
     let binary = get_release_binary();
 
@@ -549,8 +532,8 @@ fn bench_list_by_worktree_count(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_list_cold_cache(c: &mut Criterion) {
-    let mut group = c.benchmark_group("list_cold_cache");
+fn bench_worktree_scaling_cold(c: &mut Criterion) {
+    let mut group = c.benchmark_group("worktree_scaling_cold");
 
     let binary = get_release_binary();
 
@@ -651,8 +634,8 @@ fn bench_list_cold_cache(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_list_by_repo_profile(c: &mut Criterion) {
-    let mut group = c.benchmark_group("list_by_profile");
+fn bench_profile_scaling(c: &mut Criterion) {
+    let mut group = c.benchmark_group("profile_scaling");
 
     let binary = get_release_binary();
 
@@ -822,8 +805,8 @@ fn get_or_clone_rust_repo() -> PathBuf {
         .clone()
 }
 
-fn bench_list_real_repo(c: &mut Criterion) {
-    let mut group = c.benchmark_group("list_real_repo");
+fn bench_real_repo(c: &mut Criterion) {
+    let mut group = c.benchmark_group("real_repo");
 
     let binary = get_release_binary();
 
@@ -891,8 +874,8 @@ fn bench_list_real_repo(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_list_real_repo_cold_cache(c: &mut Criterion) {
-    let mut group = c.benchmark_group("list_real_repo_cold_cache");
+fn bench_real_repo_cold(c: &mut Criterion) {
+    let mut group = c.benchmark_group("real_repo_cold");
 
     let binary = get_release_binary();
 
@@ -1069,8 +1052,8 @@ fn create_repo_with_many_branches(num_branches: usize) -> TempDir {
 
 /// Benchmark `wt list --branches` with many branches.
 /// Tests performance scaling with 25, 50, and 100 branches (no worktrees).
-fn bench_list_many_branches(c: &mut Criterion) {
-    let mut group = c.benchmark_group("list_many_branches");
+fn bench_many_branches(c: &mut Criterion) {
+    let mut group = c.benchmark_group("many_branches");
 
     let binary = get_release_binary();
 
@@ -1102,8 +1085,8 @@ fn bench_list_many_branches(c: &mut Criterion) {
 
 /// Cold cache variant of many branches benchmark.
 /// Invalidates packed-refs before each measurement to simulate first-run performance.
-fn bench_list_many_branches_cold(c: &mut Criterion) {
-    let mut group = c.benchmark_group("list_many_branches_cold");
+fn bench_many_branches_cold(c: &mut Criterion) {
+    let mut group = c.benchmark_group("many_branches_cold");
 
     let binary = get_release_binary();
 
@@ -1147,6 +1130,6 @@ criterion_group! {
         .sample_size(30)
         .measurement_time(std::time::Duration::from_secs(15))
         .warm_up_time(std::time::Duration::from_secs(3));
-    targets = bench_time_to_skeleton, bench_time_to_skeleton_cold, bench_time_to_complete, bench_time_to_complete_cold, bench_list_by_worktree_count, bench_list_by_repo_profile, bench_sequential_vs_parallel, bench_list_cold_cache, bench_list_real_repo, bench_list_real_repo_cold_cache, bench_list_many_branches, bench_list_many_branches_cold
+    targets = bench_skeleton, bench_skeleton_cold, bench_complete, bench_complete_cold, bench_worktree_scaling, bench_profile_scaling, bench_sequential_vs_parallel, bench_worktree_scaling_cold, bench_real_repo, bench_real_repo_cold, bench_many_branches, bench_many_branches_cold
 }
 criterion_main!(benches);
