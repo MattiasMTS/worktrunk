@@ -240,6 +240,7 @@ pub fn handle_squash(
 
     let commit_message = crate::llm::generate_squash_message(
         &target_branch,
+        &merge_base,
         &subjects,
         &current_branch,
         repo_name,

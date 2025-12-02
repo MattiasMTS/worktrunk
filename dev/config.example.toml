@@ -145,7 +145,7 @@ approved-commands = ["npm install"]
 # """
 
 # Optional: Custom squash commit message template (inline) - Uses minijinja syntax
-# Available variables: {{ commits }}, {{ target_branch }}, {{ branch }}, {{ repo }}
+# Available variables: {{ git_diff }}, {{ branch }}, {{ recent_commits }}, {{ repo }}, {{ commits }}, {{ target_branch }}
 # If not specified, uses the default template:
 # <!-- DEFAULT_SQUASH_TEMPLATE_START -->
 # squash-template = """
@@ -163,6 +163,12 @@ approved-commands = ["npm install"]
 # {% for commit in commits %}
 # - {{ commit }}
 # {% endfor %}
+#
+# <git-diff>
+# ```
+# {{ git_diff }}
+# ```
+# </git-diff>
 # """
 # <!-- DEFAULT_SQUASH_TEMPLATE_END -->
 #

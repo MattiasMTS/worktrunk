@@ -184,7 +184,7 @@ Creates [2m~/.config/worktrunk/config.toml[0m with the following content:
   [2m# """[0m
   [2m[0m
   [2m# Optional: Custom squash commit message template (inline) - Uses minijinja syntax[0m
-  [2m# Available variables: {{ commits }}, {{ target_branch }}, {{ branch }}, {{ repo }}[0m
+  [2m# Available variables: {{ git_diff }}, {{ branch }}, {{ recent_commits }}, {{ repo }}, {{ commits }}, {{ target_branch }}[0m
   [2m# If not specified, uses the default template:[0m
   [2m# <!-- DEFAULT_SQUASH_TEMPLATE_START -->[0m
   [2m# squash-template = """[0m
@@ -202,6 +202,12 @@ Creates [2m~/.config/worktrunk/config.toml[0m with the following content:
   [2m# {% for commit in commits %}[0m
   [2m# - {{ commit }}[0m
   [2m# {% endfor %}[0m
+  [2m#[0m
+  [2m# <git-diff>[0m
+  [2m# ```[0m
+  [2m# {{ git_diff }}[0m
+  [2m# ```[0m
+  [2m# </git-diff>[0m
   [2m# """[0m
   [2m# <!-- DEFAULT_SQUASH_TEMPLATE_END -->[0m
   [2m#[0m
