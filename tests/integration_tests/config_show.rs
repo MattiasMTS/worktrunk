@@ -177,7 +177,7 @@ if command -v wt >/dev/null 2>&1; then eval "$(command wt config shell init zsh)
         let mut cmd = wt_command();
         repo.clean_cli_env(&mut cmd);
         // Force compinit warning for deterministic tests across environments
-        cmd.env("WT_ASSUME_NO_COMPINIT", "1");
+        cmd.env("WORKTRUNK_TEST_COMPINIT_MISSING", "1");
         cmd.arg("config").arg("show").current_dir(repo.root_path());
         set_temp_home_env(&mut cmd, temp_home.path());
 
@@ -220,7 +220,7 @@ if command -v wt >/dev/null 2>&1; then eval "$(command wt config shell init zsh)
         repo.clean_cli_env(&mut cmd);
         cmd.arg("config").arg("show").current_dir(repo.root_path());
         set_temp_home_env(&mut cmd, temp_home.path());
-        cmd.env("WT_ASSUME_COMPINIT", "1"); // Bypass zsh subprocess check
+        cmd.env("WORKTRUNK_TEST_COMPINIT_CONFIGURED", "1"); // Bypass zsh subprocess check
 
         assert_cmd_snapshot!(cmd);
     });
@@ -255,7 +255,7 @@ if command -v wt >/dev/null 2>&1; then eval "$(command wt config shell init zsh)
         repo.clean_cli_env(&mut cmd);
         cmd.arg("config").arg("show").current_dir(repo.root_path());
         set_temp_home_env(&mut cmd, temp_home.path());
-        cmd.env("WT_ASSUME_COMPINIT", "1"); // Bypass zsh subprocess check (unreliable on CI)
+        cmd.env("WORKTRUNK_TEST_COMPINIT_CONFIGURED", "1"); // Bypass zsh subprocess check (unreliable on CI)
 
         assert_cmd_snapshot!(cmd);
     });

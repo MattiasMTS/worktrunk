@@ -20,7 +20,7 @@ fn test_configure_shell_with_yes() {
         set_temp_home_env(&mut cmd, temp_home.path());
         cmd.env("SHELL", "/bin/zsh");
         // Force compinit warning for deterministic tests across environments
-        cmd.env("WT_ASSUME_NO_COMPINIT", "1");
+        cmd.env("WORKTRUNK_TEST_COMPINIT_MISSING", "1");
         cmd.arg("config")
             .arg("shell")
             .arg("install")
@@ -66,7 +66,7 @@ fn test_configure_shell_specific_shell() {
         set_temp_home_env(&mut cmd, temp_home.path());
         cmd.env("SHELL", "/bin/zsh");
         // Force compinit warning for deterministic tests across environments
-        cmd.env("WT_ASSUME_NO_COMPINIT", "1");
+        cmd.env("WORKTRUNK_TEST_COMPINIT_MISSING", "1");
         cmd.arg("config")
             .arg("shell")
             .arg("install")
@@ -292,7 +292,7 @@ fn test_configure_shell_multiple_configs() {
         set_temp_home_env(&mut cmd, temp_home.path());
         cmd.env("SHELL", "/bin/zsh");
         // Force compinit warning for deterministic tests across environments
-        cmd.env("WT_ASSUME_NO_COMPINIT", "1");
+        cmd.env("WORKTRUNK_TEST_COMPINIT_MISSING", "1");
         cmd.arg("config")
             .arg("shell")
             .arg("install")
@@ -355,7 +355,7 @@ fn test_configure_shell_mixed_states() {
         set_temp_home_env(&mut cmd, temp_home.path());
         cmd.env("SHELL", "/bin/zsh");
         // Force compinit warning for deterministic tests across environments
-        cmd.env("WT_ASSUME_NO_COMPINIT", "1");
+        cmd.env("WORKTRUNK_TEST_COMPINIT_MISSING", "1");
         cmd.arg("config")
             .arg("shell")
             .arg("install")
@@ -680,7 +680,7 @@ fn test_configure_shell_no_warning_when_compinit_enabled() {
         set_temp_home_env(&mut cmd, temp_home.path());
         cmd.env("SHELL", "/bin/zsh");
         cmd.env("ZDOTDIR", temp_home.path()); // Point zsh to our test home for config
-        cmd.env("WT_ASSUME_COMPINIT", "1"); // Bypass zsh subprocess check (unreliable on CI)
+        cmd.env("WORKTRUNK_TEST_COMPINIT_CONFIGURED", "1"); // Bypass zsh subprocess check (unreliable on CI)
         cmd.arg("config")
             .arg("shell")
             .arg("install")

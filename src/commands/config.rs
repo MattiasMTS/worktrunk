@@ -405,12 +405,12 @@ fn check_zsh_compinit_missing() -> bool {
     use std::process::{Command, Stdio};
 
     // Allow tests to bypass this check since zsh subprocess behavior varies across CI envs
-    if std::env::var("WT_ASSUME_COMPINIT").is_ok() {
+    if std::env::var("WORKTRUNK_TEST_COMPINIT_CONFIGURED").is_ok() {
         return false; // Assume compinit is configured
     }
 
     // Force compinit to be missing (for tests that expect the warning)
-    if std::env::var("WT_ASSUME_NO_COMPINIT").is_ok() {
+    if std::env::var("WORKTRUNK_TEST_COMPINIT_MISSING").is_ok() {
         return true; // Force warning to appear
     }
 
