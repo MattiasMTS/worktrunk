@@ -133,7 +133,7 @@ wt list --format=json | jq '.[] | select(.status.main_divergence == "Ahead")'
 
 <!-- ⚠️ AUTO-GENERATED from `wt list --help-page` — edit cli.rs to update -->
 
-```bash
+```
 wt list - List worktrees and optionally branches
 Usage: wt list [OPTIONS]
        wt list <COMMAND>

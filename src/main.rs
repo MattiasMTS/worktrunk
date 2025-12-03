@@ -269,7 +269,7 @@ fn handle_help_page(args: &[String]) {
         "<!-- ⚠️ AUTO-GENERATED from `wt {subcommand} --help-page` — edit cli.rs to update -->"
     );
     println!();
-    println!("```bash");
+    println!("```");
     print!("{}", reference_block.trim());
     println!();
     println!("```");

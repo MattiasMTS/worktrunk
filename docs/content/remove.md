@@ -68,7 +68,7 @@ If `repo.foo/` exists on branch `bar`, both `wt remove foo` and `wt remove bar` 
 
 <!-- ⚠️ AUTO-GENERATED from `wt remove --help-page` — edit cli.rs to update -->
 
-```bash
+```
 wt remove - Remove worktree and branch
 Usage: wt remove [OPTIONS] [WORKTREES]...
 

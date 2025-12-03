@@ -47,7 +47,7 @@ Toggle between views with number keys:
 
 <!-- ⚠️ AUTO-GENERATED from `wt select --help-page` — edit cli.rs to update -->
 
-```bash
+```
 wt select - Interactive worktree selector
 
 Toggle preview tabs with 1/2/3 keys. Toggle preview visibility with alt-p.

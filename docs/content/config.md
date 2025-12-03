@@ -72,7 +72,7 @@ See [LLM Commits](/llm-commits/) for installation, provider setup, and customiza
 
 <!-- ⚠️ AUTO-GENERATED from `wt config --help-page` — edit cli.rs to update -->
 
-```bash
+```
 wt config - Manage configuration and shell integration
 Usage: wt config [OPTIONS] <COMMAND>
 

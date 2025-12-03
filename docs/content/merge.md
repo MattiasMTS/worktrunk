@@ -68,7 +68,7 @@ Use `--no-commit` to skip steps 1-3 and only run hooks and push. Requires a clea
 
 <!-- ⚠️ AUTO-GENERATED from `wt merge --help-page` — edit cli.rs to update -->
 
-```bash
+```
 wt merge - Merge worktree into target branch
 Usage: wt merge [OPTIONS] [TARGET]
 

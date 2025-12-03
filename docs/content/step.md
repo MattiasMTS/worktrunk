@@ -59,7 +59,7 @@ wt step push
 
 <!-- ⚠️ AUTO-GENERATED from `wt step --help-page` — edit cli.rs to update -->
 
-```bash
+```
 wt step - Run individual workflow operations
 Usage: wt step [OPTIONS] <COMMAND>
 

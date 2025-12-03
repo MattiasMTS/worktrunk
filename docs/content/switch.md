@@ -78,7 +78,7 @@ wt switch --create temp --no-verify      # Skip hooks
 
 <!-- ⚠️ AUTO-GENERATED from `wt switch --help-page` — edit cli.rs to update -->
 
-```bash
+```
 wt switch - Switch to a worktree
 Usage: wt switch [OPTIONS] <BRANCH>
 
