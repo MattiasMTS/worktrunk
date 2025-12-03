@@ -73,6 +73,7 @@ Hooks can use template variables that expand at runtime:
 - `{{ branch }}` — Branch name (slashes replaced with dashes)
 - `{{ worktree }}` — Absolute path to the worktree
 - `{{ repo_root }}` — Absolute path to the repository root
+- `{{ default_branch }}` — Default branch name (e.g., "main")
 
 ### Merge Variables (pre-commit, pre-merge, post-merge)
 

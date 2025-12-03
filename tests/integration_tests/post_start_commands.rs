@@ -229,6 +229,52 @@ approved-commands = [
     );
 }
 
+#[test]
+fn test_post_create_default_branch_template() {
+    let mut repo = TestRepo::new();
+    repo.commit("Initial commit");
+    repo.setup_remote("main");
+
+    // Create project config with default_branch template variable
+    repo.write_project_config(
+        r#"post-create = "echo 'Default: {{ default_branch }}' > default.txt""#,
+    );
+
+    repo.commit("Add config with default_branch template");
+
+    // Pre-approve the command
+    repo.write_test_config(
+        r#"worktree-path = "../{{ main_worktree }}.{{ branch }}"
+
+[projects."repo"]
+approved-commands = ["echo 'Default: {{ default_branch }}' > default.txt"]
+"#,
+    );
+
+    // Create a feature branch worktree (--force skips approval prompt)
+    snapshot_switch(
+        "post_create_default_branch_template",
+        &repo,
+        &["--create", "feature", "--force"],
+    );
+
+    // Verify template expansion actually worked
+    let worktree_path = repo.root_path().parent().unwrap().join("repo.feature");
+    let default_file = worktree_path.join("default.txt");
+
+    assert!(
+        default_file.exists(),
+        "default.txt should have been created in the worktree"
+    );
+
+    let contents = fs::read_to_string(&default_file).unwrap();
+    assert!(
+        contents.contains("Default: main"),
+        "Should contain expanded default_branch, got: {}",
+        contents
+    );
+}
+
 // ============================================================================
 // Post-Start Command Tests (parallel, background)
 // ============================================================================

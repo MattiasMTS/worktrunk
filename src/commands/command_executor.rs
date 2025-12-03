@@ -69,6 +69,9 @@ fn expand_commands(
         "repo_root".to_string(),
         repo_root.to_string_lossy().to_string(),
     );
+    if let Ok(default_branch) = ctx.repo.default_branch() {
+        extras_owned.insert("default_branch".to_string(), default_branch);
+    }
     for &(key, value) in extra_vars {
         extras_owned.insert(key.to_string(), value.to_string());
     }

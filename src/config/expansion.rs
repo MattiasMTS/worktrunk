@@ -100,6 +100,7 @@ pub fn expand_template(
 /// - `{{ branch }}` - Branch name (sanitized: slashes → dashes)
 /// - `{{ worktree }}` - Path to the worktree
 /// - `{{ repo_root }}` - Path to the main repository root
+/// - `{{ default_branch }}` - Default branch name (e.g., "main")
 /// - `{{ target }}` - Target branch (for merge commands, optional)
 ///
 /// # Examples
