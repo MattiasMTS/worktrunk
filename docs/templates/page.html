@@ -1,49 +1,11 @@
 {% extends "base.html" %}
+{% import "macros.html" as macros %}
 
 {% block title %}{{ page.title }} | {{ config.title }}{% endblock title %}
 
 {% block toc %}
 {% set docs_section = get_section(path="_index.md") %}
-<div class="toc">
-    <div class="toc-sticky">
-        {% set current_group = "" %}
-        {% for doc_page in docs_section.pages %}
-        {% set is_current = doc_page.permalink == page.permalink %}
-        {% set page_group = doc_page.extra.group | default(value="") %}
-
-        {# Show group label when group changes #}
-        {% if page_group != current_group and page_group != "" %}
-        <div class="toc-group-label">{{ page_group }}</div>
-        {% set_global current_group = page_group %}
-        {% endif %}
-
-        <div class="toc-item">
-            <a class="subtext {% if is_current %}active{% endif %}" href="{{ doc_page.permalink | safe }}">
-                {{ doc_page.title }}
-            </a>
-        </div>
-
-        {% if is_current and page.toc %}
-        {% for h in page.toc %}
-        <div class="toc-item-child">
-            <a class="subtext" href="{{ h.permalink | safe }}">
-                <small>{{ h.title }}</small>
-            </a>
-        </div>
-        {% if h.children %}
-        {% for h2 in h.children %}
-        <div class="toc-item-child nested">
-            <a class="subtext" href="{{ h2.permalink | safe }}">
-                <small>{{ h2.title }}</small>
-            </a>
-        </div>
-        {% endfor %}
-        {% endif %}
-        {% endfor %}
-        {% endif %}
-        {% endfor %}
-    </div>
-</div>
+{{ macros::toc_nav(docs_section=docs_section, current_page=page) }}
 {% endblock toc %}
 
 {% block content %}
