@@ -1,18 +1,14 @@
 +++
-title = "Advanced Features"
+title = "Claude Code Integration"
 weight = 23
 
 [extra]
 group = "Reference"
 +++
 
-Most Worktrunk users get everything they need from `wt switch`, `wt list`, `wt merge`, and `wt remove`. The features below are optional power-user capabilities.
-
-## Claude Code integration
-
 Worktrunk includes a Claude Code plugin for tracking agent status across worktrees.
 
-### Status tracking
+## Status tracking
 
 The plugin adds status indicators to `wt list`:
 
@@ -34,7 +30,7 @@ The plugin adds status indicators to `wt list`:
 - `🤖` — Claude is working
 - `💬` — Claude is waiting for input
 
-### Install the plugin
+### Installation
 
 ```bash
 $ claude plugin marketplace add max-sixty/worktrunk
@@ -51,19 +47,11 @@ $ wt config var set marker "✅" --branch feature  # Specific branch
 $ git config worktrunk.marker.feature "💬"        # Direct git config
 ```
 
-## Statusline integration
+## Statusline
 
-`wt list statusline` outputs a single-line status for shell prompts, starship, or editor integrations.[^1]
+`wt list statusline --claude-code` outputs a single-line status for the Claude Code statusline (currently this grabs CI status, so is too slow to use in synchronous contexts—if a faster version would be helpful, please [open an issue](https://github.com/max-sixty/worktrunk/issues)):
 
-[^1]: Currently this grabs CI status, so is too slow to use in synchronous contexts. If a faster version would be helpful, please [open an issue](https://github.com/max-sixty/worktrunk/issues).
-
-### Claude Code statusline
-
-For Claude Code, outputs directory, branch status, and model:
-
-```
-~/w/myproject.feature-auth  !🤖  ±+42 -8  ↑3  ⇡1  ●  | Opus
-```
+`~/w/myproject.feature-auth  !🤖  @`<span style='color:#0a0'>+42</span> <span style='color:#a00'>-8</span>`  `<span style='color:#0a0'>↑3</span>`  `<span style='color:#0a0'>⇡1</span>`  `<span style='color:#0a0'>●</span>`  | Opus`
 
 Add to `~/.claude/settings.json`:
 
@@ -75,11 +63,3 @@ Add to `~/.claude/settings.json`:
   }
 }
 ```
-
-## Interactive worktree picker
-
-`wt select` opens a fuzzy-search worktree picker with diff preview (Unix only).
-
-Type to filter, use arrow keys or `j`/`k` to navigate, Enter to switch. Preview tabs show working tree changes, commit history, or branch diff — toggle with `1`/`2`/`3`.
-
-See [wt select](@/select.md) for full keyboard shortcuts and details.

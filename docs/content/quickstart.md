@@ -84,4 +84,4 @@ Worktrunk checks if your changes are already on main before deleting the branch.
 
 - Understand [why worktrees matter](@/concepts.md) and how Worktrunk improves on plain git
 - Set up [project hooks](@/hooks.md) for automated setup
-- Explore advanced features: [LLM commit messages](@/llm-commits.md), [local merging](@/merge.md), [fzf-like picker](@/select.md), [Claude Code integration](@/advanced.md#claude-code-integration)
+- Explore advanced features: [LLM commit messages](@/llm-commits.md), [local merging](@/merge.md), [fzf-like picker](@/select.md), [Claude Code integration](@/claude-code.md)

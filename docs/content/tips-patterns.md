@@ -61,7 +61,7 @@ wt config var set marker "✅" --branch feature  # Specific branch
 git config worktrunk.marker.feature "💬"        # Direct git config
 ```
 
-See [Claude Code Integration](@/advanced.md#claude-code-integration) for plugin installation.
+See [Claude Code Integration](@/claude-code.md#installation) for plugin installation.
 
 ## Monitor CI across branches
 
