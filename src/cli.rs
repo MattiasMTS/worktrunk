@@ -1063,6 +1063,19 @@ Arguments resolve by checking the filesystem before git branches:
         base: Option<String>,
 
         /// Command to run after switch
+        ///
+        /// Replaces the wt process with the command after switching, giving
+        /// it full terminal control. Useful for launching editors, AI agents,
+        /// or other interactive tools.
+        ///
+        /// Especially useful in shell aliases to create a worktree and start
+        /// working in one command:
+        ///
+        /// ```sh
+        /// alias wsc='wt switch --create --execute=claude'
+        /// ```
+        ///
+        /// Then `wsc feature-branch` creates the worktree and launches Claude Code.
         #[arg(short = 'x', long)]
         execute: Option<String>,
 
