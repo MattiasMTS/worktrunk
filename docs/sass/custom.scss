@@ -21,6 +21,9 @@ body {
     line-height: 1.5;
     color: var(--wt-color-text);
     background-color: var(--wt-color-bg);
+    // Override Juice theme's min-height: 100vh to prevent scroll jank on mobile
+    // when browser chrome appears/disappears (svh = stable small viewport height)
+    min-height: 100svh;
 }
 
 // Override Juice theme's .text class (sets font-size: 18px, we want 15px)
@@ -517,7 +520,7 @@ table {
     border: 1px solid var(--wt-color-border-subtle);
     border-top: 3px solid var(--wt-color-accent);
     padding: 0.75rem 0 1rem;
-    max-height: calc(100vh - var(--wt-header-height) - var(--wt-main-padding-top) - 20px); // Fill viewport minus sticky offset and bottom margin
+    max-height: calc(100svh - var(--wt-header-height) - var(--wt-main-padding-top) - 20px); // Fill viewport minus sticky offset and bottom margin
     overflow-y: auto;
     overscroll-behavior: contain; // Trap scroll events within TOC
 }
