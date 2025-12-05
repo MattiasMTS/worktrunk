@@ -106,7 +106,7 @@ The CI column shows GitHub/GitLab pipeline status:
 | [2m●[0m gray | No checks configured |
 | blank | No PR/MR found |
 
-Any CI dot appears dimmed when there are unpushed local changes (stale status).
+Any CI dot appears dimmed when there are unpushed local changes (stale status). CI indicators are clickable links to the PR page.
 
 [32mStatus symbols[0m
 
