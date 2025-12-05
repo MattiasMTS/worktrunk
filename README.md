@@ -23,13 +23,13 @@ Worktrunk is a CLI for git worktree management, designed for parallel AI agent w
 
 AI agents like Claude and Codex can increasingly handle longer tasks without supervision. Running several in parallel is practical. But on a single checkout they step on each other's uncommitted changes.
 
-Git worktrees solve this: multiple working directories backed by one `.git`. Each gets its own files and index but shares the repository's history and objects.
+Git worktrees solve this: multiple working directories backed by one `.git`. Each gets its own files and index while sharing the repository's history and objects.
 
 But the built-in commands are path-oriented: `git worktree add ../repo.feature`, then `cd ../repo.feature`, then later `git worktree remove ../repo.feature`.
 
 ## What Worktrunk adds
 
-Worktrunk makes worktrees easy to use. Branch names replace paths:
+Worktrunk makes worktrees easy to use. Both for basic branch-based navigation & status....
 
 | Task | Worktrunk | Plain git |
 |------|-----------|-----------|
@@ -38,7 +38,7 @@ Worktrunk makes worktrees easy to use. Branch names replace paths:
 | Clean up | `wt remove` | `cd ../repo && git worktree remove ../repo.feature && git branch -d feature` |
 | List with status | `wt list` | `git worktree list` (paths only) |
 
-Beyond navigation, Worktrunk automates common tasks:
+...and automating a bunch of workflows, including:
 
 - **[Lifecycle hooks](https://worktrunk.dev/hooks/)** — run commands on create, switch, merge (deps install, dev servers, test suites)
 - **[LLM commit messages](https://worktrunk.dev/llm-commits/)** — generate commits from diffs via [llm](https://llm.datasette.io/)
