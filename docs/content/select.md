@@ -10,10 +10,7 @@ group = "Commands"
 
 Interactive worktree picker with live preview. Navigate worktrees with keyboard shortcuts and press Enter to switch.
 
-<figure>
-<img src="/assets/wt-select.gif" alt="wt select demo">
-<figcaption>Navigating worktrees with preview panes showing diffs and commit history</figcaption>
-</figure>
+![wt select demo](/assets/wt-select.gif)
 
 ## Examples
 
