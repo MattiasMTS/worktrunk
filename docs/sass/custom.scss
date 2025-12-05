@@ -283,6 +283,20 @@ main {
     margin-bottom: 0.75rem;
 }
 
+// Images - horizontally scrollable, never shrink
+.content p:has(> img) {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.content img {
+    display: block;
+    max-width: none; // Don't shrink to fit container
+    border-radius: 0.5rem;
+    border: 1px solid var(--wt-color-border-subtle);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
 // Tighten spacing between paragraphs and code blocks
 .content p + pre,
 .content p + .terminal,
