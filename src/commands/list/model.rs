@@ -862,10 +862,10 @@ impl serde::Serialize for WorktreeState {
 ///
 /// Represents the primary state of a branch/worktree in a single position.
 /// Priority order determines which symbol is shown when multiple conditions apply:
-/// 1. Conflicts (✖) - blocking, must resolve
-/// 2. Rebase (↻) - active operation
-/// 3. Merge (⋈) - active operation
-/// 4. MergeTreeConflicts (⚔) - potential problem
+/// 1. Conflicts (✘) - blocking, must resolve
+/// 2. Rebase (⤴) - active operation
+/// 3. Merge (⤵) - active operation
+/// 4. MergeTreeConflicts (✗) - potential problem
 /// 5. SameCommit (·) - removable, maps to [`IntegrationReason::SameCommit`]
 /// 6. NoAddedChanges (⊂) - removable, maps to [`IntegrationReason::NoAddedChanges`]
 /// 7. TreesMatch (⊂) - removable, maps to [`IntegrationReason::TreesMatch`]
@@ -911,10 +911,10 @@ impl std::fmt::Display for BranchOpState {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Self::None => Ok(()),
-            Self::Conflicts => write!(f, "✖"),
-            Self::Rebase => write!(f, "↻"),
-            Self::Merge => write!(f, "⋈"),
-            Self::MergeTreeConflicts => write!(f, "⚔"),
+            Self::Conflicts => write!(f, "✘"),
+            Self::Rebase => write!(f, "⤴"),
+            Self::Merge => write!(f, "⤵"),
+            Self::MergeTreeConflicts => write!(f, "✗"),
             Self::SameCommit => write!(f, "·"),
             // All other integration states use ⊂ (content is subset of main)
             Self::TreesMatch | Self::NoAddedChanges | Self::MergeAddsNothing => write!(f, "⊂"),
@@ -1014,7 +1014,7 @@ impl PositionMask {
             1, // STAGED: + (1 char)
             1, // MODIFIED: ! (1 char)
             1, // UNTRACKED: ? (1 char)
-            1, // BRANCH_OP_STATE: ✖↻⋈⚔·⊂ (1 char, priority: conflicts > rebase > merge > merge-tree > same-commit > integrated)
+            1, // BRANCH_OP_STATE: ✘⤴⤵✗·⊂ (1 char, priority: conflicts > rebase > merge > merge-tree > same-commit > integrated)
             1, // MAIN_DIVERGENCE: ^, ↑, ↓, ↕ (1 char)
             1, // UPSTREAM_DIVERGENCE: ⇡, ⇣, ⇅ (1 char)
             1, // WORKTREE_STATE: / for branches, ⚑⌫⊠ for worktrees (priority: path_mismatch > prunable > locked)
@@ -1032,7 +1032,7 @@ impl PositionMask {
 ///
 /// Symbols are categorized to enable vertical alignment in table output:
 /// - Working tree: +, !, ? (staged, modified, untracked - priority order)
-/// - Branch/op state: ✖, ↻, ⋈, ⚔, ·, ⊂ (combined position with priority)
+/// - Branch/op state: ✘, ⤴, ⤵, ✗, ·, ⊂ (combined position with priority)
 /// - Main divergence: ^, ↕, ↑, ↓
 /// - Upstream divergence: ⇅, ⇡, ⇣
 /// - Worktree state: / for branches, ⚑⌫⊠ for worktrees (priority-only)
@@ -1041,11 +1041,11 @@ impl PositionMask {
 /// ## Mutual Exclusivity
 ///
 /// **Combined with priority (branch state + git operation):**
-/// Priority: ✖ > ↻ > ⋈ > ⚔ > · > ⊂
-/// - ✖: Actual conflicts (must resolve)
-/// - ↻: Rebase in progress
-/// - ⋈: Merge in progress
-/// - ⚔: Merge-tree conflicts (potential problem)
+/// Priority: ✘ > ⤴ > ⤵ > ✗ > · > ⊂
+/// - ✘: Actual conflicts (must resolve)
+/// - ⤴: Rebase in progress
+/// - ⤵: Merge in progress
+/// - ✗: Merge-tree conflicts (potential problem)
 /// - ·: Same commit (removable)
 /// - ⊂: Content integrated (removable)
 ///
@@ -1062,7 +1062,7 @@ impl PositionMask {
 #[derive(Debug, Clone, Default)]
 pub struct StatusSymbols {
     /// Combined branch and operation state (mutually exclusive with priority)
-    /// Priority: Conflicts (✖) > Rebase (↻) > Merge (⋈) > MergeTreeConflicts (⚔) > SameCommit (·) > others (⊂)
+    /// Priority: Conflicts (✘) > Rebase (⤴) > Merge (⤵) > MergeTreeConflicts (✗) > SameCommit (·) > others (⊂)
     pub(crate) branch_op_state: BranchOpState,
 
     /// Worktree state: / for branches, ⚑⌫⊠ for worktrees (priority: path_mismatch > prunable > locked)

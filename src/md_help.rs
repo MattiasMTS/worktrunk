@@ -300,12 +300,12 @@ fn colorize_status_symbols(text: &str) -> String {
     result = replace_dim(result, "?", working_tree);
 
     // Conflicts: ERROR (red)
-    result = replace_dim(result, "✖", error);
+    result = replace_dim(result, "✘", error);
 
     // Git operations, MergeTreeConflicts: WARNING (yellow)
-    result = replace_dim(result, "↻", warning);
-    result = replace_dim(result, "⋈", warning);
-    result = replace_dim(result, "⚔", warning);
+    result = replace_dim(result, "⤴", warning);
+    result = replace_dim(result, "⤵", warning);
+    result = replace_dim(result, "✗", warning);
 
     // Worktree state: PathMismatch (red), Prunable/Locked (yellow)
     result = replace_dim(result, "⚑", error);

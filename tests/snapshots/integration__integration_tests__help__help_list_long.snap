@@ -117,10 +117,10 @@ The Status column has multiple subcolumns. Within each, only the first matching 
   Working tree (1)   [36m+[0m       Staged files                                        
   Working tree (2)   [36m![0m       Modified files (unstaged)                           
   Working tree (3)   [36m?[0m       Untracked files                                     
-  Branch state       [31m✖[0m       Merge conflicts                                     
-                     [33m↻[0m       Rebase in progress                                  
-                     [33m⋈[0m       Merge in progress                                   
-                     [33m⚔[0m       Would conflict if merged to main                    
+  Branch state       [31m✘[0m       Merge conflicts                                     
+                     [33m⤴[0m       Rebase in progress                                  
+                     [33m⤵[0m       Merge in progress                                   
+                     [33m✗[0m       Would conflict if merged to main                    
                      [2m·[0m       Same commit                                         
                      [2m⊂[0m       Content integrated ([2m--full[0m detects additional cases)
   Main divergence    [2m^[0m       Is the main branch                                  
