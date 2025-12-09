@@ -144,9 +144,9 @@ exit_code: 0
       "branch_op_state": "·",
       "main_divergence": "",
       "upstream_divergence": "",
-      "worktree_state": "⊠"
+      "worktree_state": "⊞"
     },
-    "status_line": "locked-feature  /u001b[2m·/u001b[22m/u001b[33m⊠/u001b[39m",
+    "status_line": "locked-feature  /u001b[2m·/u001b[22m/u001b[33m⊞/u001b[39m",
     "type": "worktree",
     "path": "[REPO].locked-feature",
     "bare": false,

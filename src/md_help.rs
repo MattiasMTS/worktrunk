@@ -309,8 +309,8 @@ fn colorize_status_symbols(text: &str) -> String {
 
     // Worktree state: PathMismatch (red), Prunable/Locked (yellow)
     result = replace_dim(result, "⚑", error);
-    result = replace_dim(result, "⌫", warning);
-    result = replace_dim(result, "⊠", warning);
+    result = replace_dim(result, "⊟", warning);
+    result = replace_dim(result, "⊞", warning);
 
     // CI status circles: replace dimmed ● followed by color name
     let dimmed_bullet = format!("{dim}●{dim:#}");

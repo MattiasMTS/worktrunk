@@ -133,8 +133,8 @@ The Status column has multiple subcolumns. Within each, only the first matching 
                      [2m⇣[0m       Behind remote                                       
   Worktree state     [2m/[0m       Branch without worktree                             
                      [31m⚑[0m       Path doesn't match template                         
-                     [33m⌫[0m       Prunable (directory missing)                        
-                     [33m⊠[0m       Locked worktree                                     
+                     [33m⊟[0m       Prunable (directory missing)                        
+                     [33m⊞[0m       Locked worktree                                     
 
 Rows are dimmed when the branch content is already in main ([2m·[0m same commit or [2m⊂[0m content integrated).
 

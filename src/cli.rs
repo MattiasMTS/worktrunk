@@ -1397,8 +1397,8 @@ The Status column has multiple subcolumns. Within each, only the first matching 
 | | `⇣` | Behind remote |
 | Worktree state | `/` | Branch without worktree |
 | | `⚑` | Path doesn't match template |
-| | `⌫` | Prunable (directory missing) |
-| | `⊠` | Locked worktree |
+| | `⊟` | Prunable (directory missing) |
+| | `⊞` | Locked worktree |
 
 Rows are dimmed when the branch [content is already in main](@/remove.md#branch-cleanup) (`·` same commit or `⊂` content integrated).
 

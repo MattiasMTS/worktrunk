@@ -842,8 +842,8 @@ impl std::fmt::Display for WorktreeState {
         match self {
             Self::None => Ok(()),
             Self::PathMismatch => write!(f, "⚑"),
-            Self::Prunable => write!(f, "⌫"),
-            Self::Locked => write!(f, "⊠"),
+            Self::Prunable => write!(f, "⊟"),
+            Self::Locked => write!(f, "⊞"),
             Self::Branch => write!(f, "/"),
         }
     }
@@ -1017,7 +1017,7 @@ impl PositionMask {
             1, // BRANCH_OP_STATE: ✘⤴⤵✗·⊂ (1 char, priority: conflicts > rebase > merge > merge-tree > same-commit > integrated)
             1, // MAIN_DIVERGENCE: ^, ↑, ↓, ↕ (1 char)
             1, // UPSTREAM_DIVERGENCE: ⇡, ⇣, ⇅ (1 char)
-            1, // WORKTREE_STATE: / for branches, ⚑⌫⊠ for worktrees (priority: path_mismatch > prunable > locked)
+            1, // WORKTREE_STATE: / for branches, ⚑⊟⊞ for worktrees (priority: path_mismatch > prunable > locked)
             2, // USER_MARKER: single emoji or two chars (allocate 2)
         ],
     };
@@ -1035,7 +1035,7 @@ impl PositionMask {
 /// - Branch/op state: ✘, ⤴, ⤵, ✗, ·, ⊂ (combined position with priority)
 /// - Main divergence: ^, ↕, ↑, ↓
 /// - Upstream divergence: ⇅, ⇡, ⇣
-/// - Worktree state: / for branches, ⚑⌫⊠ for worktrees (priority-only)
+/// - Worktree state: / for branches, ⚑⊟⊞ for worktrees (priority-only)
 /// - User marker: custom labels, emoji
 ///
 /// ## Mutual Exclusivity
@@ -1054,8 +1054,8 @@ impl PositionMask {
 /// - ⇅ vs ⇡ vs ⇣: Upstream divergence (UpstreamDivergence enum)
 ///
 /// **Priority-only (can co-occur but only highest priority shown):**
-/// - ⚑ vs ⌫ vs ⊠: Worktree attrs (priority: path_mismatch ⚑ > prunable ⌫ > locked ⊠)
-/// - /: Branch indicator (mutually exclusive with ⚑⌫⊠ as branches can't have worktree attrs)
+/// - ⚑ vs ⊟ vs ⊞: Worktree attrs (priority: path_mismatch ⚑ > prunable ⊟ > locked ⊞)
+/// - /: Branch indicator (mutually exclusive with ⚑⊟⊞ as branches can't have worktree attrs)
 ///
 /// **NOT mutually exclusive (can co-occur):**
 /// - Working tree symbols (+!?): Can have multiple types of changes
@@ -1065,7 +1065,7 @@ pub struct StatusSymbols {
     /// Priority: Conflicts (✘) > Rebase (⤴) > Merge (⤵) > MergeTreeConflicts (✗) > SameCommit (·) > others (⊂)
     pub(crate) branch_op_state: BranchOpState,
 
-    /// Worktree state: / for branches, ⚑⌫⊠ for worktrees (priority: path_mismatch > prunable > locked)
+    /// Worktree state: / for branches, ⚑⊟⊞ for worktrees (priority: path_mismatch > prunable > locked)
     pub(crate) worktree_state: WorktreeState,
 
     /// Main branch divergence state (mutually exclusive)
@@ -1186,7 +1186,7 @@ impl StatusSymbols {
             WorktreeState::Branch => cformat!("<dim>{}</>", self.worktree_state),
             // Path mismatch (⚑) is a stronger warning (red)
             WorktreeState::PathMismatch => cformat!("<red>{}</>", self.worktree_state),
-            // Other worktree attrs (⌫⊠) are warnings (yellow)
+            // Other worktree attrs (⊟⊞) are warnings (yellow)
             _ => cformat!("<yellow>{}</>", self.worktree_state),
         };
 
