@@ -188,7 +188,7 @@ impl Task for AheadBehindTask {
     }
 }
 
-/// Task 3: Tree identity check (does HEAD tree match default branch's tree?)
+/// Task 3: Tree identity check (does the item's commit tree match default branch's tree?)
 pub struct CommittedTreesMatchTask;
 
 impl Task for CommittedTreesMatchTask {
@@ -197,7 +197,9 @@ impl Task for CommittedTreesMatchTask {
     fn compute(ctx: TaskContext) -> TaskResult {
         let committed_trees_match = if let Some(base) = ctx.default_branch.as_deref() {
             let repo = Repository::at(&ctx.repo_path);
-            repo.head_tree_matches_branch(base).unwrap_or(false)
+            // Use ctx.commit_sha (the item's commit) instead of HEAD,
+            // since for branches without worktrees, HEAD is the main worktree's HEAD
+            repo.trees_match(&ctx.commit_sha, base).unwrap_or(false)
         } else {
             false
         };
