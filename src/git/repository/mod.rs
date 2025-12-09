@@ -3,6 +3,7 @@ use std::process::Command;
 use std::sync::OnceLock;
 
 use anyhow::{Context, bail};
+use normalize_path::NormalizePath;
 
 // Import types and functions from parent module (mod.rs)
 use super::{
@@ -1191,12 +1192,13 @@ impl Repository {
         path: &Path,
     ) -> anyhow::Result<Option<(PathBuf, Option<String>)>> {
         let worktrees = self.list_worktrees()?;
-        let canonical_path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+        // Use lexical normalization so comparison works even when path doesn't exist
+        let normalized_path = path.normalize();
 
         Ok(worktrees
             .worktrees
             .iter()
-            .find(|wt| wt.path.canonicalize().unwrap_or_else(|_| wt.path.clone()) == canonical_path)
+            .find(|wt| wt.path.normalize() == normalized_path)
             .map(|wt| (wt.path.clone(), wt.branch.clone())))
     }
 

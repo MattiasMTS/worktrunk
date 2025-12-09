@@ -11,9 +11,8 @@ pub fn home_dir() -> Option<PathBuf> {
 
 /// Format a filesystem path for user-facing output.
 ///
-/// When the path lives under the user's home directory, it is shown with a
-/// leading `~` (e.g., `/Users/alex/projects/wt` -> `~/projects/wt`). Paths
-/// outside home are returned unchanged.
+/// Replaces home directory prefix with `~` (e.g., `/Users/alex/projects/wt` -> `~/projects/wt`).
+/// Paths outside home are returned unchanged.
 pub fn format_path_for_display(path: &Path) -> String {
     if let Some(home) = home_dir()
         && let Ok(stripped) = path.strip_prefix(&home)

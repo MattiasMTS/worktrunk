@@ -252,7 +252,9 @@ impl std::fmt::Display for GitError {
                     error_message(cformat!(
                         "Directory already exists: <bold>{path_display}</>"
                     )),
-                    hint_message("Remove the directory or use a different branch name")
+                    hint_message(cformat!(
+                        "Remove with <bright-black>rm -rf {path_display}</> or use a different branch name"
+                    ))
                 )
             }
 
