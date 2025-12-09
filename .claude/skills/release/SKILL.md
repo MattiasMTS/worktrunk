@@ -15,8 +15,10 @@ description: Worktrunk release workflow. Use when user asks to "do a release", "
 6. **Commit**: `git add -A && git commit -m "Release vX.Y.Z"`
 7. **Push to main**: `git push origin <branch>:main`
 8. **Tag and push**: `git tag vX.Y.Z && git push origin vX.Y.Z`
+9. **Wait for release workflow**: Check GitHub Actions completes (builds binaries, publishes to crates.io)
+10. **Update Homebrew**: `./dev/update-homebrew.sh` (requires sibling `homebrew-worktrunk` checkout)
 
-The tag push triggers the release workflow which builds binaries and publishes to crates.io.
+The tag push triggers the release workflow which builds binaries and publishes to crates.io. The Homebrew script fetches SHA256 hashes from the release assets and updates the formula.
 
 ## CHANGELOG Review
 
