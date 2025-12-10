@@ -164,19 +164,6 @@ fn expand_commands(
     Ok(result)
 }
 
-/// Expand commands for approval display (public version for gate approval)
-///
-/// Returns commands with their `expanded` field filled in, showing actual values
-/// instead of template placeholders.
-pub fn expand_commands_for_approval(
-    commands: &[Command],
-    ctx: &CommandContext<'_>,
-    extra_vars: &[(&str, &str)],
-) -> anyhow::Result<Vec<Command>> {
-    let expanded = expand_commands(commands, ctx, extra_vars)?;
-    Ok(expanded.into_iter().map(|(cmd, _json)| cmd).collect())
-}
-
 /// Prepare project commands for execution
 ///
 /// This function:

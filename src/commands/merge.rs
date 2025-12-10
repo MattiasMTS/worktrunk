@@ -4,7 +4,7 @@ use worktrunk::git::Repository;
 use worktrunk::styling::info_message;
 
 use super::command_approval::approve_command_batch;
-use super::command_executor::{CommandContext, expand_commands_for_approval};
+use super::command_executor::CommandContext;
 use super::commit::CommitOptions;
 use super::context::CommandEnv;
 use super::hooks::{HookFailureStrategy, HookPipeline, HookSource};
@@ -118,13 +118,8 @@ pub fn handle_merge(
     }
     .collect()?;
 
-    // Expand commands for approval display (shows actual values instead of templates)
-    let ctx = env.context(force);
-    let expanded =
-        expand_commands_for_approval(&all_commands, &ctx, &[("target", &target_branch)])?;
-
-    // Approve all expanded commands in a single batch
-    let approved = approve_command_batch(&expanded, &project_id, config, force, false)?;
+    // Approve all commands in a single batch (shows templates, not expanded values)
+    let approved = approve_command_batch(&all_commands, &project_id, config, force, false)?;
 
     // If commands were declined, skip hooks but continue with merge
     // Shadow verify to gate all subsequent hook execution on approval

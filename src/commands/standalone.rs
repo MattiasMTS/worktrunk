@@ -36,27 +36,8 @@ pub fn run_hook(hook_type: HookType, force: bool, name_filter: Option<&str>) -> 
     let project_config = repo.load_project_config()?;
 
     // "Approve at the Gate": approve project hooks upfront
-    // Get extra vars for template expansion based on hook type
-    // For wt hook pre-merge/post-merge, use current branch as target (not default branch)
-    // because we're testing hooks in the context of the current worktree
-    let default_branch = repo.default_branch().ok();
-    let extra_vars: Vec<(&str, &str)> = match hook_type {
-        HookType::PreCommit => {
-            // Pre-commit uses default branch as target (for comparison context)
-            default_branch
-                .as_deref()
-                .into_iter()
-                .map(|t| ("target", t))
-                .collect()
-        }
-        HookType::PreMerge | HookType::PostMerge => {
-            // Pre-merge and post-merge use current branch as target for testing
-            vec![("target", env.branch.as_str())]
-        }
-        _ => Vec::new(),
-    };
     // Pass name_filter to only approve the targeted hook, not all hooks of this type
-    let approved = approve_hooks_filtered(&ctx, &[hook_type], &extra_vars, name_filter)?;
+    let approved = approve_hooks_filtered(&ctx, &[hook_type], name_filter)?;
     // If declined, return early - the whole point of `wt hook` is to run hooks
     if !approved {
         crate::output::print(worktrunk::styling::info_message("Commands declined"))?;
@@ -227,13 +208,7 @@ pub fn step_commit(
     // "Approve at the Gate": approve pre-commit hooks upfront (unless --no-verify)
     // Shadow no_verify: if user declines approval, skip hooks but continue commit
     let no_verify = if !no_verify {
-        let target_branch = env.repo.default_branch().ok();
-        let extra_vars: Vec<(&str, &str)> = target_branch
-            .as_deref()
-            .into_iter()
-            .map(|t| ("target", t))
-            .collect();
-        let approved = approve_hooks(&ctx, &[HookType::PreCommit], &extra_vars)?;
+        let approved = approve_hooks(&ctx, &[HookType::PreCommit])?;
         if !approved {
             crate::output::print(worktrunk::styling::info_message(
                 "Commands declined, committing without hooks",

@@ -924,13 +924,7 @@ fn main() {
                         use commands::context::CommandEnv;
                         let env = CommandEnv::for_action("squash")?;
                         let ctx = env.context(force);
-                        let target_branch = env.repo.default_branch().ok();
-                        let extra_vars: Vec<(&str, &str)> = target_branch
-                            .as_deref()
-                            .into_iter()
-                            .map(|t| ("target", t))
-                            .collect();
-                        let approved = approve_hooks(&ctx, &[HookType::PreCommit], &extra_vars)?;
+                        let approved = approve_hooks(&ctx, &[HookType::PreCommit])?;
                         if !approved {
                             crate::output::print(info_message(
                                 "Commands declined, squashing without hooks",
@@ -1083,7 +1077,7 @@ fn main() {
                         &repo_root,
                         force,
                     );
-                    approve_hooks(&ctx, &[HookType::PostCreate, HookType::PostStart], &[])?
+                    approve_hooks(&ctx, &[HookType::PostCreate, HookType::PostStart])?
                 } else {
                     true // No hooks to approve = considered approved
                 };
@@ -1169,7 +1163,7 @@ fn main() {
                         &repo_root,
                         force,
                     );
-                    let approved = approve_hooks(&ctx, &[HookType::PreRemove], &[])?;
+                    let approved = approve_hooks(&ctx, &[HookType::PreRemove])?;
                     // If declined, skip hooks but continue with removal
                     if !approved {
                         crate::output::print(info_message(

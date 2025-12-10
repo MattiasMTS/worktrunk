@@ -808,7 +808,7 @@ worktree_name = "echo 'Name: {{ worktree_name }}'"
     );
     repo.commit("Add config with templates");
 
-    // Pre-approve the commands (use expanded forms for approval)
+    // Pre-approve the commands (templates match what's shown in prompts)
     repo.write_test_config(
         r#"worktree-path = "../{{ main_worktree }}.{{ branch }}"
 

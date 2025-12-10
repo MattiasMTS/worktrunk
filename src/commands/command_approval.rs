@@ -33,7 +33,8 @@ use worktrunk::styling::{
 /// Returns `Ok(true)` when execution may continue, `Ok(false)` when the user
 /// declined, and `Err` if config reload/save fails.
 ///
-/// Shows expanded commands to the user. Templates are saved to config for future approval checks.
+/// Shows command templates to the user (what gets saved to config), not expanded values.
+/// This ensures users see exactly what they're approving.
 ///
 /// # Parameters
 /// - `commands_already_filtered`: If true, commands list is pre-filtered; skip filtering by approval status
@@ -123,7 +124,7 @@ fn prompt_for_batch_approval(commands: &[&Command], project_id: &str) -> anyhow:
             None => format!("{INFO_EMOJI} {phase}:"),
         };
         eprintln!("{label}");
-        eprint!("{}", format_bash_with_gutter(&cmd.expanded, ""));
+        eprint!("{}", format_bash_with_gutter(&cmd.template, ""));
     }
 
     // Check if stdin is a TTY before attempting to prompt
@@ -150,35 +151,28 @@ fn prompt_for_batch_approval(commands: &[&Command], project_id: &str) -> anyhow:
     Ok(response.trim().eq_ignore_ascii_case("y"))
 }
 
-/// Collect project commands for hooks and request batch approval with template expansion.
+/// Collect project commands for hooks and request batch approval.
 ///
 /// This is the "gate" function that should be called at command entry points
 /// (like `wt remove`, `wt switch --create`, `wt merge`) before any hooks execute.
-/// It expands template variables before showing the approval prompt, so users see
-/// the actual commands that will run (e.g., with actual branch names) instead of
-/// template placeholders.
+/// Shows command templates (not expanded values) so users see exactly what
+/// patterns they're approving.
 ///
 /// # Parameters
-/// - `ctx`: Command context providing template variables (branch, worktree, etc.)
+/// - `ctx`: Command context (provides project identifier and config)
 /// - `hook_types`: Which hook types to collect commands for
-/// - `extra_vars`: Additional template variables
 ///
 /// # Example
 ///
 /// ```ignore
 /// let ctx = CommandContext::new(&repo, &config, &branch, &worktree_path, &repo_root, force);
-/// let approved = approve_hooks(
-///     &ctx,
-///     &[HookType::PostCreate, HookType::PostStart],
-///     &[],
-/// )?;
+/// let approved = approve_hooks(&ctx, &[HookType::PostCreate, HookType::PostStart])?;
 /// ```
 pub fn approve_hooks(
     ctx: &super::command_executor::CommandContext<'_>,
     hook_types: &[HookType],
-    extra_vars: &[(&str, &str)],
 ) -> anyhow::Result<bool> {
-    approve_hooks_filtered(ctx, hook_types, extra_vars, None)
+    approve_hooks_filtered(ctx, hook_types, None)
 }
 
 /// Like `approve_hooks` but with optional name filter for targeted hook approval.
@@ -189,7 +183,6 @@ pub fn approve_hooks(
 pub fn approve_hooks_filtered(
     ctx: &super::command_executor::CommandContext<'_>,
     hook_types: &[HookType],
-    extra_vars: &[(&str, &str)],
     name_filter: Option<&str>,
 ) -> anyhow::Result<bool> {
     let project_config = match ctx.repo.load_project_config()? {
@@ -208,10 +201,6 @@ pub fn approve_hooks_filtered(
         return Ok(true);
     }
 
-    // Expand templates with the provided context
-    let expanded =
-        super::command_executor::expand_commands_for_approval(&commands, ctx, extra_vars)?;
-
     let project_id = ctx.repo.project_identifier()?;
-    approve_command_batch(&expanded, &project_id, ctx.config, ctx.force, false)
+    approve_command_batch(&commands, &project_id, ctx.config, ctx.force, false)
 }
