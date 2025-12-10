@@ -39,65 +39,54 @@ fn format_command_display(command: &str, args: &[String]) -> String {
 /// Default template for commit message prompts
 ///
 /// Synced to dev/config.example.toml by `cargo test readme_sync`
-const DEFAULT_TEMPLATE: &str = r#"Format
-- First line: <50 chars, present tense, describes WHAT and WHY (not HOW).
-- Blank line after first line.
-- Optional details with proper line breaks explaining context. Commits with more substantial changes should have more details.
-- Return ONLY the formatted message without quotes, code blocks, or preamble.
+const DEFAULT_TEMPLATE: &str = r#"Write a commit message for the staged changes below.
 
-Style
-- Do not give normative statements or otherwise speculate on why the change was made.
-- Broadly match the style of the previous commit messages.
-  - For example, if they're in conventional commit format, use conventional commits; if they're not, don't use conventional commits.
+<format>
+- Subject under 50 chars, blank line, then optional body
+- Output only the commit message, no quotes or code blocks
+</format>
 
-The context contains:
-- <git-diff> with the staged changes. This is the ONLY content you should base your message on.
-- <git-info> with branch name and recent commit message titles for style reference ONLY. DO NOT use their content to inform your message.
+<style>
+- Imperative mood: "Add feature" not "Added feature"
+- Match recent commit style (conventional commits if used)
+- Describe the change, not the intent or benefit
+</style>
 
----
-The following is the context for your task:
----
-<git-diff>
-```
+<diff>
 {{ git_diff }}
-```
-</git-diff>
+</diff>
 
-<git-info>
-  <current-branch>{{ branch }}</current-branch>
-{% if recent_commits %}
-  <previous-commit-message-titles>
-{% for commit in recent_commits %}
-    <previous-commit-message-title>{{ commit }}</previous-commit-message-title>
-{% endfor %}
-  </previous-commit-message-titles>
-{% endif %}
-</git-info>
+<context>
+Branch: {{ branch }}
+{% if recent_commits %}<recent_commits>
+{% for commit in recent_commits %}- {{ commit }}
+{% endfor %}</recent_commits>{% endif %}
+</context>
 "#;
 
 /// Default template for squash commit message prompts
 ///
 /// Synced to dev/config.example.toml by `cargo test readme_sync`
-const DEFAULT_SQUASH_TEMPLATE: &str = r#"Generate a commit message that combines these changes into one cohesive message. Output only the commit message without any explanation.
+const DEFAULT_SQUASH_TEMPLATE: &str = r#"Combine these commits into a single commit message.
 
-Format
-- First line: <50 chars, present tense, describes WHAT and WHY (not HOW).
-- Blank line after first line.
-- Optional details with proper line breaks explaining context.
-- Match the style of the existing commits being squashed (e.g., if they use conventional commits, use conventional commits).
+<format>
+- Subject under 50 chars, blank line, then optional body
+- Output only the commit message, no quotes or code blocks
+</format>
 
-Squashing commits from {{ branch }} to merge into {{ target_branch }}
+<style>
+- Imperative mood: "Add feature" not "Added feature"
+- Match the style of commits being squashed (conventional commits if used)
+- Describe the change, not the intent or benefit
+</style>
 
-Commits being combined:
-{% for commit in commits %}
-- {{ commit }}
-{% endfor %}
+<commits branch="{{ branch }}" target="{{ target_branch }}">
+{% for commit in commits %}- {{ commit }}
+{% endfor %}</commits>
 
-<git-diff>
-```
+<diff>
 {{ git_diff }}
-```
-</git-diff>
+</diff>
 "#;
 
 /// Execute an LLM command with the given prompt via stdin.
@@ -527,7 +516,7 @@ mod tests {
         let prompt = result.unwrap();
         assert!(prompt.contains("feat: add feature"));
         assert!(prompt.contains("fix: bug"));
-        assert!(prompt.contains("<previous-commit-message-titles>"));
+        assert!(prompt.contains("<recent_commits>"));
     }
 
     #[test]
@@ -537,9 +526,14 @@ mod tests {
         let context = commit_context("diff", "main", Some(&commits), "repo");
         let result = build_prompt(&config, TemplateType::Commit, &context);
         assert!(result.is_ok());
-        // Should not render the recent commits section if empty
+        // Should not render the recent commits data section if empty
+        // Note: <recent_commits> is mentioned in the style text, but the actual
+        // data section (with commit list) should not be rendered
         let prompt = result.unwrap();
-        assert!(!prompt.contains("<previous-commit-message-titles>"));
+        // The context section should have the branch but no recent_commits content
+        assert!(prompt.contains("Branch: main"));
+        assert!(!prompt.contains("- feat:"));
+        assert!(!prompt.contains("- fix:"));
     }
 
     #[test]

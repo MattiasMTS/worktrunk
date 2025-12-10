@@ -128,40 +128,29 @@ Creates [2m~/.config/worktrunk/config.toml[0m with the following content:
   [2m# If not specified, uses the default template shown below:[0m
   [2m# <!-- DEFAULT_TEMPLATE_START -->[0m
   [2m# template = """[0m
-  [2m# Format[0m
-  [2m# - First line: <50 chars, present tense, describes WHAT and WHY (not HOW).[0m
-  [2m# - Blank line after first line.[0m
-  [2m# - Optional details with proper line breaks explaining context. Commits with more substantial changes should have more details.[0m
-  [2m# - Return ONLY the formatted message without quotes, code blocks, or preamble.[0m
+  [2m# Write a commit message for the staged changes below.[0m
   [2m#[0m
-  [2m# Style[0m
-  [2m# - Do not give normative statements or otherwise speculate on why the change was made.[0m
-  [2m# - Broadly match the style of the previous commit messages.[0m
-  [2m#   - For example, if they're in conventional commit format, use conventional commits; if they're not, don't use conventional commits.[0m
+  [2m# <format>[0m
+  [2m# - Subject under 50 chars, blank line, then optional body[0m
+  [2m# - Output only the commit message, no quotes or code blocks[0m
+  [2m# </format>[0m
   [2m#[0m
-  [2m# The context contains:[0m
-  [2m# - <git-diff> with the staged changes. This is the ONLY content you should base your message on.[0m
-  [2m# - <git-info> with branch name and recent commit message titles for style reference ONLY. DO NOT use their content to inform your message.[0m
+  [2m# <style>[0m
+  [2m# - Imperative mood: "Add feature" not "Added feature"[0m
+  [2m# - Match recent commit style (conventional commits if used)[0m
+  [2m# - Describe the change, not the intent or benefit[0m
+  [2m# </style>[0m
   [2m#[0m
-  [2m# ---[0m
-  [2m# The following is the context for your task:[0m
-  [2m# ---[0m
-  [2m# <git-diff>[0m
-  [2m# ```[0m
+  [2m# <diff>[0m
   [2m# {{ git_diff }}[0m
-  [2m# ```[0m
-  [2m# </git-diff>[0m
+  [2m# </diff>[0m
   [2m#[0m
-  [2m# <git-info>[0m
-  [2m#   <current-branch>{{ branch }}</current-branch>[0m
-  [2m# {% if recent_commits %}[0m
-  [2m#   <previous-commit-message-titles>[0m
-  [2m# {% for commit in recent_commits %}[0m
-  [2m#     <previous-commit-message-title>{{ commit }}</previous-commit-message-title>[0m
-  [2m# {% endfor %}[0m
-  [2m#   </previous-commit-message-titles>[0m
-  [2m# {% endif %}[0m
-  [2m# </git-info>[0m
+  [2m# <context>[0m
+  [2m# Branch: {{ branch }}[0m
+  [2m# {% if recent_commits %}<recent_commits>[0m
+  [2m# {% for commit in recent_commits %}- {{ commit }}[0m
+  [2m# {% endfor %}</recent_commits>{% endif %}[0m
+  [2m# </context>[0m
   [2m# """[0m
   [2m# <!-- DEFAULT_TEMPLATE_END -->[0m
   [2m#[0m
@@ -194,26 +183,26 @@ Creates [2m~/.config/worktrunk/config.toml[0m with the following content:
   [2m# If not specified, uses the default template:[0m
   [2m# <!-- DEFAULT_SQUASH_TEMPLATE_START -->[0m
   [2m# squash-template = """[0m
-  [2m# Generate a commit message that combines these changes into one cohesive message. Output only the commit message without any explanation.[0m
+  [2m# Combine these commits into a single commit message.[0m
   [2m#[0m
-  [2m# Format[0m
-  [2m# - First line: <50 chars, present tense, describes WHAT and WHY (not HOW).[0m
-  [2m# - Blank line after first line.[0m
-  [2m# - Optional details with proper line breaks explaining context.[0m
-  [2m# - Match the style of the existing commits being squashed (e.g., if they use conventional commits, use conventional commits).[0m
+  [2m# <format>[0m
+  [2m# - Subject under 50 chars, blank line, then optional body[0m
+  [2m# - Output only the commit message, no quotes or code blocks[0m
+  [2m# </format>[0m
   [2m#[0m
-  [2m# Squashing commits from {{ branch }} to merge into {{ target_branch }}[0m
+  [2m# <style>[0m
+  [2m# - Imperative mood: "Add feature" not "Added feature"[0m
+  [2m# - Match the style of commits being squashed (conventional commits if used)[0m
+  [2m# - Describe the change, not the intent or benefit[0m
+  [2m# </style>[0m
   [2m#[0m
-  [2m# Commits being combined:[0m
-  [2m# {% for commit in commits %}[0m
-  [2m# - {{ commit }}[0m
-  [2m# {% endfor %}[0m
+  [2m# <commits branch="{{ branch }}" target="{{ target_branch }}">[0m
+  [2m# {% for commit in commits %}- {{ commit }}[0m
+  [2m# {% endfor %}</commits>[0m
   [2m#[0m
-  [2m# <git-diff>[0m
-  [2m# ```[0m
+  [2m# <diff>[0m
   [2m# {{ git_diff }}[0m
-  [2m# ```[0m
-  [2m# </git-diff>[0m
+  [2m# </diff>[0m
   [2m# """[0m
   [2m# <!-- DEFAULT_SQUASH_TEMPLATE_END -->[0m
   [2m#[0m
