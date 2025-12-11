@@ -84,10 +84,14 @@ document.addEventListener('keydown', function(e) {
     });
   });
 
-  // Clear suggestions when clicking a result
-  suggestions.addEventListener('click', function() {
-    suggestions.innerHTML = '';
-    suggestions.style.display = 'none';
+  // Only hide suggestions on modifier-click (opens in new tab).
+  // Normal clicks navigate away, so the page resets naturally.
+  // Clearing during navigation causes layout shift during the view transition.
+  suggestions.addEventListener('click', function(e) {
+    if (e.ctrlKey || e.metaKey || e.shiftKey) {
+      suggestions.innerHTML = '';
+      suggestions.style.display = 'none';
+    }
   });
 
   function escapeHtml(text) {

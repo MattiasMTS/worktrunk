@@ -199,6 +199,20 @@ nav {
 .search-container {
     position: relative;
     margin-right: 1rem;
+
+    // Keep input expanded while anything in container has focus (including
+    // clicking a search result link). Prevents jarring shrink during navigation.
+    &:focus-within #userinput {
+        width: 240px;
+        border-color: var(--wt-color-accent);
+    }
+
+    // Freeze search container during view transitions to prevent layout shift.
+    // Without this, focus loss during transition causes input to shrink.
+    // Progressive enhancement: View Transitions API (Chrome 111+, Safari 18+)
+    &:focus-within {
+        view-transition-name: search-frozen;
+    }
 }
 
 #userinput {
@@ -214,12 +228,6 @@ nav {
 
     &::placeholder {
         color: var(--wt-color-text-soft);
-    }
-
-    &:focus {
-        width: 240px;
-        border-color: var(--wt-color-accent);
-        outline: none;
     }
 }
 
@@ -1094,6 +1102,12 @@ body.mobile-menu-open {
 ::view-transition-old(root),
 ::view-transition-new(root) {
     animation-duration: 50ms;
+}
+
+// Freeze focused search box during transition - no animation, just cross-fade
+::view-transition-old(search-frozen),
+::view-transition-new(search-frozen) {
+    animation: none;
 }
 
 // ============================================================================
