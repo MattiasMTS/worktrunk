@@ -708,8 +708,6 @@ fn test_remove_squash_merged_then_main_advanced(repo: TestRepo) {
 // ============================================================================
 
 /// Test pre-remove hook executes before worktree removal.
-/// Skipped on Windows: snapshot output differs due to shell/path differences.
-#[cfg_attr(windows, ignore)]
 #[rstest]
 fn test_pre_remove_hook_executes(mut repo: TestRepo) {
     // Create project config with pre-remove hook

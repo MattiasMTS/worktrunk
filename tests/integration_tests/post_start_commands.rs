@@ -44,9 +44,7 @@ fn test_post_create_no_config(repo: TestRepo) {
     snapshot_switch("post_create_no_config", &repo, &["--create", "feature"]);
 }
 
-/// Skipped on Windows: snapshot output differs due to shell/path differences.
 #[rstest]
-#[cfg_attr(windows, ignore)]
 fn test_post_create_single_command(repo: TestRepo) {
     // Create project config with a single command (string format)
     repo.write_project_config(r#"post-create = "echo 'Setup complete'""#);
@@ -70,9 +68,7 @@ approved-commands = ["echo 'Setup complete'"]
     );
 }
 
-/// Skipped on Windows: snapshot output differs due to shell/path differences.
 #[rstest]
-#[cfg_attr(windows, ignore)]
 fn test_post_create_named_commands(repo: TestRepo) {
     // Create project config with named commands (table format)
     repo.write_project_config(
@@ -598,8 +594,6 @@ approved-commands = ["cat > context.json"]
 // Post-Start Command Tests (parallel, background)
 // ============================================================================
 
-/// Skipped on Windows: snapshot output differs due to shell/path differences.
-#[cfg_attr(windows, ignore)]
 #[rstest]
 fn test_post_start_single_background_command(repo: TestRepo) {
     // Create project config with a background command
@@ -636,8 +630,6 @@ approved-commands = ["sleep 0.1 && echo 'Background task done' > background.txt"
     wait_for_file(output_file.as_path(), Duration::from_secs(5));
 }
 
-/// Skipped on Windows: snapshot output differs due to shell/path differences.
-#[cfg_attr(windows, ignore)]
 #[rstest]
 fn test_post_start_multiple_background_commands(repo: TestRepo) {
     // Create project config with multiple background commands (table format)
@@ -681,8 +673,6 @@ approved-commands = [
     );
 }
 
-/// Skipped on Windows: snapshot output differs due to shell/path differences.
-#[cfg_attr(windows, ignore)]
 #[rstest]
 fn test_both_post_create_and_post_start(repo: TestRepo) {
     // Create project config with both command types
