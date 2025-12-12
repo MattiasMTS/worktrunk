@@ -838,7 +838,7 @@ wt step for-each -- "echo Branch: {{ branch }}"
 Pull updates in worktrees with upstreams (skips others):
 
 ```console
-wt step for-each -- '[ "$(git rev-parse @{u} 2>/dev/null)" ] || exit 0; git pull --autostash'
+git fetch --prune && wt step for-each -- '[ "$(git rev-parse @{u} 2>/dev/null)" ] || exit 0; git pull --autostash'
 ```
 
 Note: This command is experimental and may change in future versions.
