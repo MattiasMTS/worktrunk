@@ -19,6 +19,8 @@
 //! - Within worktrees: Git operations (ahead/behind, diffs, CI) run concurrently via scoped threads
 //!
 //! This ensures fast operations don't wait for slow ones (e.g., CI doesn't block ahead/behind counts)
+use std::path::Path;
+
 use crossbeam_channel as chan;
 use dunce::canonicalize;
 use rayon::prelude::*;
@@ -538,16 +540,25 @@ pub fn collect(
         Vec::new()
     };
 
+    // Pre-canonicalize main_worktree.path for is_main comparison
+    // (paths from git worktree list may differ based on symlinks or working directory)
+    let main_worktree_canonical = canonicalize(&main_worktree.path).ok();
+
     // Initialize worktree items with identity fields and None for computed fields
     let mut all_items: Vec<ListItem> = sorted_worktrees
         .iter()
         .map(|wt| {
-            let is_main = wt.path == main_worktree.path;
-            // Canonicalize wt.path for comparison since current_worktree_path is canonicalized
-            // (On Windows, paths from git worktree list may differ from git rev-parse --show-toplevel)
+            // Canonicalize paths for comparison - git worktree list may return different
+            // path representations depending on symlinks or which directory you run from
+            let wt_canonical = canonicalize(&wt.path).ok();
+            let is_main = match (&wt_canonical, &main_worktree_canonical) {
+                (Some(wt_c), Some(main_c)) => wt_c == main_c,
+                // Fallback to direct comparison if canonicalization fails
+                _ => wt.path == main_worktree.path,
+            };
             let is_current = current_worktree_path
                 .as_ref()
-                .is_some_and(|cp| canonicalize(&wt.path).as_ref().ok() == Some(cp));
+                .is_some_and(|cp| wt_canonical.as_ref() == Some(cp));
             let is_previous = previous_branch
                 .as_deref()
                 .is_some_and(|prev| wt.branch.as_deref() == Some(prev));
@@ -555,30 +566,23 @@ pub fn collect(
             // Compute path mismatch: does the actual path match what the template would generate?
             // Main worktree on default branch is the reference point (no mismatch possible)
             // Main worktree on OTHER branch should show mismatch (it's "not at home")
+            let paths_equal = |expected: &Path| -> bool {
+                match (&wt_canonical, canonicalize(expected).ok()) {
+                    (Some(actual), Some(expected)) => actual == &expected,
+                    _ => wt.path == *expected,
+                }
+            };
             let path_mismatch = if is_main && wt.branch.as_deref() == Some(default_branch.as_str())
             {
                 false
             } else if let Some(branch) = &wt.branch {
-                // Expand template and compare with actual path
-                match config.format_path(main_worktree_name, branch) {
-                    Ok(expected_relative) => {
-                        // Template path is relative to main worktree, resolve it
-                        let expected_path = main_worktree.path.join(&expected_relative);
-                        // Canonicalize both paths for comparison (handles symlinks, .., etc.)
-                        let actual_canonical = canonicalize(&wt.path).ok();
-                        let expected_canonical = canonicalize(&expected_path).ok();
-                        match (actual_canonical, expected_canonical) {
-                            (Some(actual), Some(expected)) => actual != expected,
-                            // Can't canonicalize one or both paths (e.g., worktree deleted,
-                            // expected parent doesn't exist). Fall back to direct comparison.
-                            _ => wt.path != expected_path,
-                        }
-                    }
-                    Err(e) => {
+                config
+                    .format_path(main_worktree_name, branch)
+                    .map(|rel| !paths_equal(&main_worktree.path.join(&rel)))
+                    .unwrap_or_else(|e| {
                         log::debug!("Template expansion failed for branch {}: {}", branch, e);
-                        false // Template expansion failed, don't mark as mismatch
-                    }
-                }
+                        false
+                    })
             } else {
                 // Detached HEAD - not on any branch, so "not at home"
                 true
