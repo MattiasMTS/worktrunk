@@ -541,8 +541,6 @@ With `--project`, creates `.config/wt.toml` in the current repository:
 # test = ".venv/bin/pytest"
 ```
 
----
-
 ### Command reference
 
 ```
@@ -614,7 +612,245 @@ Clear all stored state:
 wt config state clear
 ```
 
----
+## wt config state default-branch
+
+### Detection
+
+Worktrunk detects the default branch automatically:
+
+1. **Local cache** — Checks `git rev-parse origin/HEAD` (fast, no network)
+2. **Remote query** — If not cached, queries `git ls-remote` (100ms–2s)
+3. **Cache result** — Stores via `git remote set-head` for future calls
+4. **Local inference** — If no remote, infers from local branches
+
+The local inference fallback uses these heuristics in order:
+- If only one local branch exists, uses it
+- Checks what HEAD points to in main worktree
+- Checks `git config init.defaultBranch`
+- Looks for common names: main, master, develop
+
+### When to use
+
+Most users never need this command — default branch detection is automatic.
+Use it to:
+
+- **Debug** — See what worktrunk thinks the default branch is
+- **Override** — Set a non-standard default branch with `set`
+- **Refresh** — Force re-query with `get --refresh` after remote changes
+- **Clear** — Remove cached value with `clear`
+
+Without a subcommand, runs `get`. For `--refresh`, use `get --refresh`.
+
+### Command reference
+
+```
+wt config state default-branch - Default branch setting
+
+Usage: wt config state default-branch [OPTIONS] [COMMAND]
+
+Commands:
+  get    Get the default branch
+  set    Set the default branch
+  clear  Clear the default branch cache
+
+Options:
+  -h, --help
+          Print help (see a summary with '-h')
+
+Global Options:
+  -C <path>
+          Working directory for this command
+
+      --config <path>
+          User config file path
+
+  -v, --verbose
+          Show commands and debug info
+```
+
+
+## wt config state ci-status
+
+Caches GitHub/GitLab CI status for display in [wt list](@/list.md#ci-status).
+
+### How it works
+
+1. **Platform detection** — Detected from remote URL (github.com → GitHub, gitlab.com → GitLab)
+2. **CLI requirement** — Requires `gh` (GitHub) or `glab` (GitLab) CLI, authenticated
+3. **What's checked** — PRs/MRs first, then branch pipelines for branches with upstream
+4. **Caching** — Results cached 30-60 seconds per branch+commit
+
+### Status values
+
+| Status | Meaning |
+|--------|---------|
+| `passed` | All checks passed |
+| `running` | Checks in progress |
+| `failed` | Checks failed |
+| `conflicts` | PR has merge conflicts |
+| `noci` | No checks configured |
+
+See [wt list CI status](@/list.md#ci-status) for display symbols and colors.
+
+### When to use
+
+- **Debug** — See cached status and when it was fetched
+- **Refresh** — Force re-fetch with `get --refresh`
+- **Clear** — Remove stale cache entries
+
+Without a subcommand, runs `get` for the current branch. For `--branch` or `--refresh`, use `get --branch=NAME`.
+
+### Command reference
+
+```
+wt config state ci-status - CI status cache
+
+Usage: wt config state ci-status [OPTIONS] [COMMAND]
+
+Commands:
+  get    Get CI status for a branch
+  clear  Clear CI status cache
+
+Options:
+  -h, --help
+          Print help (see a summary with '-h')
+
+Global Options:
+  -C <path>
+          Working directory for this command
+
+      --config <path>
+          User config file path
+
+  -v, --verbose
+          Show commands and debug info
+```
+
+
+## wt config state marker
+
+Custom status text or emoji shown in the `wt list` Status column.
+
+### Display
+
+Markers appear at the start of the Status column:
+
+```
+Branch    Status   Path
+main      ^        ~/code/myproject
+feature   🚧↑      ~/code/myproject.feature
+bugfix    🤖!↑⇡    ~/code/myproject.bugfix
+```
+
+### Use cases
+
+- **Work status** — `🚧` WIP, `✅` ready for review, `🔥` urgent
+- **Agent tracking** — The [Claude Code plugin](@/claude-code.md) sets markers automatically
+- **Notes** — Any short text: `"blocked"`, `"needs tests"`
+
+### Storage
+
+Stored in git config as `worktrunk.marker.<branch>`. Set directly with:
+
+```bash
+git config worktrunk.marker.feature "🚧"
+```
+
+Without a subcommand, runs `get` for the current branch. For `--branch`, use `get --branch=NAME`.
+
+### Command reference
+
+```
+wt config state marker - Branch markers
+
+Usage: wt config state marker [OPTIONS] [COMMAND]
+
+Commands:
+  get    Get marker for a branch
+  set    Set marker for a branch
+  clear  Clear marker for a branch
+
+Options:
+  -h, --help
+          Print help (see a summary with '-h')
+
+Global Options:
+  -C <path>
+          Working directory for this command
+
+      --config <path>
+          User config file path
+
+  -v, --verbose
+          Show commands and debug info
+```
+
+
+## wt config state logs
+
+View and manage logs from background operations.
+
+### What's logged
+
+| Operation | Log file |
+|-----------|----------|
+| post-start hooks | `{branch}-{source}-post-start-{name}.log` |
+| Background removal | `{branch}-remove.log` |
+
+Source is `user` or `project` depending on where the hook is defined.
+
+### Location
+
+All logs are stored in `.git/wt-logs/` (in the main worktree's git directory).
+
+### Behavior
+
+- **Overwrites** — Same operation on same branch overwrites previous log
+- **Persists** — Logs from deleted branches remain until manually cleared
+- **Shared** — All worktrees write to the same log directory
+
+### Examples
+
+List all log files:
+```bash
+wt config state logs get
+```
+
+View a specific log:
+```bash
+cat "$(git rev-parse --git-dir)/wt-logs/feature-project-post-start-build.log"
+```
+
+Clear all logs:
+```bash
+wt config state logs clear
+```
+
+### Command reference
+
+```
+wt config state logs - Background operation logs
+
+Usage: wt config state logs [OPTIONS] [COMMAND]
+
+Commands:
+  get    List background operation log files
+  clear  Clear background operation logs
+
+Options:
+  -h, --help
+          Print help (see a summary with '-h')
+
+Global Options:
+  -C <path>
+          Working directory for this command
+
+      --config <path>
+          User config file path
+
+  -v, --verbose
+          Show commands and debug info
+```
 
 ### Command reference
 
@@ -646,8 +882,6 @@ Global Options:
   -v, --verbose
           Show commands and debug info
 ```
-
----
 
 ## Command reference
 

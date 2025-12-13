@@ -41,8 +41,6 @@ wt step push
 - [wt merge](@/merge.md) — Runs commit → squash → rebase → hooks → push → cleanup automatically
 - [wt hook](@/hook.md) — Run hooks independently
 
----
-
 ## Command reference
 
 ```

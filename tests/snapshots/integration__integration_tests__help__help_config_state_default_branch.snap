@@ -42,4 +42,29 @@ Usage: [1m[36mwt config state default-branch[0m [36m[OPTIONS][0m [36m[COMM
   [1m[36m-v[0m, [1m[36m--verbose
           Show commands and debug info
 
+[32mDetection
+
+Worktrunk detects the default branch automatically:
+
+1. [1mLocal cache[0m — Checks [2mgit rev-parse origin/HEAD[0m (fast, no network)
+2. [1mRemote query[0m — If not cached, queries [2mgit ls-remote[0m (100ms–2s)
+3. [1mCache result[0m — Stores via [2mgit remote set-head[0m for future calls
+4. [1mLocal inference[0m — If no remote, infers from local branches
+
+The local inference fallback uses these heuristics in order:
+- If only one local branch exists, uses it
+- Checks what HEAD points to in main worktree
+- Checks [2mgit config init.defaultBranch
+- Looks for common names: main, master, develop
+
+[32mWhen to use
+
+Most users never need this command — default branch detection is automatic.
+Use it to:
+
+- [1mDebug[0m — See what worktrunk thinks the default branch is
+- [1mOverride[0m — Set a non-standard default branch with [2mset
+- [1mRefresh[0m — Force re-query with [2mget --refresh[0m after remote changes
+- [1mClear[0m — Remove cached value with [2mclear
+
 Without a subcommand, runs [2mget[0m. For [2m--refresh[0m, use [2mget --refresh[0m.

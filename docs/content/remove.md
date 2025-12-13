@@ -63,8 +63,6 @@ Arguments resolve by path first, then branch name. [Shortcuts](@/switch.md#short
 - [wt merge](@/merge.md) — Remove worktree after merging
 - [wt list](@/list.md) — View all worktrees
 
----
-
 ## Command reference
 
 ```

@@ -343,8 +343,6 @@ env = "cp {{ repo_root }}/.env.local .env"
 - [wt switch](@/switch.md) — Runs post-create/post-start hooks on `--create`
 - [wt config](@/config.md) — Manage hook approvals
 
----
-
 ## Command reference
 
 ```

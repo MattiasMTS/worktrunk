@@ -41,4 +41,31 @@ Usage: [1m[36mwt config state ci-status[0m [36m[OPTIONS][0m [36m[COMMAND]
   [1m[36m-v[0m, [1m[36m--verbose
           Show commands and debug info
 
+Caches GitHub/GitLab CI status for display in wt list.
+
+[32mHow it works
+
+1. [1mPlatform detection[0m — Detected from remote URL (github.com → GitHub, gitlab.com → GitLab)
+2. [1mCLI requirement[0m — Requires [2mgh[0m (GitHub) or [2mglab[0m (GitLab) CLI, authenticated
+3. [1mWhat's checked[0m — PRs/MRs first, then branch pipelines for branches with upstream
+4. [1mCaching[0m — Results cached 30-60 seconds per branch+commit
+
+[32mStatus values
+
+  Status     Meaning               
+  ─────────  ──────────────────────
+  [2mpassed[0m     All checks passed     
+  [2mrunning[0m    Checks in progress    
+  [2mfailed[0m     Checks failed         
+  [2mconflicts[0m  PR has merge conflicts
+  [2mnoci[0m       No checks configured  
+
+See wt list CI status for display symbols and colors.
+
+[32mWhen to use
+
+- [1mDebug[0m — See cached status and when it was fetched
+- [1mRefresh[0m — Force re-fetch with [2mget --refresh
+- [1mClear[0m — Remove stale cache entries
+
 Without a subcommand, runs [2mget[0m for the current branch. For [2m--branch[0m or [2m--refresh[0m, use [2mget --branch=NAME[0m.

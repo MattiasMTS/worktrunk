@@ -179,8 +179,6 @@ wt list --format=json | jq '.[] | select(.main_state == "integrated" or .main_st
 
 - [wt select](@/select.md) — Interactive worktree picker with live preview
 
----
-
 ## Command reference
 
 ```

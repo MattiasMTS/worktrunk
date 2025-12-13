@@ -29,9 +29,32 @@ Usage: [1m[36mwt config state previous-branch[0m [36m[OPTIONS][0m [36m[COM
   [1m[36mclear[0m  Clear the previous branch
 
 [1m[32mOptions:
-  [1m[36m-h[0m, [1m[36m--help[0m  Print help
+  [1m[36m-h[0m, [1m[36m--help
+          Print help (see a summary with '-h')
 
 [1m[32mGlobal Options:
-  [1m[36m-C[0m[36m [0m[36m<path>[0m            Working directory for this command
-      [1m[36m--config[0m[36m [0m[36m<path>[0m  User config file path
-  [1m[36m-v[0m, [1m[36m--verbose[0m        Show commands and debug info
+  [1m[36m-C[0m[36m [0m[36m<path>
+          Working directory for this command
+
+      [1m[36m--config[0m[36m [0m[36m<path>
+          User config file path
+
+  [1m[36m-v[0m, [1m[36m--verbose
+          Show commands and debug info
+
+Enables [2mwt switch -[0m to return to the previous worktree, similar to [2mcd -[0m or [2mgit checkout -[0m.
+
+[32mHow it works
+
+Updated automatically on every [2mwt switch[0m. Stored in git config as [2mworktrunk.history[0m.
+
+[32mWhen to use
+
+Most users never need this command — the previous branch updates automatically.
+Use it to:
+
+- [1mDebug[0m — See what [2m-[0m resolves to
+- [1mOverride[0m — Set a specific branch as "previous"
+- [1mClear[0m — Reset the history
+
+Without a subcommand, runs [2mget[0m.

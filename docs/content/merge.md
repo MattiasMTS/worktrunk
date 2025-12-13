@@ -62,8 +62,6 @@ Use `--no-commit` to skip all git operations (steps 1-2) and only run hooks and 
 - [wt remove](@/remove.md) — Remove worktrees without merging
 - [wt switch](@/switch.md) — Navigate to other worktrees
 
----
-
 ## Command reference
 
 ```

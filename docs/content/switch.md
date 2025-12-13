@@ -62,8 +62,6 @@ wt switch --create fix --base=@  # Branch from current HEAD
 - [wt remove](@/remove.md) — Delete worktrees when done
 - [wt merge](@/merge.md) — Integrate changes back to main
 
----
-
 ## Command reference
 
 ```

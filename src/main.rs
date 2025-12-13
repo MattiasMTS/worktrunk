@@ -301,8 +301,6 @@ fn handle_help_page(args: &[String]) {
     println!();
     println!("{}", after_help.trim());
     println!();
-    println!("---");
-    println!();
     println!("## Command reference");
     println!();
     println!("```");
@@ -418,15 +416,25 @@ fn format_subcommand_section(
     let full_command = format!("{} {}", parent_name, subcommand_name);
 
     // Get the after_long_help content (conceptual docs)
-    // Increase heading levels since this will be nested under an H2
+    // First increase heading levels for the direct content, THEN expand subdocs.
+    // This way subdocs stay at their written level (##) instead of being bumped up.
     let after_help = sub
         .get_after_long_help()
         .map(|s| {
             let text = s.to_string().replace("```console\n", "```bash\n");
             let text = increase_heading_levels(&text);
+            let text = expand_subdoc_placeholders(&text, sub, &full_command);
             colorize_ci_status_for_html(&text)
         })
         .unwrap_or_default();
+
+    // Format the section
+    let mut section = format!("## {}\n\n", full_command);
+
+    if !after_help.is_empty() {
+        section.push_str(after_help.trim());
+        section.push_str("\n\n");
+    }
 
     // Build command path from parent_name: "wt config" -> ["config", "create"]
     let command_path: Vec<&str> = parent_name
@@ -437,14 +445,6 @@ fn format_subcommand_section(
         .collect();
 
     let reference_block = get_help_reference(&command_path);
-
-    // Format the section
-    let mut section = format!("## {}\n\n", full_command);
-
-    if !after_help.is_empty() {
-        section.push_str(after_help.trim());
-        section.push_str("\n\n---\n\n");
-    }
 
     section.push_str("### Command reference\n\n```\n");
     section.push_str(reference_block.trim());
