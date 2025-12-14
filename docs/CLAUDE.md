@@ -267,11 +267,23 @@ Demo GIFs (~2MB each) are stored in a separate `worktrunk-assets` repo to avoid 
 **To update demos:**
 ```bash
 ./docs/demos/wt/build          # Build from VHS tape file
-./docs/demos/wt-select/build   # Build select demo
+./docs/demos/wt-select/build   # Build select demo (requires vhs-keystrokes, see below)
 ./scripts/publish-assets       # Push to assets repo
 ```
 
 Deploy runs `fetch-assets` before building.
+
+### wt-select prerequisites
+
+The `wt-select` demo requires a custom VHS fork with keystroke overlay. Build it once:
+
+```bash
+cd docs/demos/wt-select
+git clone -b keypress-overlay https://github.com/max-sixty/vhs.git vhs-keystrokes
+cd vhs-keystrokes && go build -o vhs-keystrokes .
+```
+
+The build script looks for `docs/demos/wt-select/vhs-keystrokes/vhs-keystrokes`.
 
 ### Light/dark theme variants
 
