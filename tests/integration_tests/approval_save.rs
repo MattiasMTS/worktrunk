@@ -338,6 +338,188 @@ args = ["-s"]
     );
 }
 
+/// Test that concurrent approve operations don't lose data
+///
+/// This tests a race condition where two config instances (simulating separate processes)
+/// both approve commands. Without proper merging, the second save would overwrite
+/// the first approval, losing it.
+#[test]
+fn test_concurrent_approve_preserves_all_approvals() {
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join("config.toml");
+
+    // Process A: Start with empty config, approve "npm install"
+    let mut config_a = WorktrunkConfig::default();
+
+    // Process B: Start with empty config (simulating a separate process that loaded before A saved)
+    let mut config_b = WorktrunkConfig::default();
+
+    // Process A approves and saves "npm install"
+    config_a
+        .approve_command_to(
+            "github.com/user/repo".to_string(),
+            "npm install".to_string(),
+            Some(&config_path),
+        )
+        .unwrap();
+
+    // Verify file has "npm install"
+    let toml_content = fs::read_to_string(&config_path).unwrap();
+    assert!(
+        toml_content.contains("npm install"),
+        "File should contain 'npm install'"
+    );
+
+    // Process B (which loaded BEFORE Process A saved) now approves and saves "npm test"
+    // The save_to method should merge with what's on disk, not overwrite
+    config_b
+        .approve_command_to(
+            "github.com/user/repo".to_string(),
+            "npm test".to_string(),
+            Some(&config_path),
+        )
+        .unwrap();
+
+    // Read the final state from disk
+    let toml_content = fs::read_to_string(&config_path).unwrap();
+
+    // Both approvals should be preserved
+    assert!(
+        toml_content.contains("npm install"),
+        "BUG: 'npm install' approval was lost due to race condition. \
+         config_b's save_to() should merge with disk state, not overwrite it. \
+         Saved content:\n{toml_content}"
+    );
+    assert!(
+        toml_content.contains("npm test"),
+        "'npm test' approval should exist. Saved content:\n{toml_content}"
+    );
+}
+
+/// Test that concurrent revoke operations don't lose data
+///
+/// This tests a race condition where two config instances (simulating separate processes)
+/// both revoke commands. Without proper merging, the second save would restore
+/// the revoked command from its stale in-memory state.
+#[test]
+fn test_concurrent_revoke_preserves_all_changes() {
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join("config.toml");
+
+    // Setup: config file has two commands approved
+    let mut setup_config = WorktrunkConfig::default();
+    setup_config
+        .approve_command_to(
+            "github.com/user/repo".to_string(),
+            "npm install".to_string(),
+            Some(&config_path),
+        )
+        .unwrap();
+    setup_config
+        .approve_command_to(
+            "github.com/user/repo".to_string(),
+            "npm test".to_string(),
+            Some(&config_path),
+        )
+        .unwrap();
+
+    // Verify setup
+    let toml_content = fs::read_to_string(&config_path).unwrap();
+    assert!(toml_content.contains("npm install"));
+    assert!(toml_content.contains("npm test"));
+
+    // Process A: loads config (has ["npm install", "npm test"])
+    let mut config_a = WorktrunkConfig::default();
+    config_a
+        .projects
+        .entry("github.com/user/repo".to_string())
+        .or_default()
+        .approved_commands = vec!["npm install".to_string(), "npm test".to_string()];
+
+    // Process B: loads config (has ["npm install", "npm test"])
+    let mut config_b = WorktrunkConfig::default();
+    config_b
+        .projects
+        .entry("github.com/user/repo".to_string())
+        .or_default()
+        .approved_commands = vec!["npm install".to_string(), "npm test".to_string()];
+
+    // Process A revokes "npm install"
+    config_a
+        .revoke_command_to("github.com/user/repo", "npm install", Some(&config_path))
+        .unwrap();
+
+    // Process B (with stale state) revokes "npm test"
+    // Should see that "npm install" was already revoked and preserve that
+    config_b
+        .revoke_command_to("github.com/user/repo", "npm test", Some(&config_path))
+        .unwrap();
+
+    // Read the final state from disk
+    let toml_content = fs::read_to_string(&config_path).unwrap();
+
+    // Both revocations should be respected - neither command should remain
+    assert!(
+        !toml_content.contains("npm install"),
+        "'npm install' should have been revoked. Saved content:\n{toml_content}"
+    );
+    assert!(
+        !toml_content.contains("npm test"),
+        "'npm test' should have been revoked. Saved content:\n{toml_content}"
+    );
+}
+
+/// Test that concurrent approve operations across different projects also work
+#[test]
+fn test_concurrent_approve_different_projects() {
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join("config.toml");
+
+    // Process A: empty config
+    let mut config_a = WorktrunkConfig::default();
+
+    // Process B: empty config (loaded before A saved)
+    let mut config_b = WorktrunkConfig::default();
+
+    // Process A approves for project1
+    config_a
+        .approve_command_to(
+            "github.com/user/project1".to_string(),
+            "npm install".to_string(),
+            Some(&config_path),
+        )
+        .unwrap();
+
+    // Process B approves for project2
+    // Should preserve project1's approval
+    config_b
+        .approve_command_to(
+            "github.com/user/project2".to_string(),
+            "cargo build".to_string(),
+            Some(&config_path),
+        )
+        .unwrap();
+
+    let toml_content = fs::read_to_string(&config_path).unwrap();
+
+    assert!(
+        toml_content.contains("github.com/user/project1"),
+        "Project1 should be preserved. Content:\n{toml_content}"
+    );
+    assert!(
+        toml_content.contains("npm install"),
+        "'npm install' should be preserved. Content:\n{toml_content}"
+    );
+    assert!(
+        toml_content.contains("github.com/user/project2"),
+        "Project2 should exist. Content:\n{toml_content}"
+    );
+    assert!(
+        toml_content.contains("cargo build"),
+        "'cargo build' should exist. Content:\n{toml_content}"
+    );
+}
+
 /// Test that permission errors when saving config are handled gracefully
 ///
 /// This tests the lower-level `approve_command_to()` method fails when permissions

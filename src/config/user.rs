@@ -451,12 +451,18 @@ impl WorktrunkConfig {
     }
 
     /// Add an approved command and save to a specific config file (for testing)
+    ///
+    /// Reloads from disk before modifying to reduce race conditions from concurrent processes.
     pub fn approve_command_to(
         &mut self,
         project: String,
         command: String,
         config_path: Option<&std::path::Path>,
     ) -> Result<(), ConfigError> {
+        // Reload from disk first to get fresh state (fixes race condition where
+        // concurrent approvals would overwrite each other)
+        self.reload_projects_from(config_path)?;
+
         if self.is_command_approved(&project, &command) {
             return Ok(());
         }
@@ -469,12 +475,58 @@ impl WorktrunkConfig {
         self.save_impl(config_path)
     }
 
+    /// Reload only the projects section from disk, preserving other in-memory state
+    ///
+    /// This replaces the in-memory projects with the authoritative disk state,
+    /// while keeping other config values (worktree-path, commit-generation, etc.).
+    /// Callers should reload before modifying and saving to avoid race conditions.
+    fn reload_projects_from(
+        &mut self,
+        config_path: Option<&std::path::Path>,
+    ) -> Result<(), ConfigError> {
+        let path = match config_path {
+            Some(p) => Some(p.to_path_buf()),
+            None => get_config_path(),
+        };
+
+        let Some(path) = path else {
+            return Ok(()); // No config file to reload from
+        };
+
+        if !path.exists() {
+            return Ok(()); // Nothing to reload
+        }
+
+        let content = std::fs::read_to_string(&path).map_err(|e| {
+            ConfigError::Message(format!(
+                "Failed to read config file {}: {}",
+                path.display(),
+                e
+            ))
+        })?;
+
+        let disk_config: WorktrunkConfig = toml::from_str(&content).map_err(|e| {
+            ConfigError::Message(format!(
+                "Failed to parse config file {}: {}",
+                path.display(),
+                e
+            ))
+        })?;
+
+        // Replace in-memory projects with disk state (disk is authoritative)
+        self.projects = disk_config.projects;
+
+        Ok(())
+    }
+
     /// Revoke an approved command and save to config file
     pub fn revoke_command(&mut self, project: &str, command: &str) -> Result<(), ConfigError> {
         self.revoke_command_to(project, command, None)
     }
 
     /// Revoke an approved command and save to a specific config file (for testing)
+    ///
+    /// Reloads from disk before modifying to reduce race conditions from concurrent processes.
     #[doc(hidden)]
     pub fn revoke_command_to(
         &mut self,
@@ -482,6 +534,9 @@ impl WorktrunkConfig {
         command: &str,
         config_path: Option<&std::path::Path>,
     ) -> Result<(), ConfigError> {
+        // Reload from disk first to get fresh state (fixes race condition)
+        self.reload_projects_from(config_path)?;
+
         if let Some(project_config) = self.projects.get_mut(project) {
             let len_before = project_config.approved_commands.len();
             project_config.approved_commands.retain(|c| c != command);
@@ -504,12 +559,17 @@ impl WorktrunkConfig {
     }
 
     /// Remove all approvals for a project and save to a specific config file (for testing)
+    ///
+    /// Reloads from disk before modifying to reduce race conditions from concurrent processes.
     #[doc(hidden)]
     pub fn revoke_project_to(
         &mut self,
         project: &str,
         config_path: Option<&std::path::Path>,
     ) -> Result<(), ConfigError> {
+        // Reload from disk first to get fresh state (fixes race condition)
+        self.reload_projects_from(config_path)?;
+
         if self.projects.remove(project).is_some() {
             self.save_impl(config_path)?;
         }
