@@ -205,34 +205,51 @@ pub fn handle_list(
     if show_full {
         let ci_tools = ci_status::CiToolsStatus::detect();
         if !ci_tools.any_available() {
+            use ci_status::{CiPlatform, get_platform_for_repo};
             use color_print::cformat;
+            use worktrunk::git::Repository;
             use worktrunk::styling::hint_message;
-            crate::output::blank()?;
 
-            // Provide specific guidance based on what's installed but not authenticated
-            let gh_needs_auth = ci_tools.gh_installed && !ci_tools.gh_authenticated;
-            let glab_needs_auth = ci_tools.glab_installed && !ci_tools.glab_authenticated;
+            // Detect platform from repo's remote URL
+            let platform = Repository::current()
+                .worktree_root()
+                .ok()
+                .and_then(|root| get_platform_for_repo(root.to_str()?));
 
-            if gh_needs_auth && glab_needs_auth {
-                // Both installed but neither authenticated
-                crate::output::print(hint_message(cformat!(
-                    "CI status unavailable; run <bright-black>gh auth login</> or <bright-black>glab auth login</>"
-                )))?;
-            } else if gh_needs_auth {
-                // gh installed but not authenticated
-                crate::output::print(hint_message(cformat!(
-                    "CI status unavailable; run <bright-black>gh auth login</> to authenticate"
-                )))?;
-            } else if glab_needs_auth {
-                // glab installed but not authenticated
-                crate::output::print(hint_message(cformat!(
-                    "CI status unavailable; run <bright-black>glab auth login</> to authenticate"
-                )))?;
-            } else {
-                // Neither tool is installed
-                crate::output::print(hint_message(cformat!(
-                    "CI status unavailable; install <bright-black>gh</> or <bright-black>glab</>"
-                )))?;
+            // Only show hint for the relevant platform's tool
+            let hint = match platform {
+                Some(CiPlatform::GitHub) => {
+                    if ci_tools.gh_installed && !ci_tools.gh_authenticated {
+                        Some(cformat!(
+                            "CI status unavailable; run <bright-black>gh auth login</> to authenticate"
+                        ))
+                    } else if !ci_tools.gh_installed {
+                        Some(cformat!(
+                            "CI status unavailable; install <bright-black>gh</>"
+                        ))
+                    } else {
+                        None
+                    }
+                }
+                Some(CiPlatform::GitLab) => {
+                    if ci_tools.glab_installed && !ci_tools.glab_authenticated {
+                        Some(cformat!(
+                            "CI status unavailable; run <bright-black>glab auth login</> to authenticate"
+                        ))
+                    } else if !ci_tools.glab_installed {
+                        Some(cformat!(
+                            "CI status unavailable; install <bright-black>glab</>"
+                        ))
+                    } else {
+                        None
+                    }
+                }
+                None => None, // Unknown platform - don't show any hint
+            };
+
+            if let Some(message) = hint {
+                crate::output::blank()?;
+                crate::output::print(hint_message(message))?;
             }
         }
     }

@@ -6,7 +6,7 @@ use worktrunk::git::Repository;
 // TODO: Add a `[ci] platform = "github" | "gitlab"` override in project config
 // for cases where URL detection fails or users want to force a specific platform.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum CiPlatform {
+pub enum CiPlatform {
     GitHub,
     GitLab,
 }
@@ -24,7 +24,7 @@ fn detect_platform_from_url(url: &str) -> Option<CiPlatform> {
 }
 
 /// Get the CI platform for a repository by checking its origin remote URL.
-fn get_platform_for_repo(repo_root: &str) -> Option<CiPlatform> {
+pub fn get_platform_for_repo(repo_root: &str) -> Option<CiPlatform> {
     let output = Command::new("git")
         .args(["remote", "get-url", "origin"])
         .current_dir(repo_root)

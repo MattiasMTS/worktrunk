@@ -5,7 +5,6 @@ info:
   args:
     - config
     - show
-    - "--full"
   env:
     APPDATA: "[TEST_CONFIG_HOME]"
     CLICOLOR_FORCE: "1"
@@ -31,10 +30,6 @@ exit_code: 0
 ----- stderr -----
 [36mUSER CONFIG[39m  ~/.config/worktrunk/config.toml
 [107m [0m  worktree-path = [32m"../{{ main_worktree }}.{{ branch }}"
-[107m [0m  
-[107m [0m  [1m[36m[commit-generation]
-[107m [0m  command = [32m"nonexistent-llm-command-12345"
-[107m [0m  args = [[32m"-m"[0m, [32m"test-model"[0m]
 
 [36mPROJECT CONFIG[39m  [REPO]/.config/wt.toml
 💡 [2mNot found[22m
@@ -45,16 +40,4 @@ exit_code: 0
 ⚪ [2mSkipped fish; ~/.config/fish/conf.d not found[22m
 
 [36mBINARIES[39m
-💡 [2mCI status requires GitHub or GitLab remote[22m
-
-⚪ Running diagnostic checks...
-
-🔄 [36mTesting commit generation with [1mnonexistent-llm-command-12345 -m test-model[22m[39m
-❌ [31mCommit generation failed[39m
-[107m [0m  ❌ [31mCommit generation command failed[39m
-[107m [0m  [107m [0m  Failed to spawn LLM command
-[107m [0m  
-[107m [0m  ⚪ Ran command:
-[107m [0m  [107m [0m  nonexistent-llm-command-12345 -m test-model
-
-💡 [2mCheck that the command is installed and API keys are configured[22m
+🟡 [33m[1mgh[22m installed but not authenticated; run [90mgh auth login[39m[39m

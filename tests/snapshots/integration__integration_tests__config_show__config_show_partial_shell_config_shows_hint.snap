@@ -43,5 +43,4 @@ exit_code: 0
 💡 [2m[90mwt config shell install[39m enables shell integration[22m
 
 [36mBINARIES[39m
-🟡 [33m[1mgh[22m installed but not authenticated; run [90mgh auth login[39m[39m
-🟡 [33m[1mglab[22m installed but not authenticated; run [90mglab auth login[39m[39m
+💡 [2mCI status requires GitHub or GitLab remote[22m

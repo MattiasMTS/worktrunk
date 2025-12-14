@@ -352,3 +352,79 @@ args = ["-m", "test-model"]
         assert_cmd_snapshot!(cmd);
     });
 }
+
+/// Test `wt config show` with GitHub remote shows only gh status
+#[rstest]
+fn test_config_show_github_remote(mut repo: TestRepo, temp_home: TempDir) {
+    // Setup mock gh/glab for deterministic BINARIES output
+    repo.setup_mock_ci_tools_unauthenticated();
+
+    // Add GitHub remote
+    repo.git_command(&[
+        "remote",
+        "add",
+        "origin",
+        "https://github.com/example/repo.git",
+    ])
+    .output()
+    .unwrap();
+
+    // Create fake global config
+    let global_config_dir = temp_home.path().join(".config").join("worktrunk");
+    fs::create_dir_all(&global_config_dir).unwrap();
+    fs::write(
+        global_config_dir.join("config.toml"),
+        r#"worktree-path = "../{{ main_worktree }}.{{ branch }}"
+"#,
+    )
+    .unwrap();
+
+    let settings = setup_snapshot_settings_with_home(&repo, &temp_home);
+    settings.bind(|| {
+        let mut cmd = wt_command();
+        repo.clean_cli_env(&mut cmd);
+        repo.configure_mock_commands(&mut cmd);
+        cmd.arg("config").arg("show").current_dir(repo.root_path());
+        set_temp_home_env(&mut cmd, temp_home.path());
+
+        assert_cmd_snapshot!(cmd);
+    });
+}
+
+/// Test `wt config show` with GitLab remote shows only glab status
+#[rstest]
+fn test_config_show_gitlab_remote(mut repo: TestRepo, temp_home: TempDir) {
+    // Setup mock gh/glab for deterministic BINARIES output
+    repo.setup_mock_ci_tools_unauthenticated();
+
+    // Add GitLab remote
+    repo.git_command(&[
+        "remote",
+        "add",
+        "origin",
+        "https://gitlab.com/example/repo.git",
+    ])
+    .output()
+    .unwrap();
+
+    // Create fake global config
+    let global_config_dir = temp_home.path().join(".config").join("worktrunk");
+    fs::create_dir_all(&global_config_dir).unwrap();
+    fs::write(
+        global_config_dir.join("config.toml"),
+        r#"worktree-path = "../{{ main_worktree }}.{{ branch }}"
+"#,
+    )
+    .unwrap();
+
+    let settings = setup_snapshot_settings_with_home(&repo, &temp_home);
+    settings.bind(|| {
+        let mut cmd = wt_command();
+        repo.clean_cli_env(&mut cmd);
+        repo.configure_mock_commands(&mut cmd);
+        cmd.arg("config").arg("show").current_dir(repo.root_path());
+        set_temp_home_env(&mut cmd, temp_home.path());
+
+        assert_cmd_snapshot!(cmd);
+    });
+}

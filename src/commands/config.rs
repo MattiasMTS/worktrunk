@@ -428,65 +428,82 @@ fn render_shell_status(out: &mut String) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn render_ci_tool_status(
+    out: &mut String,
+    tool: &str,
+    platform: &str,
+    installed: bool,
+    authenticated: bool,
+) -> anyhow::Result<()> {
+    if installed {
+        if authenticated {
+            writeln!(
+                out,
+                "{}",
+                info_message(cformat!("<bold>{tool}</> installed & authenticated"))
+            )?;
+        } else {
+            writeln!(
+                out,
+                "{}",
+                warning_message(cformat!(
+                    "<bold>{tool}</> installed but not authenticated; run <bright-black>{tool} auth login</>"
+                ))
+            )?;
+        }
+    } else {
+        writeln!(
+            out,
+            "{}",
+            hint_message(cformat!(
+                "<bold>{tool}</> not found ({platform} CI status unavailable)"
+            ))
+        )?;
+    }
+    Ok(())
+}
+
 fn render_binaries_status(out: &mut String) -> anyhow::Result<()> {
-    use super::list::ci_status::CiToolsStatus;
+    use super::list::ci_status::{CiPlatform, CiToolsStatus, get_platform_for_repo};
 
     writeln!(out, "{}", cformat!("<cyan>BINARIES</>"))?;
 
     let ci_tools = CiToolsStatus::detect();
 
-    // Check gh (GitHub CLI)
-    if ci_tools.gh_installed {
-        if ci_tools.gh_authenticated {
-            writeln!(
-                out,
-                "{}",
-                info_message(cformat!("<bold>gh</> installed & authenticated"))
-            )?;
-        } else {
-            writeln!(
-                out,
-                "{}",
-                warning_message(cformat!(
-                    "<bold>gh</> installed but not authenticated; run <bright-black>gh auth login</>"
-                ))
-            )?;
-        }
-    } else {
-        writeln!(
-            out,
-            "{}",
-            hint_message(cformat!(
-                "<bold>gh</> not found (GitHub CI status unavailable)"
-            ))
-        )?;
-    }
+    // Detect platform from repo's remote URL (if in a repo)
+    let platform = Repository::current()
+        .worktree_root()
+        .ok()
+        .and_then(|root| get_platform_for_repo(root.to_str()?));
 
-    // Check glab (GitLab CLI)
-    if ci_tools.glab_installed {
-        if ci_tools.glab_authenticated {
-            writeln!(
+    // Only show the relevant CI tool based on detected platform
+    // If platform is unknown, don't show any warnings (user may not need CI status)
+    match platform {
+        Some(CiPlatform::GitHub) => {
+            render_ci_tool_status(
                 out,
-                "{}",
-                info_message(cformat!("<bold>glab</> installed & authenticated"))
-            )?;
-        } else {
-            writeln!(
-                out,
-                "{}",
-                warning_message(cformat!(
-                    "<bold>glab</> installed but not authenticated; run <bright-black>glab auth login</>"
-                ))
+                "gh",
+                "GitHub",
+                ci_tools.gh_installed,
+                ci_tools.gh_authenticated,
             )?;
         }
-    } else {
-        writeln!(
-            out,
-            "{}",
-            hint_message(cformat!(
-                "<bold>glab</> not found (GitLab CI status unavailable)"
-            ))
-        )?;
+        Some(CiPlatform::GitLab) => {
+            render_ci_tool_status(
+                out,
+                "glab",
+                "GitLab",
+                ci_tools.glab_installed,
+                ci_tools.glab_authenticated,
+            )?;
+        }
+        None => {
+            writeln!(
+                out,
+                "{}",
+                hint_message("CI status requires GitHub or GitLab remote")
+            )?;
+        }
     }
 
     Ok(())
