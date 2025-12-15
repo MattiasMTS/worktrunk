@@ -567,95 +567,21 @@ impl WorktreeSkimItem {
         // - \x1f (unit separator) separates fields within a commit line
         // - --numstat gives tab-separated "added\tdeleted\tfilename" lines we sum
         // Format: graph + hash \x1f timestamp \x1f message (followed by numstat lines)
-        const TIMESTAMP_WIDTH: usize = 4; // "12mo" is the longest
-        const FIELD_DELIM: char = '\x1f';
-        let timestamp_format = "--format=%C(auto)%h\x1f%ct\x1f%C(auto)%d%C(reset) %s";
+        let timestamp_format = format!(
+            "--format=%C(auto)%h{}%ct{}%C(auto)%d%C(reset) %s",
+            FIELD_DELIM, FIELD_DELIM
+        );
         // Dim format: hash is dimmed, timestamp will also be dimmed
-        let dim_timestamp_format = "--format=%C(dim)%h%C(reset)\x1f%ct\x1f %s";
-
-        // Helper to format log output with timestamps and diffstat
-        // Parses --numstat output: commit lines have \x1f, stat lines have tabs
-        let format_log_output = |log_output: &str| -> String {
-            use crate::display::format_relative_time_short;
-            use worktrunk::styling::{ADDITION, DELETION};
-
-            let dim_style = anstyle::Style::new().dimmed();
-            let reset = anstyle::Reset;
-
-            // State machine: accumulate stats for each commit
-            let mut pending_commit: Option<&str> = None;
-            let mut pending_stats: (usize, usize) = (0, 0);
-            let mut result = Vec::new();
-
-            // Format a commit line with stats
-            let format_commit =
-                |commit_line: &str, (insertions, deletions): (usize, usize)| -> String {
-                    if let Some(first_delim) = commit_line.find(FIELD_DELIM)
-                        && let Some(second_delim) = commit_line[first_delim + 1..].find(FIELD_DELIM)
-                    {
-                        let graph_hash = &commit_line[..first_delim];
-                        let timestamp_str =
-                            &commit_line[first_delim + 1..first_delim + 1 + second_delim];
-                        let rest = &commit_line[first_delim + 1 + second_delim + 1..];
-
-                        let time = timestamp_str
-                            .parse::<i64>()
-                            .map(format_relative_time_short)
-                            .unwrap_or_default();
-
-                        // Use the same diff formatting as wt list (aligned columns)
-                        let diff_config = DiffDisplayConfig {
-                            variant: DiffVariant::Signs,
-                            positive_style: ADDITION,
-                            negative_style: DELETION,
-                            always_show_zeros: false,
-                        };
-                        // 3 digits handles values up to 999; overflow uses K notation
-                        let stat_str =
-                            format!(" {}", diff_config.format_aligned(insertions, deletions, 3));
-
-                        format!(
-                            "{}{} {dim_style}{:>width$}{reset}{}",
-                            graph_hash,
-                            stat_str,
-                            time,
-                            rest,
-                            width = TIMESTAMP_WIDTH
-                        )
-                    } else {
-                        commit_line.to_string()
-                    }
-                };
-
-            for line in log_output.lines() {
-                if line.contains(FIELD_DELIM) {
-                    // This is a commit line - emit any pending commit first
-                    if let Some(prev) = pending_commit.take() {
-                        result.push(format_commit(prev, pending_stats));
-                    }
-                    pending_commit = Some(line);
-                    pending_stats = (0, 0);
-                } else if let Some((ins, del)) = Self::parse_numstat_line(line) {
-                    // Accumulate stats for pending commit
-                    pending_stats.0 += ins;
-                    pending_stats.1 += del;
-                }
-                // Skip empty/graph-only lines
-            }
-
-            // Don't forget final commit
-            if let Some(last) = pending_commit {
-                result.push(format_commit(last, pending_stats));
-            }
-
-            result.join("\n")
-        };
+        let dim_timestamp_format = format!(
+            "--format=%C(dim)%h%C(reset){}%ct{} %s",
+            FIELD_DELIM, FIELD_DELIM
+        );
 
         let log_limit_str = log_limit.to_string();
         if is_default_branch {
             // Viewing default branch itself - show history without dimming
-            let format = if show_timestamps {
-                timestamp_format
+            let format: &str = if show_timestamps {
+                &timestamp_format
             } else {
                 no_timestamp_format
             };
@@ -677,8 +603,8 @@ impl WorktreeSkimItem {
 
             // Part 1: Bright commits (merge-base..HEAD)
             let range = format!("{}..{}", merge_base, head);
-            let format = if show_timestamps {
-                timestamp_format
+            let format: &str = if show_timestamps {
+                &timestamp_format
             } else {
                 no_timestamp_format
             };
@@ -692,7 +618,10 @@ impl WorktreeSkimItem {
                 && !log_output.is_empty()
             {
                 // Count commit lines (those with field delimiter, not numstat lines)
-                bright_count = log_output.lines().filter(|l| l.contains('\x1f')).count();
+                bright_count = log_output
+                    .lines()
+                    .filter(|l| l.contains(FIELD_DELIM))
+                    .count();
                 if show_timestamps {
                     output.push_str(&format_log_output(&log_output));
                 } else {
@@ -708,8 +637,8 @@ impl WorktreeSkimItem {
             // Only show enough to reach LOG_LIMIT total
             let dim_limit = log_limit.saturating_sub(bright_count);
             if dim_limit > 0 {
-                let format = if show_timestamps {
-                    dim_timestamp_format
+                let format: &str = if show_timestamps {
+                    &dim_timestamp_format
                 } else {
                     dim_no_timestamp_format
                 };
@@ -731,41 +660,144 @@ impl WorktreeSkimItem {
 
         output
     }
+}
 
-    /// Parse a git numstat line and extract insertions/deletions
-    ///
-    /// Numstat format: `added<TAB>deleted<TAB>filename`
-    /// With --graph --color=always, lines have ANSI-colored graph prefix like `ESC[31m|ESC[m `.
-    /// Binary files show "-" instead of numbers.
-    ///
-    /// Returns Some((insertions, deletions)) for valid numstat lines.
-    fn parse_numstat_line(line: &str) -> Option<(usize, usize)> {
-        use ansi_str::AnsiStr;
+/// Parse a git numstat line and extract insertions/deletions
+///
+/// Numstat format: `added<TAB>deleted<TAB>filename`
+/// With --graph --color=always, lines have ANSI-colored graph prefix like `ESC[31m|ESC[m `.
+/// Binary files show "-" instead of numbers.
+///
+/// Returns Some((insertions, deletions)) for valid numstat lines.
+fn parse_numstat_line(line: &str) -> Option<(usize, usize)> {
+    use ansi_str::AnsiStr;
 
-        // First strip ANSI escape sequences (graph coloring contains digits that confuse parsing)
-        let stripped = line.ansi_strip();
+    // First strip ANSI escape sequences (graph coloring contains digits that confuse parsing)
+    let stripped = line.ansi_strip();
 
-        // Strip graph prefix (e.g., "| ") and find tab-separated values
-        let trimmed = stripped.trim_start_matches(|c: char| !c.is_ascii_digit() && c != '-');
+    // Strip graph prefix (e.g., "| ") and find tab-separated values
+    let trimmed = stripped.trim_start_matches(|c: char| !c.is_ascii_digit() && c != '-');
 
-        // Must have at least two tab-separated fields
-        let mut parts = trimmed.split('\t');
-        let added_str = parts.next()?;
-        let deleted_str = parts.next()?;
+    // Must have at least two tab-separated fields
+    let mut parts = trimmed.split('\t');
+    let added_str = parts.next()?;
+    let deleted_str = parts.next()?;
 
-        // "-" means binary file, treat as 0
-        let added = if added_str == "-" {
-            0
-        } else {
-            added_str.parse().ok()?
+    // "-" means binary file, treat as 0
+    let added = if added_str == "-" {
+        0
+    } else {
+        added_str.parse().ok()?
+    };
+    let deleted = if deleted_str == "-" {
+        0
+    } else {
+        deleted_str.parse().ok()?
+    };
+
+    Some((added, deleted))
+}
+
+/// Field delimiter for git log format with timestamps
+const FIELD_DELIM: char = '\x1f';
+
+/// Timestamp column width ("12mo" is the longest)
+const TIMESTAMP_WIDTH: usize = 4;
+
+/// Format git log output with timestamps and diffstats.
+///
+/// Parses git log output in the format:
+/// `graph_hash\x1ftimestamp\x1f decoration message`
+/// followed by numstat lines (`added\tdeleted\tfilename`).
+///
+/// Returns formatted output with aligned timestamps and diff stats.
+fn format_log_output(log_output: &str) -> String {
+    use crate::display::format_relative_time_short;
+    format_log_output_with_formatter(log_output, format_relative_time_short)
+}
+
+/// Format git log output with a custom time formatter.
+///
+/// This variant allows dependency injection for testing with deterministic timestamps.
+fn format_log_output_with_formatter<F>(log_output: &str, format_time: F) -> String
+where
+    F: Fn(i64) -> String,
+{
+    // State machine: accumulate stats for each commit
+    let mut pending_commit: Option<&str> = None;
+    let mut pending_stats: (usize, usize) = (0, 0);
+    let mut result = Vec::new();
+
+    for line in log_output.lines() {
+        if line.contains(FIELD_DELIM) {
+            // This is a commit line - emit any pending commit first
+            if let Some(prev) = pending_commit.take() {
+                result.push(format_commit_line(prev, pending_stats, &format_time));
+            }
+            pending_commit = Some(line);
+            pending_stats = (0, 0);
+        } else if let Some((ins, del)) = parse_numstat_line(line) {
+            // Accumulate stats for pending commit
+            pending_stats.0 += ins;
+            pending_stats.1 += del;
+        }
+        // Skip empty/graph-only lines
+    }
+
+    // Don't forget final commit
+    if let Some(last) = pending_commit {
+        result.push(format_commit_line(last, pending_stats, &format_time));
+    }
+
+    result.join("\n")
+}
+
+/// Format a single commit line with stats
+fn format_commit_line<F>(
+    commit_line: &str,
+    (insertions, deletions): (usize, usize),
+    format_time: &F,
+) -> String
+where
+    F: Fn(i64) -> String,
+{
+    use worktrunk::styling::{ADDITION, DELETION};
+
+    let dim_style = anstyle::Style::new().dimmed();
+    let reset = anstyle::Reset;
+
+    if let Some(first_delim) = commit_line.find(FIELD_DELIM)
+        && let Some(second_delim) = commit_line[first_delim + 1..].find(FIELD_DELIM)
+    {
+        let graph_hash = &commit_line[..first_delim];
+        let timestamp_str = &commit_line[first_delim + 1..first_delim + 1 + second_delim];
+        let rest = &commit_line[first_delim + 1 + second_delim + 1..];
+
+        let time = timestamp_str
+            .parse::<i64>()
+            .map(format_time)
+            .unwrap_or_default();
+
+        // Use the same diff formatting as wt list (aligned columns)
+        let diff_config = DiffDisplayConfig {
+            variant: DiffVariant::Signs,
+            positive_style: ADDITION,
+            negative_style: DELETION,
+            always_show_zeros: false,
         };
-        let deleted = if deleted_str == "-" {
-            0
-        } else {
-            deleted_str.parse().ok()?
-        };
+        // 3 digits handles values up to 999; overflow uses K notation
+        let stat_str = format!(" {}", diff_config.format_aligned(insertions, deletions, 3));
 
-        Some((added, deleted))
+        format!(
+            "{}{} {dim_style}{:>width$}{reset}{}",
+            graph_hash,
+            stat_str,
+            time,
+            rest,
+            width = TIMESTAMP_WIDTH
+        )
+    } else {
+        commit_line.to_string()
     }
 }
 
@@ -1127,59 +1159,224 @@ mod tests {
     #[test]
     fn test_parse_numstat_line_basic() {
         // Tab-separated: added<TAB>deleted<TAB>filename
-        let result = WorktreeSkimItem::parse_numstat_line("10\t5\tfile.rs");
+        let result = parse_numstat_line("10\t5\tfile.rs");
         assert_eq!(result, Some((10, 5)));
     }
 
     #[test]
     fn test_parse_numstat_line_insertions_only() {
-        let result = WorktreeSkimItem::parse_numstat_line("15\t0\tfile.rs");
+        let result = parse_numstat_line("15\t0\tfile.rs");
         assert_eq!(result, Some((15, 0)));
     }
 
     #[test]
     fn test_parse_numstat_line_deletions_only() {
-        let result = WorktreeSkimItem::parse_numstat_line("0\t8\tfile.rs");
+        let result = parse_numstat_line("0\t8\tfile.rs");
         assert_eq!(result, Some((0, 8)));
     }
 
     #[test]
     fn test_parse_numstat_line_binary_file() {
         // Binary files show "-" instead of numbers
-        let result = WorktreeSkimItem::parse_numstat_line("-\t-\timage.png");
+        let result = parse_numstat_line("-\t-\timage.png");
         assert_eq!(result, Some((0, 0)));
     }
 
     #[test]
     fn test_parse_numstat_line_with_graph_prefix() {
         // Git graph prefixes the numstat line with graph characters
-        let result = WorktreeSkimItem::parse_numstat_line("| 10\t5\tfile.rs");
+        let result = parse_numstat_line("| 10\t5\tfile.rs");
         assert_eq!(result, Some((10, 5)));
 
         // First numstat line after commit has "* | " prefix
-        let result = WorktreeSkimItem::parse_numstat_line("* | 11\t0\tCargo.toml");
+        let result = parse_numstat_line("* | 11\t0\tCargo.toml");
         assert_eq!(result, Some((11, 0)));
 
         // Subsequent numstat lines have "| " prefix
-        let result = WorktreeSkimItem::parse_numstat_line("| 17\t3\tsrc/main.rs");
+        let result = parse_numstat_line("| 17\t3\tsrc/main.rs");
         assert_eq!(result, Some((17, 3)));
 
         // With ANSI colors (--color=always adds escape codes to graph)
         // ESC[31m = red, ESC[m = reset
         let esc = '\x1b';
         let ansi_colored = format!("{esc}[31m|{esc}[m 11\t0\tCargo.toml");
-        let result = WorktreeSkimItem::parse_numstat_line(&ansi_colored);
+        let result = parse_numstat_line(&ansi_colored);
         assert_eq!(result, Some((11, 0)));
     }
 
     #[test]
     fn test_parse_numstat_line_not_numstat() {
         // Not a numstat line
-        assert_eq!(
-            WorktreeSkimItem::parse_numstat_line("* abc1234 Fix bug"),
-            None
+        assert_eq!(parse_numstat_line("* abc1234 Fix bug"), None);
+        assert_eq!(parse_numstat_line(""), None);
+        assert_eq!(parse_numstat_line("regular text"), None);
+    }
+
+    // format_log_output tests use dependency injection for deterministic time formatting.
+    // The format_log_output_with_formatter function accepts a time formatter closure.
+
+    /// Fixed time formatter for deterministic tests
+    fn fixed_time_formatter(_timestamp: i64) -> String {
+        "1h".to_string() // Return a fixed time for all timestamps
+    }
+
+    #[test]
+    fn test_format_log_output_single_commit() {
+        // Simulate git log output: hash\x1ftimestamp\x1f message
+        let input = "abc1234\x1f1699999000\x1f Fix bug";
+        let output = format_log_output_with_formatter(input, fixed_time_formatter);
+
+        // Should contain the hash and message
+        assert!(output.contains("abc1234"), "output: {}", output);
+        assert!(output.contains("Fix bug"), "output: {}", output);
+        // Should contain formatted time
+        assert!(output.contains("1h"), "output: {}", output);
+    }
+
+    #[test]
+    fn test_format_log_output_with_numstat() {
+        // Commit line followed by numstat lines
+        let input = "abc1234\x1f1699999000\x1f Add feature\n\
+                     10\t5\tfile1.rs\n\
+                     3\t0\tfile2.rs";
+        let output = format_log_output_with_formatter(input, fixed_time_formatter);
+
+        // Should contain the hash and message
+        assert!(output.contains("abc1234"), "output: {}", output);
+        // Stats should be accumulated: 10+3=13 insertions, 5+0=5 deletions
+        // The output should contain the stats in the formatted line
+        assert!(output.contains("Add feature"), "output: {}", output);
+        // Verify stats are present (green +13, red -5)
+        assert!(output.contains("+13"), "expected +13 in output: {}", output);
+        assert!(output.contains("-5"), "expected -5 in output: {}", output);
+    }
+
+    #[test]
+    fn test_format_log_output_multiple_commits() {
+        // Two commits, each with numstat
+        let input = "abc1234\x1f1699999000\x1f First commit\n\
+                     5\t2\tfile.rs\n\
+                     def5678\x1f1699998000\x1f Second commit\n\
+                     10\t3\tother.rs";
+        let output = format_log_output_with_formatter(input, fixed_time_formatter);
+
+        // Both commits should be in output
+        assert!(output.contains("abc1234"), "output: {}", output);
+        assert!(output.contains("def5678"), "output: {}", output);
+        assert!(output.contains("First commit"), "output: {}", output);
+        assert!(output.contains("Second commit"), "output: {}", output);
+
+        // Output should be two lines (one per commit)
+        let lines: Vec<&str> = output.lines().collect();
+        assert_eq!(lines.len(), 2, "Expected 2 lines, got: {:?}", lines);
+    }
+
+    #[test]
+    fn test_format_log_output_empty_input() {
+        let output = format_log_output_with_formatter("", fixed_time_formatter);
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn test_format_log_output_no_numstat() {
+        // Commit without numstat lines
+        let input = "abc1234\x1f1699999000\x1f Just a commit";
+        let output = format_log_output_with_formatter(input, fixed_time_formatter);
+
+        assert!(output.contains("abc1234"), "output: {}", output);
+        assert!(output.contains("Just a commit"), "output: {}", output);
+    }
+
+    #[test]
+    fn test_format_log_output_with_graph_prefix() {
+        // Git graph output includes graph characters
+        let input = "* abc1234\x1f1699999000\x1f Commit with graph\n\
+                     | 5\t2\tfile.rs";
+        let output = format_log_output_with_formatter(input, fixed_time_formatter);
+
+        assert!(output.contains("abc1234"), "output: {}", output);
+        assert!(output.contains("Commit with graph"), "output: {}", output);
+        // Verify stats are present
+        assert!(output.contains("+5"), "expected +5 in output: {}", output);
+        assert!(output.contains("-2"), "expected -2 in output: {}", output);
+    }
+
+    #[test]
+    fn test_format_log_output_binary_files() {
+        // Binary files show "-" in numstat
+        let input = "abc1234\x1f1699999000\x1f Add image\n\
+                     -\t-\timage.png\n\
+                     5\t0\tdocs.md";
+        let output = format_log_output_with_formatter(input, fixed_time_formatter);
+
+        // Binary files treated as 0 additions/deletions
+        // Should still format the commit line
+        assert!(output.contains("abc1234"), "output: {}", output);
+        assert!(output.contains("Add image"), "output: {}", output);
+        // Verify stats: 0 (binary) + 5 = 5 insertions, 0 deletions
+        assert!(output.contains("+5"), "expected +5 in output: {}", output);
+    }
+
+    #[test]
+    fn test_format_log_output_malformed_commit_line() {
+        // Line without proper field delimiters should be passed through
+        let input = "abc1234 regular commit line";
+        let output = format_log_output_with_formatter(input, fixed_time_formatter);
+
+        // Should be empty since no valid commit lines (no FIELD_DELIM)
+        assert!(output.is_empty(), "output: {}", output);
+    }
+
+    #[test]
+    fn test_format_log_output_commit_line_missing_second_delimiter() {
+        // Only one delimiter - malformed
+        let input = "abc1234\x1f1699999000 Fix bug";
+        let output = format_log_output_with_formatter(input, fixed_time_formatter);
+
+        // Should output the line as-is since it's malformed (only one \x1f)
+        assert!(output.contains("abc1234"), "output: {}", output);
+    }
+
+    #[test]
+    fn test_format_log_output_stats_only_deletions() {
+        // Commit with only deletions (no insertions)
+        let input = "abc1234\x1f1699999000\x1f Remove old code\n\
+                     0\t50\told_file.rs";
+        let output = format_log_output_with_formatter(input, fixed_time_formatter);
+
+        assert!(output.contains("abc1234"), "output: {}", output);
+        assert!(output.contains("Remove old code"), "output: {}", output);
+        // Should show deletions
+        assert!(output.contains("-50"), "expected -50 in output: {}", output);
+    }
+
+    #[test]
+    fn test_format_log_output_large_stats() {
+        // Commit with large stats (tests K notation)
+        let input = "abc1234\x1f1699999000\x1f Big refactor\n\
+                     1500\t800\tlarge_file.rs";
+        let output = format_log_output_with_formatter(input, fixed_time_formatter);
+
+        assert!(output.contains("abc1234"), "output: {}", output);
+        // Large numbers should use K notation
+        assert!(
+            output.contains("+1K") || output.contains("+1.5K"),
+            "expected K notation in output: {}",
+            output
         );
-        assert_eq!(WorktreeSkimItem::parse_numstat_line(""), None);
-        assert_eq!(WorktreeSkimItem::parse_numstat_line("regular text"), None);
+    }
+
+    #[test]
+    fn test_format_commit_line_directly() {
+        // Test the format_commit_line function directly
+        let commit_line = "abc1234\x1f1699999000\x1f Test commit";
+        let stats = (10, 5);
+        let output = format_commit_line(commit_line, stats, &fixed_time_formatter);
+
+        assert!(output.contains("abc1234"), "output: {}", output);
+        assert!(output.contains("Test commit"), "output: {}", output);
+        assert!(output.contains("+10"), "expected +10 in output: {}", output);
+        assert!(output.contains("-5"), "expected -5 in output: {}", output);
+        assert!(output.contains("1h"), "expected time in output: {}", output);
     }
 }
