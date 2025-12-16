@@ -359,14 +359,18 @@ See `src/commands/list/render.rs` for advanced usage.
 
 ## Gutter Formatting for Quoted Content
 
-Use `format_with_gutter()` for **external data** — anything read from outside
-the application: git output, shell commands, commit messages, config values,
-cached data. Gutter visually quotes this content to distinguish it from
-application-generated output.
+Use gutter formatting for **quoted content** — anything that should be visually
+distinguished from application prose:
+
+- **External data**: git output, commit messages, config values, cached data
+- **Suggested commands**: shell commands the user might run
+
+Use `format_bash_with_gutter()` for shell commands (applies dimming + syntax
+highlighting). Use `format_with_gutter()` for other content (no dimming).
 
 **Gutter vs Table:** Tabular data structured by the application should use
 `output::table()` with markdown formatting via `render_markdown_in_help()`.
-Tables are artifacts; gutter is for quoting external data.
+Tables are artifacts; gutter is for quoting content.
 
 **Linebreaks:** Gutter requires a single newline before it, never double.
 `output::print()` adds a trailing newline, so messages should not include `\n`:

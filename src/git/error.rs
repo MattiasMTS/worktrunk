@@ -16,7 +16,8 @@ use color_print::{cformat, cwrite};
 use super::HookType;
 use crate::path::format_path_for_display;
 use crate::styling::{
-    ERROR_EMOJI, HINT_EMOJI, error_message, format_with_gutter, hint_message, info_message,
+    ERROR_EMOJI, HINT_EMOJI, error_message, format_bash_with_gutter, format_with_gutter,
+    hint_message, info_message,
 };
 
 /// Domain errors for git and worktree operations.
@@ -244,7 +245,7 @@ impl std::fmt::Display for GitError {
                         "Cannot create worktree for <bold>{branch}</>: {error_detail}"
                     )),
                     hint,
-                    format_with_gutter(&command, "", None)
+                    format_bash_with_gutter(&command, "")
                 )
             }
 
