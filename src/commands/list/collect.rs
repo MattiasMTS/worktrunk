@@ -57,7 +57,7 @@ struct StatusContext {
 #[strum_discriminants(
     name(TaskKind),
     vis(pub),
-    derive(Hash, strum::IntoStaticStr),
+    derive(Hash, Ord, PartialOrd, strum::IntoStaticStr),
     strum(serialize_all = "kebab-case")
 )]
 pub(super) enum TaskResult {
@@ -1005,11 +1005,15 @@ pub fn collect(
 
     // Display collection errors as warnings (after table rendering)
     if !errors.is_empty() {
+        // Sort for deterministic output (tasks complete in arbitrary order)
+        errors.sort_by_key(|e| (e.item_idx, e.kind));
         let mut warning = String::from("Some git operations failed:");
         for error in &errors {
             let name = all_items[error.item_idx].branch_name();
             let kind_str: &'static str = error.kind.into();
-            warning.push_str(&format!("\n  - {}: {} ({})", name, kind_str, error.message));
+            // Take first line only - git errors can be multi-line with usage hints
+            let msg = error.message.lines().next().unwrap_or(&error.message);
+            warning.push_str(&format!("\n  - {}: {} ({})", name, kind_str, msg));
         }
         crate::output::print(warning_message(warning))?;
     }
