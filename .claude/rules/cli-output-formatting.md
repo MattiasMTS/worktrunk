@@ -162,18 +162,11 @@ spawn_background(build_command_that_checks_merge_again());  // Duplicate check!
 
 ## Message Types
 
-Seven canonical message patterns with their symbols:
+See `output-system-architecture.md` for the API. This section covers when to use
+each type.
 
-1. **Progress**: ◎ (operations in progress)
-2. **Success**: ✓ (something was created or changed)
-3. **Errors**: ✗ (failures, invalid states)
-4. **Warnings**: ▲ (non-blocking issues)
-5. **Hints**: ↳ (actionable — user could/should do something)
-6. **Info**: ○ (status — acknowledging state or user choices, no action needed)
-7. **Prompts**: ❯ (questions requiring user input)
-
-**Success vs Info decision:** Success (✓) means something was created or
-changed. Info (○) means acknowledging state without creating/changing anything.
+**Success vs Info:** Success (✓) means something was created or changed. Info
+(○) acknowledges state without changing anything.
 
 | Success ✓                               | Info ○                                |
 | --------------------------------------- | ------------------------------------- |
@@ -181,8 +174,7 @@ changed. Info (○) means acknowledging state without creating/changing anything
 | "Created new worktree for feature"      | "Already on worktree for feature"     |
 | "Commands approved & saved"             | "All commands already approved"       |
 
-**Hint vs Info decision:** If the message suggests the user take an action, it's
-a hint. If it's acknowledging what happened (including flag effects), it's info.
+**Hint vs Info:** Hints suggest user action. Info acknowledges what happened.
 
 | Hint ↳                        | Info ○                                |
 | ----------------------------- | ------------------------------------- |
@@ -190,17 +182,16 @@ a hint. If it's acknowledging what happened (including flag effects), it's info.
 | "Use `--force` to override"   | "Skipping hooks (--no-verify)"        |
 | "Branch can be deleted"       | "Worktree preserved (main worktree)"  |
 
-**Command suggestions in hints:** When suggesting a command the user should run,
-use the pattern "To X, run Y" where X describes the goal and Y is the command.
-**Always end with the command** so users can easily copy it:
+**Command suggestions in hints:** Use "To X, run Y" pattern. End with the
+command for easy copying:
 
 ```rust
-// GOOD - "To X, run Y" pattern, command at end for easy copying
+// GOOD - command at end for easy copying
 "To delete the unmerged branch, run wt remove feature -D"
 "To rebase onto main, run wt step rebase or wt merge"
 "To create a new branch, run wt switch feature --create; to list branches, run wt list --branches"
 
-// GOOD - when user needs to modify their command, instruction then command
+// GOOD - when user needs to modify their command
 "To switch to the remote branch, remove --create; run wt switch feature"
 
 // BAD - command without context
@@ -210,40 +201,12 @@ use the pattern "To X, run Y" where X describes the goal and Y is the command.
 "Run wt switch feature (without --create) to switch to the remote branch"
 ```
 
-Use `suggest_command()` from `worktrunk::styling` to build commands with proper
-shell escaping. Include the branch name or other specific arguments so users can
-copy-paste.
+Use `suggest_command()` from `worktrunk::styling` for proper shell escaping.
 
-**Message formatting functions** add symbol AND semantic color. Callers provide
-content with optional inner styling (like `<bold>`), then pass to
-`output::print()`:
+**Every user-facing message requires either a symbol or a gutter.**
 
-```rust
-// Simple message - formatting function adds symbol + color
-output::print(success_message("Created worktree"))?;
-output::print(hint_message("Run 'wt config' to configure"))?;
-
-// With inner styling - use cformat! for bold/dim within the message
-output::print(success_message(cformat!("Created worktree for <bold>{branch}</>")))?;
-output::print(warning_message(cformat!("Branch <bold>{name}</> not found")))?;
-```
-
-**Semantic colors from formatting functions:**
-
-- `success_message()` → green
-- `progress_message()` → cyan
-- `hint_message()` → dimmed
-- `warning_message()` → yellow
-- `info_message()` → no color (neutral status)
-- `error_message()` → red
-
-**Every user-facing message requires either a symbol or a gutter** for
-consistent visual separation.
-
-**Section titles** (experimental): For output with distinct sections (like
-`wt hook show`, `wt config show`), use cyan uppercase text without symbol:
-`<cyan>SECTION TITLE</>`. This distinguishes organizational headers from status
-messages. Currently being trialed — expand to other commands if it works well.
+**Section titles** (experimental): For sectioned output (`wt hook show`,
+`wt config show`), use `<cyan>SECTION TITLE</>`.
 
 ## Blank Line Principles
 
@@ -255,18 +218,7 @@ messages. Currently being trialed — expand to other commands if it works well.
 
 ## stdout vs stderr
 
-stdout is for the primary output of commands — the data you asked for. stderr
-is for status messages about the operation. This separation allows piping
-(`wt list | grep foo`) without progress or warnings interfering.
-
-- **stdout**: Primary output (table data, JSON, statusline)
-- **stderr**: Status messages (progress, success, errors, hints, warnings)
-
-Shell integration writes directives (cd, exec) to `WORKTRUNK_DIRECTIVE_FILE`, keeping
-stdout completely free for data.
-
-Use the output system (`output::print()` with message formatting functions).
-Never write directly to stdout/stderr in command code.
+See `output-system-architecture.md` for the stream separation. Key rule:
 
 ```rust
 // GOOD - use output system
@@ -276,7 +228,7 @@ output::print(success_message("Branch created"))?;
 println!("Branch created");
 ```
 
-Interactive prompts must flush stderr before blocking on stdin:
+**Interactive prompts** must flush stderr before blocking on stdin:
 
 ```rust
 eprint!("❯ Allow and remember? [y/N] ");
@@ -328,47 +280,35 @@ output::print(success_message("Squashed @ a1b2c3d"))?;
 
 ## Style Constants
 
-Style constants in `src/styling/constants.rs` (minimal set for programmatic
-styling):
+Only three `anstyle` constants exist for table rendering (`src/styling/constants.rs`):
 
-- `ADDITION`: Green (diffs, additions) — used in table rendering
-- `DELETION`: Red (diffs, deletions) — used in table rendering
-- `GUTTER`: BrightWhite background (quoted content)
+- `ADDITION`: Green (diffs)
+- `DELETION`: Red (diffs)
+- `GUTTER`: BrightWhite background
 
-Symbol constants: `PROGRESS_SYMBOL` (◎), `SUCCESS_SYMBOL` (✓), `ERROR_SYMBOL` (✗),
-`WARNING_SYMBOL` (▲), `HINT_SYMBOL` (↳), `INFO_SYMBOL` (○), `PROMPT_SYMBOL` (❯)
-
-For all other styling, use color-print tags in `cformat!`: `<red>`, `<green>`,
-`<yellow>`, `<cyan>`, `<dim>`, `<bold>`, `<bright-black>`
+For everything else, use `cformat!` tags.
 
 ## Styling in Command Code
 
-Use `output::print()` with message formatting functions. The formatting function
-adds the symbol + semantic color, and `cformat!` handles inner styling:
+Use `output::print()` with formatting functions. Use `cformat!` for inner
+styling:
 
 ```rust
-// GOOD - formatting function handles symbol + outer color, cformat! handles inner styling
 output::print(success_message(cformat!("Created <bold>{branch}</> from <bold>{base}</>")))?;
-output::print(warning_message(cformat!("Branch <bold>{name}</> has <dim>uncommitted changes</>")))?;
 output::print(hint_message(cformat!("Run <bright-black>wt merge</> to continue")))?;
-
-// GOOD - plain strings work too (no inner styling needed)
-output::print(progress_message("Rebasing onto main..."))?;
-output::print(hint_message("No changes to commit"))?;
 ```
 
-**Available color-print tags:** `<bold>`, `<dim>`, `<bright-black>`, `<red>`,
-`<green>`, `<yellow>`, `<cyan>`, `<magenta>`
+**color-print tags:** `<bold>`, `<dim>`, `<bright-black>`, `<red>`, `<green>`,
+`<yellow>`, `<cyan>`, `<magenta>`
 
-**Symbol constants in cformat!:** Use `{ERROR_SYMBOL}`, `{HINT_SYMBOL}`, etc. for
-messages that bypass output:: functions (e.g., GitError Display impl):
+**Branch names** should be bolded in messages.
+
+**Symbol constants in cformat!:** For messages that bypass output:: functions
+(e.g., `GitError` Display impl), use symbol constants directly:
 
 ```rust
 cformat!("{ERROR_SYMBOL} <red>Branch <bold>{branch}</> not found</>")
 ```
-
-Branch names in messages should be bolded. Tables (`wt list`) use `StyledLine`
-with conditional styling for branch names.
 
 ## Commands and Branches in Messages
 
@@ -392,36 +332,15 @@ output::print(hint_message("No changes to commit"))?;
 output::print(hint_message("Run 'wt list' to see worktrees"))?;
 ```
 
-## Color Detection
-
-Colors automatically adjust based on environment (NO_COLOR, CLICOLOR_FORCE, TTY
-detection). When using `output::` functions, this is handled automatically.
-
-For direct terminal I/O (rare — mainly internal output system code), import
-print macros from `worktrunk::styling`:
-
-```rust
-use worktrunk::styling::eprintln;  // Auto-detects color support
-```
-
 ## Design Principles
 
-- **color-print for all styling** — Use `cformat!` with HTML-like tags
-  (`<green>`, `<bold>`, etc.). Only use anstyle for `StyledLine` table
-  rendering.
-- **output:: functions over direct printing** — Use output:: for user messages,
-  which auto-adds symbol + semantic color
-- **cformat! for inner styling** — Use `<bold>`, `<dim>` tags within output::
-  calls
-- **Never manual escape codes** — No `\x1b[...` in code
-- **YAGNI for presentation** — Most output needs no styling
-- **Unicode-aware** — Width calculations respect symbols and CJK characters (via
-  `StyledLine`)
-- **Graceful degradation** — Must work without color support
+- **`cformat!` for styling** — Never manual escape codes (`\x1b[...`)
+- **`output::` for printing** — Never direct `println!`/`eprintln!`
+- **YAGNI** — Most output needs no styling
+- **Graceful degradation** — Colors auto-adjust (NO_COLOR, TTY detection)
+- **Unicode-aware** — Width calculations respect symbols and CJK (via `StyledLine`)
 
-## StyledLine API
-
-For complex table formatting with proper width calculations, use `StyledLine`:
+**StyledLine** for table rendering with proper width calculations:
 
 ```rust
 use worktrunk::styling::StyledLine;
@@ -436,23 +355,17 @@ println!("{}", line.render());
 
 See `src/commands/list/render.rs` for advanced usage.
 
-## Gutter Formatting for Quoted Content
+## Gutter Formatting
 
-Use gutter formatting for **quoted content** — anything that should be visually
-distinguished from application prose:
+Use gutter for **quoted content** (git output, commit messages, shell commands):
 
-- **External data**: git output, commit messages, config values, cached data
-- **Suggested commands**: shell commands the user might run
+- `format_bash_with_gutter()` — shell commands (dimmed + syntax highlighting)
+- `format_with_gutter()` — other content
 
-Use `format_bash_with_gutter()` for shell commands (applies dimming + syntax
-highlighting). Use `format_with_gutter()` for other content (no dimming).
+**Gutter vs Table:** Tables for structured app data; gutter for quoting external
+content.
 
-**Gutter vs Table:** Tabular data structured by the application should use
-`output::table()` with markdown formatting via `render_markdown_in_help()`.
-Tables are artifacts; gutter is for quoting content.
-
-**Linebreaks:** Gutter requires a single newline before it, never double.
-`output::print()` adds a trailing newline, so messages should not include `\n`:
+**No trailing `\n`:** `output::print()` adds newlines automatically:
 
 ```rust
 // GOOD - no trailing \n
@@ -463,19 +376,17 @@ output::gutter(format_with_gutter(&log, "", None))?;
 output::print(progress_message("Merging...\n"))?;
 ```
 
-**Avoid bullets in messages:** Use gutter formatting instead of bullet lists
-(`- item`) for multi-line content. Bullets add visual noise and don't provide
-the same clear separation as gutter formatting.
+**Avoid bullets — use gutter instead:**
 
 ```rust
-// BAD - bullet list in warning
+// BAD - bullet list
 let mut warning = String::from("Some git operations failed:");
 for error in &errors {
     warning.push_str(&format!("\n  - {}: {}", name, msg));
 }
 output::print(warning_message(warning))?;
 
-// GOOD - gutter formatting with bold branch names
+// GOOD - gutter formatting
 let error_lines: Vec<String> = errors
     .iter()
     .map(|e| cformat!("<bold>{}</>: {}", e.name, e.msg))
@@ -487,13 +398,9 @@ let warning = format!(
 output::print(warning_message(warning))?;
 ```
 
-The gutter provides consistent visual structure. Branch names should be bolded
-for emphasis. If we find cases where bullets are genuinely better than gutter
-formatting, we can reconsider this policy.
+## Error Formatting
 
-## Error Message Formatting
-
-**Single-line errors with variables are fine:**
+**Single-line errors** with variables are fine:
 
 ```rust
 // GOOD - single-line with path variable
@@ -503,56 +410,29 @@ formatting, we can reconsider this policy.
 std::fs::read_to_string(&path).context("Failed to read config")?
 ```
 
-**Multi-line external output needs gutter formatting:**
+**Multi-line external output** (git, hooks, LLM) needs gutter:
 
-When external commands (git, npm, LLM tools, hooks) produce multi-line stderr,
-use gutter formatting:
+1. Show the command that was run (with arguments)
+2. Put multi-line output in a gutter
 
-1. **Show the command that was run** — Include the full command with arguments
-   so users can debug
-2. **Put multi-line output in a gutter** — Don't embed raw stderr inline in the
-   message
-
-Use the `format_error_block` helper in `src/git/error.rs` or follow its pattern:
-
-```rust
-// GOOD - command shown in header, multi-line error in gutter
+```
 ✗ Commit generation command 'llm --model claude' failed
-   ┃ Error: [Errno 8] nodename nor servname provided, or not known
+   ┃ Error: [Errno 8] nodename nor servname provided
 
-// BAD - multi-line error embedded inline
-✗ Commit generation command 'llm' failed: LLM command failed: Error: [Errno 8]...
+// NOT: ✗ ... failed: LLM command failed: Error: [Errno 8]...
 ```
 
-**Implementation:** See `format_error_block()` in `src/git/error.rs` for the
-pattern, and `LlmCommandFailed` variant for an example.
+See `format_error_block()` in `src/git/error.rs`.
 
 ## Table Column Alignment
 
-**Principle: Headers and values align consistently within each column type.**
+- **Text columns** (Branch, Path): left-aligned
+- **Numeric columns** (HEAD±, main↕): right-aligned
 
-Column alignment follows standard tabular data conventions:
+## Snapshot Testing
 
-1. **Text columns** (Branch, Path, Message, Commit):
-   - Headers: Left-aligned
-   - Values: Left-aligned
-
-2. **Diff/numeric columns** (HEAD±, main↕, main…±, Remote⇅):
-   - Headers: Right-aligned
-   - Values: Right-aligned
-
-**Why:** Right-aligning numeric data allows visual scanning by magnitude
-(rightmost digits align vertically). Left-aligning text data prioritizes
-readability from the start. Matching header and value alignment within each
-column creates a consistent visual grid.
-
-**Implementation:** Headers are positioned within their column width using the
-same alignment strategy as their values (render.rs).
-
-## Snapshot Testing Requirement
-
-Every command output must have a snapshot test (`tests/integration_tests/`). See
-`tests/integration_tests/remove.rs` for the standard pattern using
+Every command output must have snapshot tests (`tests/integration_tests/`).
+See `tests/integration_tests/remove.rs` for the standard pattern using
 `setup_snapshot_settings()`, `make_snapshot_cmd()`, and `assert_cmd_snapshot!()`.
 
 Cover success/error states, with/without data, and flag variations.
