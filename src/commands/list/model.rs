@@ -663,13 +663,6 @@ pub enum Divergence {
     Diverged,
 }
 
-/// Context for divergence display (only Upstream is used now)
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DivergenceContext {
-    /// Divergence relative to upstream remote (uses ⇡⇣⇅|)
-    Upstream,
-}
-
 impl Divergence {
     /// Compute divergence state when a remote tracking branch exists.
     ///
@@ -685,7 +678,7 @@ impl Divergence {
     }
 
     /// Get the display symbol for this divergence state.
-    pub fn symbol(self, _ctx: DivergenceContext) -> &'static str {
+    pub fn symbol(self) -> &'static str {
         match self {
             Self::None => "",
             Self::InSync => "|",
@@ -696,12 +689,12 @@ impl Divergence {
     }
 
     /// Returns styled symbol (dimmed), or None for None variant.
-    pub fn styled(self, ctx: DivergenceContext) -> Option<String> {
+    pub fn styled(self) -> Option<String> {
         use color_print::cformat;
         if self == Self::None {
             None
         } else {
-            Some(cformat!("<dim>{}</>", self.symbol(ctx)))
+            Some(cformat!("<dim>{}</>", self.symbol()))
         }
     }
 }
@@ -1173,7 +1166,7 @@ impl StatusSymbols {
         // Upstream divergence (|⇅⇡⇣)
         let (upstream_divergence_str, has_upstream_divergence) = self
             .upstream_divergence
-            .styled(DivergenceContext::Upstream)
+            .styled()
             .map_or((String::new(), false), |s| (s, true));
 
         // Worktree state: operations (✘⤴⤵) take priority over location (/⚑⊟⊞)
@@ -1585,44 +1578,29 @@ mod tests {
 
     #[test]
     fn test_divergence_symbol() {
-        assert_eq!(Divergence::None.symbol(DivergenceContext::Upstream), "");
-        assert_eq!(Divergence::InSync.symbol(DivergenceContext::Upstream), "|");
-        assert_eq!(Divergence::Ahead.symbol(DivergenceContext::Upstream), "⇡");
-        assert_eq!(Divergence::Behind.symbol(DivergenceContext::Upstream), "⇣");
-        assert_eq!(
-            Divergence::Diverged.symbol(DivergenceContext::Upstream),
-            "⇅"
-        );
+        assert_eq!(Divergence::None.symbol(), "");
+        assert_eq!(Divergence::InSync.symbol(), "|");
+        assert_eq!(Divergence::Ahead.symbol(), "⇡");
+        assert_eq!(Divergence::Behind.symbol(), "⇣");
+        assert_eq!(Divergence::Diverged.symbol(), "⇅");
     }
 
     #[test]
     fn test_divergence_styled() {
         // None returns None
-        assert!(
-            Divergence::None
-                .styled(DivergenceContext::Upstream)
-                .is_none()
-        );
+        assert!(Divergence::None.styled().is_none());
 
         // Other variants return styled strings
-        let styled = Divergence::InSync
-            .styled(DivergenceContext::Upstream)
-            .unwrap();
+        let styled = Divergence::InSync.styled().unwrap();
         assert!(styled.contains("|"));
 
-        let styled = Divergence::Ahead
-            .styled(DivergenceContext::Upstream)
-            .unwrap();
+        let styled = Divergence::Ahead.styled().unwrap();
         assert!(styled.contains("⇡"));
 
-        let styled = Divergence::Behind
-            .styled(DivergenceContext::Upstream)
-            .unwrap();
+        let styled = Divergence::Behind.styled().unwrap();
         assert!(styled.contains("⇣"));
 
-        let styled = Divergence::Diverged
-            .styled(DivergenceContext::Upstream)
-            .unwrap();
+        let styled = Divergence::Diverged.styled().unwrap();
         assert!(styled.contains("⇅"));
     }
 
