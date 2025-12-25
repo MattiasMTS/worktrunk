@@ -196,6 +196,7 @@ pub const HEADER_AHEAD_BEHIND: &str = "main↕";
 pub const HEADER_BRANCH_DIFF: &str = "main…±";
 pub const HEADER_PATH: &str = "Path";
 pub const HEADER_UPSTREAM: &str = "Remote⇅";
+pub const HEADER_URL: &str = "URL";
 pub const HEADER_AGE: &str = "Age";
 pub const HEADER_CI: &str = "CI";
 pub const HEADER_COMMIT: &str = "Commit";
@@ -259,6 +260,7 @@ pub struct ColumnWidths {
     pub branch: usize,
     pub status: usize, // Includes both git status symbols and user-defined status
     pub time: usize,
+    pub url: usize,
     pub ci_status: usize,
     pub message: usize,
     pub ahead_behind: DiffWidths,
@@ -275,6 +277,7 @@ pub struct ColumnDataFlags {
     pub ahead_behind: bool,
     pub branch_diff: bool,
     pub upstream: bool,
+    pub url: bool,
     pub ci_status: bool,
     pub path: bool, // True if any worktree has path_mismatch (path doesn't match template)
 }
@@ -332,6 +335,7 @@ impl ColumnKind {
             ColumnKind::BranchDiff => flags.branch_diff,
             ColumnKind::Path => flags.path,
             ColumnKind::Upstream => flags.upstream,
+            ColumnKind::Url => flags.url,
             ColumnKind::Time => true,
             ColumnKind::CiStatus => flags.ci_status,
             ColumnKind::Commit => true,
@@ -351,6 +355,7 @@ impl ColumnKind {
             ColumnKind::Status => ColumnIdeal::text(widths.status),
             ColumnKind::Path => ColumnIdeal::text(max_path_width),
             ColumnKind::Time => ColumnIdeal::text(widths.time),
+            ColumnKind::Url => ColumnIdeal::text(widths.url),
             ColumnKind::CiStatus => ColumnIdeal::text(widths.ci_status),
             ColumnKind::Commit => ColumnIdeal::text(commit_width),
             ColumnKind::Message => None,
@@ -447,6 +452,33 @@ struct PendingColumn<'a> {
     format: ColumnFormat,
 }
 
+/// Estimate URL column width by expanding the template with a sample branch.
+///
+/// Uses the longest branch name to get an accurate width estimate for the URL column.
+/// Falls back to 22 chars ("http://localhost:12345") if expansion fails.
+fn estimate_url_width(url_template: Option<&str>, longest_branch: Option<&str>) -> usize {
+    let Some(template) = url_template else {
+        return 0;
+    };
+
+    // Try to expand the template with the longest branch name
+    if let Some(branch) = longest_branch {
+        let mut vars = std::collections::HashMap::new();
+        vars.insert("branch", branch);
+        if let Ok(expanded) = worktrunk::config::expand_template(template, &vars, false) {
+            return expanded.width();
+        }
+    }
+
+    // Fallback: estimate based on template structure
+    // {{ branch | hash_port }} becomes a 5-digit port (10000-19999)
+    // {{ branch }} becomes the branch name (unknown length, use 10 as average)
+    template
+        .replace("{{ branch | hash_port }}", "12345")
+        .replace("{{ branch }}", "feature-xx")
+        .len()
+}
+
 /// Build pre-allocated column width estimates.
 ///
 /// Uses generous fixed allocations for expensive-to-compute columns (status, diffs, time, CI)
@@ -456,6 +488,7 @@ fn build_estimated_widths(
     max_branch: usize,
     skip_tasks: &HashSet<TaskKind>,
     has_path_mismatch: bool,
+    url_width: usize,
 ) -> LayoutMetadata {
     // Fixed widths for slow columns (require expensive git operations)
     // Values exceeding these widths use compact notation (K suffix)
@@ -483,14 +516,24 @@ fn build_estimated_widths(
         ahead_behind: true,
         branch_diff: !skip_tasks.contains(&TaskKind::BranchDiff),
         upstream: true,
+        url: !skip_tasks.contains(&TaskKind::UrlStatus),
         ci_status: !skip_tasks.contains(&TaskKind::CiStatus),
         path: has_path_mismatch,
+    };
+
+    // URL width estimated from template + longest branch (or fallback)
+    // When url_width is 0 (no template), don't allocate any space for URL column
+    let url_estimate = if url_width > 0 {
+        fit_header(HEADER_URL, url_width)
+    } else {
+        0
     };
 
     let widths = ColumnWidths {
         branch: max_branch,
         status: status_fixed,
         time: age_estimate,
+        url: url_estimate,
         ci_status: ci_estimate,
         message: 50, // Will be flexible during allocation
         // Commit counts (Arrows): compact notation, 2 digits covers up to 99
@@ -720,12 +763,20 @@ fn allocate_columns_with_priority(
 /// - Age: 4 chars ("11mo" short format)
 /// - CI: 1 char (indicator symbol)
 /// - Message: flexible (20-100 chars)
+/// - URL: estimated from template + longest branch
 pub fn calculate_layout_from_basics(
     items: &[super::model::ListItem],
     skip_tasks: &HashSet<TaskKind>,
     main_worktree_path: &Path,
+    url_template: Option<&str>,
 ) -> LayoutConfig {
-    calculate_layout_with_width(items, skip_tasks, get_safe_list_width(), main_worktree_path)
+    calculate_layout_with_width(
+        items,
+        skip_tasks,
+        get_safe_list_width(),
+        main_worktree_path,
+        url_template,
+    )
 }
 
 /// Calculate layout with explicit width (for contexts like skim where available width differs)
@@ -734,16 +785,16 @@ pub fn calculate_layout_with_width(
     skip_tasks: &HashSet<TaskKind>,
     terminal_width: usize,
     main_worktree_path: &Path,
+    url_template: Option<&str>,
 ) -> LayoutConfig {
     // Calculate actual widths for things we know
     // Include branch names from both worktrees and standalone branches
-    let max_branch = items
+    let longest_branch = items
         .iter()
         .filter_map(|item| item.branch.as_deref())
-        .map(|b| b.width())
-        .max()
-        .unwrap_or(0);
+        .max_by_key(|b| b.width());
 
+    let max_branch = longest_branch.map(|b| b.width()).unwrap_or(0);
     let max_branch = fit_header(HEADER_BRANCH, max_branch);
 
     let path_data_width = items
@@ -764,8 +815,11 @@ pub fn calculate_layout_with_width(
         .filter_map(|item| item.worktree_data())
         .any(|data| data.path_mismatch);
 
+    // Estimate URL width from template + longest branch
+    let url_width = estimate_url_width(url_template, longest_branch);
+
     // Build pre-allocated width estimates (same as buffered mode)
-    let metadata = build_estimated_widths(max_branch, skip_tasks, has_path_mismatch);
+    let metadata = build_estimated_widths(max_branch, skip_tasks, has_path_mismatch, url_width);
 
     let commit_width = fit_header(HEADER_COMMIT, COMMIT_HASH_WIDTH);
 
@@ -833,6 +887,7 @@ mod tests {
             ahead_behind: true,
             branch_diff: true,
             upstream: true,
+            url: true,
             ci_status: true,
             path: true,
         };
@@ -842,6 +897,7 @@ mod tests {
             ahead_behind: false,
             branch_diff: false,
             upstream: false,
+            url: false,
             ci_status: false,
             path: false,
         };
@@ -864,6 +920,8 @@ mod tests {
         assert!(!ColumnKind::BranchDiff.has_data(&all_false));
         assert!(ColumnKind::Upstream.has_data(&all_true));
         assert!(!ColumnKind::Upstream.has_data(&all_false));
+        assert!(ColumnKind::Url.has_data(&all_true));
+        assert!(!ColumnKind::Url.has_data(&all_false));
         assert!(ColumnKind::CiStatus.has_data(&all_true));
         assert!(!ColumnKind::CiStatus.has_data(&all_false));
         assert!(ColumnKind::Path.has_data(&all_true));
@@ -936,6 +994,7 @@ mod tests {
             branch: 15,
             status: 8,
             time: 4,
+            url: 0,
             ci_status: 2,
             message: 50,
             ahead_behind: DiffWidths {
@@ -999,7 +1058,8 @@ mod tests {
         // Test that build_estimated_widths() returns correct pre-allocated estimates
         // Empty skip set means all tasks are computed (equivalent to --full)
         // has_path_mismatch=true to test the path flag is passed through
-        let metadata = build_estimated_widths(20, &HashSet::new(), true);
+        // url_width=0 since we're not testing URL column here
+        let metadata = build_estimated_widths(20, &HashSet::new(), true, 0);
         let widths = metadata.widths;
 
         // Line diffs (Signs variant: +/-) allocate 3 digits for 100-999 range
@@ -1091,6 +1151,8 @@ mod tests {
             is_ancestor: None,
             upstream: Some(UpstreamStatus::from_parts(Some("origin".to_string()), 4, 2)),
             pr_status: None,
+            url: None,
+            url_active: None,
             status_symbols: Some(StatusSymbols::default()),
             display: DisplayFields::default(),
             kind: ItemKind::Worktree(Box::new(WorktreeData {
@@ -1114,7 +1176,7 @@ mod tests {
             .into_iter()
             .collect();
         let main_worktree_path = PathBuf::from("/test");
-        let layout = calculate_layout_from_basics(&items, &skip_tasks, &main_worktree_path);
+        let layout = calculate_layout_from_basics(&items, &skip_tasks, &main_worktree_path, None);
 
         assert!(
             !layout.columns.is_empty(),
@@ -1187,6 +1249,8 @@ mod tests {
             is_ancestor: None,
             upstream: Some(UpstreamStatus::default()),
             pr_status: None,
+            url: None,
+            url_active: None,
             status_symbols: Some(StatusSymbols::default()),
             display: DisplayFields::default(),
             kind: ItemKind::Worktree(Box::new(WorktreeData {
@@ -1210,7 +1274,7 @@ mod tests {
             .into_iter()
             .collect();
         let main_worktree_path = PathBuf::from("/home/user/project");
-        let layout = calculate_layout_from_basics(&items, &skip_tasks, &main_worktree_path);
+        let layout = calculate_layout_from_basics(&items, &skip_tasks, &main_worktree_path, None);
 
         assert!(
             layout
@@ -1223,5 +1287,60 @@ mod tests {
 
         // Path visibility depends on terminal width and column priorities
         // At narrow widths (80 columns default in tests), Path may not fit
+    }
+
+    #[test]
+    fn test_estimate_url_width_no_template() {
+        // No template returns 0
+        assert_eq!(estimate_url_width(None, Some("feature")), 0);
+        assert_eq!(estimate_url_width(None, None), 0);
+    }
+
+    #[test]
+    fn test_estimate_url_width_with_hash_port() {
+        let template = "http://localhost:{{ branch | hash_port }}";
+
+        // With a branch name, expands template and measures
+        let width = estimate_url_width(Some(template), Some("feature"));
+        // "http://localhost:" (17) + 5-digit port = 22
+        assert_eq!(width, 22);
+
+        // Longer branch doesn't affect hash_port width (always 5 digits)
+        let width = estimate_url_width(Some(template), Some("very-long-feature-branch-name"));
+        assert_eq!(width, 22);
+    }
+
+    #[test]
+    fn test_estimate_url_width_with_branch_variable() {
+        let template = "http://localhost:8080/{{ branch }}";
+
+        // Width includes the branch name
+        let width = estimate_url_width(Some(template), Some("feature"));
+        // "http://localhost:8080/" (22) + "feature" (7) = 29
+        assert_eq!(width, 29);
+
+        // Longer branch increases width
+        let width = estimate_url_width(Some(template), Some("long-feature-branch"));
+        // "http://localhost:8080/" (22) + "long-feature-branch" (19) = 41
+        assert_eq!(width, 41);
+    }
+
+    #[test]
+    fn test_estimate_url_width_fallback() {
+        let template = "http://localhost:{{ branch | hash_port }}";
+
+        // No branch name triggers fallback estimation
+        let width = estimate_url_width(Some(template), None);
+        // Fallback replaces {{ branch | hash_port }} with "12345"
+        // "http://localhost:12345" = 22
+        assert_eq!(width, 22);
+    }
+
+    #[test]
+    fn test_estimate_url_width_static_template() {
+        // Template with no variables
+        let template = "http://localhost:3000";
+        let width = estimate_url_width(Some(template), Some("feature"));
+        assert_eq!(width, 21);
     }
 }
