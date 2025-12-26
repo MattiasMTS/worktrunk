@@ -89,15 +89,11 @@ pub enum Shell {
 }
 
 impl Shell {
-    /// Returns the standard config file paths for this shell
+    /// Returns the config file paths for this shell.
     ///
+    /// The `cmd` parameter affects the Fish conf.d filename (e.g., `wt.fish` or `git-wt.fish`).
     /// Returns paths in order of preference. The first existing file should be used.
-    pub fn config_paths(&self) -> Result<Vec<PathBuf>, std::io::Error> {
-        self.config_paths_with_prefix("wt")
-    }
-
-    /// Returns config paths with custom prefix (affects fish conf.d filename)
-    pub fn config_paths_with_prefix(&self, cmd: &str) -> Result<Vec<PathBuf>, std::io::Error> {
+    pub fn config_paths(&self, cmd: &str) -> Result<Vec<PathBuf>, std::io::Error> {
         let home = home_dir_required()?;
 
         Ok(match self {
@@ -125,18 +121,15 @@ impl Shell {
         })
     }
 
-    /// Returns the path to the native completion directory for this shell
+    /// Returns the path to the native completion directory for this shell.
+    ///
+    /// The `cmd` parameter affects the completion filename (e.g., `wt.fish` or `git-wt.fish`).
     ///
     /// Note: Bash and Zsh use inline lazy completions in the init script.
-    /// Only Fish uses a separate completion file at ~/.config/fish/completions/wt.fish
+    /// Only Fish uses a separate completion file at ~/.config/fish/completions/
     /// (installed by `wt config shell install`) that uses $WORKTRUNK_BIN to bypass
     /// the shell function wrapper.
-    pub fn completion_path(&self) -> Result<PathBuf, std::io::Error> {
-        self.completion_path_with_prefix("wt")
-    }
-
-    /// Returns completion path with custom prefix (affects fish completion filename)
-    pub fn completion_path_with_prefix(&self, cmd: &str) -> Result<PathBuf, std::io::Error> {
+    pub fn completion_path(&self, cmd: &str) -> Result<PathBuf, std::io::Error> {
         let home = home_dir_required()?;
 
         // Use etcetera for XDG-compliant paths when available
@@ -175,38 +168,30 @@ impl Shell {
         })
     }
 
-    /// Returns the line to add to the config file for shell integration
+    /// Returns the line to add to the config file for shell integration.
     ///
+    /// The `cmd` parameter specifies the command name (e.g., `wt` or `git-wt`).
     /// All shells use a conditional wrapper to avoid errors when the command doesn't exist.
-    pub fn config_line(&self) -> String {
-        self.config_line_with_prefix("wt")
-    }
-
-    /// Returns the line to add to the config file for shell integration with custom prefix
-    pub fn config_line_with_prefix(&self, cmd: &str) -> String {
-        // For non-default prefixes, include --cmd in the init command
-        let prefix_arg = if cmd == "wt" {
-            String::new()
-        } else {
-            format!(" --cmd={}", cmd)
-        };
-
+    ///
+    /// Note: The generated line does not include `--cmd` because `binary_name()` already
+    /// detects the command name from argv\[0\] at runtime.
+    pub fn config_line(&self, cmd: &str) -> String {
         match self {
             Self::Bash | Self::Zsh => {
                 format!(
-                    "if command -v {cmd} >/dev/null 2>&1; then eval \"$(command {cmd} config shell init {}{prefix_arg})\"; fi",
+                    "if command -v {cmd} >/dev/null 2>&1; then eval \"$(command {cmd} config shell init {})\"; fi",
                     self
                 )
             }
             Self::Fish => {
                 format!(
-                    "if type -q {cmd}; command {cmd} config shell init {}{prefix_arg} | source; end",
+                    "if type -q {cmd}; command {cmd} config shell init {} | source; end",
                     self
                 )
             }
             Self::PowerShell => {
                 format!(
-                    "if (Get-Command {cmd} -ErrorAction SilentlyContinue) {{ Invoke-Expression (& {cmd} config shell init powershell{prefix_arg}) }}",
+                    "if (Get-Command {cmd} -ErrorAction SilentlyContinue) {{ Invoke-Expression (& {cmd} config shell init powershell) }}",
                 )
             }
         }
@@ -473,7 +458,7 @@ mod tests {
 
     #[test]
     fn test_shell_config_line_bash() {
-        let line = Shell::Bash.config_line();
+        let line = Shell::Bash.config_line("wt");
         assert!(line.contains("eval"));
         assert!(line.contains("wt config shell init bash"));
         assert!(line.contains("command -v wt"));
@@ -481,14 +466,14 @@ mod tests {
 
     #[test]
     fn test_shell_config_line_zsh() {
-        let line = Shell::Zsh.config_line();
+        let line = Shell::Zsh.config_line("wt");
         assert!(line.contains("eval"));
         assert!(line.contains("wt config shell init zsh"));
     }
 
     #[test]
     fn test_shell_config_line_fish() {
-        let line = Shell::Fish.config_line();
+        let line = Shell::Fish.config_line("wt");
         assert!(line.contains("type -q wt"));
         assert!(line.contains("wt config shell init fish"));
         assert!(line.contains("source"));
@@ -496,7 +481,7 @@ mod tests {
 
     #[test]
     fn test_shell_config_line_powershell() {
-        let line = Shell::PowerShell.config_line();
+        let line = Shell::PowerShell.config_line("wt");
         assert!(line.contains("Invoke-Expression"));
         assert!(line.contains("wt config shell init powershell"));
     }
@@ -509,7 +494,7 @@ mod tests {
         let prefix = "git-wt";
 
         // Bash/Zsh
-        let bash_line = Shell::Bash.config_line_with_prefix(prefix);
+        let bash_line = Shell::Bash.config_line(prefix);
         assert!(
             bash_line.contains("command -v git-wt"),
             "bash should check for git-wt"
@@ -520,7 +505,7 @@ mod tests {
         );
 
         // Fish
-        let fish_line = Shell::Fish.config_line_with_prefix(prefix);
+        let fish_line = Shell::Fish.config_line(prefix);
         assert!(
             fish_line.contains("type -q git-wt"),
             "fish should check for git-wt"
@@ -531,7 +516,7 @@ mod tests {
         );
 
         // PowerShell
-        let ps_line = Shell::PowerShell.config_line_with_prefix(prefix);
+        let ps_line = Shell::PowerShell.config_line(prefix);
         assert!(
             ps_line.contains("Get-Command git-wt"),
             "powershell should check for git-wt"
@@ -560,7 +545,7 @@ mod tests {
         // All shells should return at least one config path
         let shells = [Shell::Bash, Shell::Zsh, Shell::Fish, Shell::PowerShell];
         for shell in shells {
-            let result = shell.config_paths();
+            let result = shell.config_paths("wt");
             assert!(result.is_ok(), "Failed to get config paths for {:?}", shell);
             let paths = result.unwrap();
             assert!(
@@ -576,7 +561,7 @@ mod tests {
         // All shells should return a completion path
         let shells = [Shell::Bash, Shell::Zsh, Shell::Fish, Shell::PowerShell];
         for shell in shells {
-            let result = shell.completion_path();
+            let result = shell.completion_path("wt");
             assert!(
                 result.is_ok(),
                 "Failed to get completion path for {:?}",
@@ -597,20 +582,20 @@ mod tests {
         let prefix = "custom-wt";
 
         // Fish config path should include prefix in filename
-        let fish_paths = Shell::Fish.config_paths_with_prefix(prefix).unwrap();
+        let fish_paths = Shell::Fish.config_paths(prefix).unwrap();
         assert!(
             fish_paths[0].to_string_lossy().contains("custom-wt.fish"),
             "Fish config should include prefix in filename"
         );
 
         // Bash and Zsh config paths are fixed (not affected by prefix)
-        let bash_paths = Shell::Bash.config_paths_with_prefix(prefix).unwrap();
+        let bash_paths = Shell::Bash.config_paths(prefix).unwrap();
         assert!(
             bash_paths[0].to_string_lossy().contains(".bashrc"),
             "Bash config should be .bashrc"
         );
 
-        let zsh_paths = Shell::Zsh.config_paths_with_prefix(prefix).unwrap();
+        let zsh_paths = Shell::Zsh.config_paths(prefix).unwrap();
         assert!(
             zsh_paths[0].to_string_lossy().contains(".zshrc"),
             "Zsh config should be .zshrc"
@@ -622,41 +607,24 @@ mod tests {
         let prefix = "my-prefix";
 
         // Bash completion should include prefix in path
-        let bash_path = Shell::Bash.completion_path_with_prefix(prefix).unwrap();
+        let bash_path = Shell::Bash.completion_path(prefix).unwrap();
         assert!(
             bash_path.to_string_lossy().contains("my-prefix"),
             "Bash completion should include prefix"
         );
 
         // Fish completion should include prefix in filename
-        let fish_path = Shell::Fish.completion_path_with_prefix(prefix).unwrap();
+        let fish_path = Shell::Fish.completion_path(prefix).unwrap();
         assert!(
             fish_path.to_string_lossy().contains("my-prefix.fish"),
             "Fish completion should include prefix in filename"
         );
 
         // Zsh completion should include prefix
-        let zsh_path = Shell::Zsh.completion_path_with_prefix(prefix).unwrap();
+        let zsh_path = Shell::Zsh.completion_path(prefix).unwrap();
         assert!(
             zsh_path.to_string_lossy().contains("_my-prefix"),
             "Zsh completion should include underscore prefix"
-        );
-    }
-
-    #[test]
-    fn test_config_line_prefix_arg_handling() {
-        // Default prefix should not include --cmd
-        let bash_default = Shell::Bash.config_line_with_prefix("wt");
-        assert!(
-            !bash_default.contains("--cmd"),
-            "Default prefix should not include --cmd"
-        );
-
-        // Custom prefix should include --cmd
-        let bash_custom = Shell::Bash.config_line_with_prefix("custom");
-        assert!(
-            bash_custom.contains("--cmd=custom"),
-            "Custom prefix should include --cmd=custom"
         );
     }
 
@@ -672,7 +640,7 @@ mod tests {
         );
     }
 
-    /// Verify that `config_line_with_prefix()` generates lines that
+    /// Verify that `config_line()` generates lines that
     /// `is_shell_integration_line()` can detect.
     ///
     /// This prevents install and detection from drifting out of sync.
@@ -681,10 +649,10 @@ mod tests {
         #[values(Shell::Bash, Shell::Zsh, Shell::Fish, Shell::PowerShell)] shell: Shell,
         #[values("wt", "git-wt")] prefix: &str,
     ) {
-        let line = shell.config_line_with_prefix(prefix);
+        let line = shell.config_line(prefix);
         assert!(
             is_shell_integration_line(&line, prefix),
-            "{shell} config_line_with_prefix({prefix:?}) not detected:\n  {line}"
+            "{shell} config_line({prefix:?}) not detected:\n  {line}"
         );
     }
 }

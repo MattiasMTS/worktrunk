@@ -228,7 +228,7 @@ pub fn scan_shell_configs(
 
     for shell in shells {
         let paths = shell
-            .config_paths_with_prefix(cmd)
+            .config_paths(cmd)
             .map_err(|e| format!("Failed to get config paths for {}: {}", shell, e))?;
 
         // Find the first existing config file
@@ -300,7 +300,7 @@ fn configure_shell_file(
     cmd: &str,
 ) -> Result<Option<ConfigureResult>, String> {
     // The line we write to the config file (also used for display)
-    let config_line = shell.config_line_with_prefix(cmd);
+    let config_line = shell.config_line(cmd);
 
     // For Fish, we write to a separate conf.d/ file
     if matches!(shell, Shell::Fish) {
@@ -607,7 +607,7 @@ pub fn process_shell_completions(
         }
 
         let completion_path = shell
-            .completion_path_with_prefix(cmd)
+            .completion_path(cmd)
             .map_err(|e| format!("Failed to get completion path for {}: {}", shell, e))?;
 
         // Check if completions already exist with correct content
@@ -699,7 +699,7 @@ fn scan_for_uninstall(
 
     for &shell in &shells {
         let paths = shell
-            .config_paths_with_prefix(cmd)
+            .config_paths(cmd)
             .map_err(|e| format!("Failed to get config paths for {}: {}", shell, e))?;
 
         // For Fish, delete entire {cmd}.fish file
@@ -767,7 +767,7 @@ fn scan_for_uninstall(
         }
 
         let completion_path = shell
-            .completion_path_with_prefix(cmd)
+            .completion_path(cmd)
             .map_err(|e| format!("Failed to get completion path for {}: {}", shell, e))?;
 
         if completion_path.exists() {

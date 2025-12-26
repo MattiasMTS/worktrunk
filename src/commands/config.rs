@@ -400,7 +400,7 @@ fn render_shell_status(out: &mut String) -> anyhow::Result<()> {
 
                 // For fish, check completions file separately
                 if matches!(shell, Shell::Fish)
-                    && let Ok(completion_path) = shell.completion_path_with_prefix(&cmd)
+                    && let Ok(completion_path) = shell.completion_path(&cmd)
                 {
                     let completion_display = format_path_for_display(&completion_path);
                     if completion_path.exists() {

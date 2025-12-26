@@ -17,24 +17,20 @@ use worktrunk::git::LineDiff;
 impl DiffDisplayConfig {
     /// Format diff values with fixed-width alignment for tabular display.
     ///
-    /// Numbers are right-aligned within their allocated digit width.
+    /// Numbers are right-aligned within a 3-digit column width.
     /// Returns empty spaces if both values are zero (unless `always_show_zeros` is set).
-    ///
-    /// # Arguments
-    /// * `positive` - The positive (added) value
-    /// * `negative` - The negative (deleted) value
-    /// * `digits` - Number of digits to allocate for each column (e.g., 3 for values up to 999)
     #[cfg(unix)] // Only used by select command which is unix-only
-    pub fn format_aligned(&self, positive: usize, negative: usize, digits: usize) -> String {
+    pub fn format_aligned(&self, positive: usize, negative: usize) -> String {
         use super::layout::DiffColumnConfig;
 
-        let positive_width = 1 + digits; // symbol + digits
-        let negative_width = 1 + digits;
+        const DIGITS: usize = 3;
+        let positive_width = 1 + DIGITS; // symbol + digits
+        let negative_width = 1 + DIGITS;
         let total_width = positive_width + 1 + negative_width; // with separator
 
         let config = DiffColumnConfig {
-            positive_digits: digits,
-            negative_digits: digits,
+            positive_digits: DIGITS,
+            negative_digits: DIGITS,
             total_width,
             display: *self,
         };
@@ -745,10 +741,10 @@ mod tests {
             always_show_zeros: false,
         };
 
-        // Test various values with 3-digit columns
-        let result1 = config.format_aligned(310, 112, 3);
-        let result2 = config.format_aligned(54, 63, 3);
-        let result3 = config.format_aligned(9, 3, 3);
+        // Test various values
+        let result1 = config.format_aligned(310, 112);
+        let result2 = config.format_aligned(54, 63);
+        let result3 = config.format_aligned(9, 3);
 
         // All should have the same width (3 + 1 + 3 + 1 + 3 = 9 chars for "+NNN -NNN")
         let clean1 = result1.ansi_strip().into_owned();
@@ -792,7 +788,7 @@ mod tests {
         };
 
         // Insertions only
-        let ins_only = config.format_aligned(447, 0, 3);
+        let ins_only = config.format_aligned(447, 0);
         let clean_ins = ins_only.ansi_strip().into_owned();
         assert!(
             clean_ins.contains("+447"),
@@ -801,7 +797,7 @@ mod tests {
         );
 
         // Deletions only
-        let del_only = config.format_aligned(0, 5, 3);
+        let del_only = config.format_aligned(0, 5);
         let clean_del = del_only.ansi_strip().into_owned();
         assert!(
             clean_del.contains("-5"),

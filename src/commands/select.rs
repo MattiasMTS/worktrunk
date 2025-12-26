@@ -783,8 +783,7 @@ where
             negative_style: DELETION,
             always_show_zeros: false,
         };
-        // 3 digits handles values up to 999; overflow uses K notation
-        let stat_str = format!(" {}", diff_config.format_aligned(insertions, deletions, 3));
+        let stat_str = format!(" {}", diff_config.format_aligned(insertions, deletions));
 
         format!(
             "{}{} {dim_style}{:>width$}{reset}{}",
