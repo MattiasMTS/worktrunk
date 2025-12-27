@@ -4,10 +4,10 @@ Require wt
 Require git
 
 Set Shell "fish"
-Set FontSize 24
+Set FontSize {{FONTSIZE}}
 Set FontFamily "Geist Mono, Berkeley Mono, Fira Code, JetBrains Mono, Menlo, Apple Color Emoji"
-Set Width 1600
-Set Height 900
+Set Width {{WIDTH}}
+Set Height {{HEIGHT}}
 Set Theme {{THEME}}
 Set Padding 18
 Set LineHeight 1.12
@@ -21,7 +21,6 @@ Env CARGO_HOME "{{REAL_HOME}}/.cargo"
 Env HOME "{{DEMO_HOME}}"
 Env XDG_CONFIG_HOME "{{DEMO_HOME}}/.config"
 Env STARSHIP_CONFIG "{{STARSHIP_CONFIG}}"
-Env GIT_TERMINAL_PROMPT "0"
 
 Hide
 Type "set -g fish_autosuggestion_enabled 0"
@@ -40,42 +39,40 @@ Type "clear"
 Enter
 Sleep 500ms
 Show
+Set KeyStrokes Show
 Sleep 500ms
 
-# 1. Show current worktrees
-Type "wt list"
+# Launch wt select
+Type "wt select"
 Enter
 Sleep 2s
 
-# 2. Switch to alpha worktree
-Type "wt switch alpha"
-Enter
+# Navigate to alpha branch (has large main…± diff and working tree changes)
+Down
 Sleep 1s
-
-# 3. Show the hooks config (bat syntax highlighting via cat wrapper)
-Type "cat .config/wt.toml"
-Enter
-Sleep 2s
-
-# 4. Create new worktree with post-start
-Type "wt switch --create api"
-Enter
-Sleep 2.5s
-
-# 5. Show full list with CI status
-Type "wt list --full"
-Enter
-Sleep 2.5s
-
-# 6. Switch to billing (already merged)
-Type "wt switch billing"
-Enter
+Down
 Sleep 1.5s
 
-# 7. Remove the merged worktree (pre-remove hook runs)
-Type "wt remove"
+# Switch to main…± tab (panel 3) to see committed diff from main
+Type "3"
+Sleep 1.5s
+
+# Browse the diff with Ctrl+D (shows scrolling through large diff)
+Ctrl+d
+Sleep 1s
+Ctrl+d
+Sleep 1s
+Ctrl+d
+Sleep 1.5s
+
+# Filter to narrow down and select
+Type "alp"
+Sleep 1.5s
 Enter
-Sleep 5s
+Sleep 2s
+
+# Show we're now in the worktree
+Sleep 500ms
 
 Type "exit"
 Enter

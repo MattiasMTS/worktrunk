@@ -439,12 +439,26 @@ def run_fish_script(
     return clean_ansi_output(result.stdout + result.stderr)
 
 
+@dataclass
+class DemoSize:
+    """Canvas and font size for demo recording."""
+    width: int
+    height: int
+    fontsize: int
+
+
+# Predefined sizes for different contexts
+SIZE_TWITTER = DemoSize(width=1200, height=700, fontsize=26)  # Big text for mobile
+SIZE_DOCS = DemoSize(width=1600, height=900, fontsize=24)     # More content for docs
+
+
 def record_all_themes(
     demo_env: "DemoEnv",
     tape_template: Path,
     output_gifs: dict[str, Path],
     repo_root: Path,
     vhs_binary: str = "vhs",
+    size: DemoSize = None,
 ):
     """Record demo GIFs for all themes.
 
@@ -454,7 +468,11 @@ def record_all_themes(
         output_gifs: Dict of theme_name -> output GIF path (e.g., {"light": path, "dark": path})
         repo_root: Path to worktrunk repo root (for target/debug)
         vhs_binary: VHS binary to use (default "vhs", can be path to custom build)
+        size: Canvas and font size (default SIZE_DOCS)
     """
+    if size is None:
+        size = SIZE_DOCS
+
     tape_rendered = demo_env.out_dir / ".rendered.tape"
     starship_config = demo_env.out_dir / "starship.toml"
     docs_assets = repo_root / "docs" / "static" / "assets"
@@ -470,6 +488,10 @@ def record_all_themes(
             "OUTPUT_GIF": output_gif,
             "TARGET_DEBUG": repo_root / "target" / "debug",
             "THEME": format_theme_for_vhs(theme),
+            "ANTHROPIC_API_KEY": os.environ.get("ANTHROPIC_API_KEY", ""),
+            "WIDTH": size.width,
+            "HEIGHT": size.height,
+            "FONTSIZE": size.fontsize,
         }
 
         if not render_tape(tape_template, tape_rendered, replacements):

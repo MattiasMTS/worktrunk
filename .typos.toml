@@ -1,3 +1,6 @@
+[files]
+extend-exclude = ["docs/demos/vhs-keystrokes/"]
+
 [default.extend-words]
 # Git commit hashes that typos flags as potential typos
 ba = "ba"  # Part of commit hashes like e28e0ba

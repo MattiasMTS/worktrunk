@@ -4,10 +4,10 @@ Require wt
 Require git
 
 Set Shell "fish"
-Set FontSize 24
+Set FontSize {{FONTSIZE}}
 Set FontFamily "Geist Mono, Berkeley Mono, Fira Code, JetBrains Mono, Menlo, Apple Color Emoji"
-Set Width 1600
-Set Height 900
+Set Width {{WIDTH}}
+Set Height {{HEIGHT}}
 Set Theme {{THEME}}
 Set Padding 18
 Set LineHeight 1.12
@@ -56,11 +56,9 @@ Type 'echo "- Q4 report ready" >> notes.md'
 Enter
 Sleep 0.8s
 
-Type "wt list"
-Enter
-Sleep 1.6s
-
+# Pre-enter pause: merge output scrolls past visible area
 Type "wt merge"
+Sleep 1s
 Enter
 Sleep 8s
 
