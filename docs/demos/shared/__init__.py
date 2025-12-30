@@ -24,6 +24,10 @@ from .lib import (
     check_dependencies,
     setup_demo_output,
     record_all_themes,
+    # Text output recording
+    is_interactive_tape,
+    record_text,
+    build_tape_replacements,
 )
 from .themes import THEMES, format_theme_for_vhs
 
@@ -53,4 +57,8 @@ __all__ = [
     "check_dependencies",
     "setup_demo_output",
     "record_all_themes",
+    # Text output recording
+    "is_interactive_tape",
+    "record_text",
+    "build_tape_replacements",
 ]

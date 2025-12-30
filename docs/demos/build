@@ -24,6 +24,7 @@ from shared import (
     setup_claude_code_config, setup_zellij_config, setup_fish_config,
     check_dependencies, setup_demo_output, record_all_themes,
     SIZE_DOCS, SIZE_TWITTER,
+    is_interactive_tape, record_text, build_tape_replacements,
 )
 
 REPO_ROOT = SCRIPT_DIR.parent.parent
@@ -359,6 +360,7 @@ Examples:
   ./build docs                    Build all doc site demos (light + dark)
   ./build twitter                 Build all Twitter demos (light only)
   ./build docs --only wt-merge    Build specific demo for docs
+  ./build docs --text             Build text output for non-interactive demos
   ./build twitter --only wt-zellij --shell   Debug shell for demo
 """
     )
@@ -367,10 +369,16 @@ Examples:
     parser.add_argument("--only", help="Only record specific demo (e.g., wt-switch)")
     parser.add_argument("--shell", action="store_true",
                         help="Build demo and spawn interactive shell for debugging (requires --only)")
+    parser.add_argument("--text", action="store_true",
+                        help="Record text output instead of GIFs (skips interactive demos)")
     args = parser.parse_args()
 
     if args.shell and not args.only:
         print("--shell requires --only to specify which demo to debug")
+        return
+
+    if args.shell and args.text:
+        print("--shell and --text are mutually exclusive")
         return
 
     # Check dependencies
@@ -410,16 +418,16 @@ Examples:
             print(f"Skipping {output_name}: {tape_file} not found")
             continue
 
+        # Skip interactive demos in text mode
+        if args.text and is_interactive_tape(tape_path):
+            print(f"Skipping {output_name}: interactive demo (has TUI/Zellij)")
+            continue
+
         vhs_binary = VHS_KEYSTROKES if vhs_type == "vhs-keystrokes" else "vhs"
         demo_size = size_override or default_size
 
-        # Build output GIF paths based on themes
-        output_gifs = {"light": OUT_DIR / f"{output_name}.gif"}
-        if "dark" in themes:
-            output_gifs["dark"] = OUT_DIR / f"{output_name}-dark.gif"
-
         print(f"\n{'='*60}")
-        print(f"Recording {output_name} ({args.target})...")
+        print(f"Recording {output_name} ({args.target}){' [text]' if args.text else ''}...")
         print(f"{'='*60}")
 
         # Create fresh environment for each demo
@@ -435,7 +443,19 @@ Examples:
             spawn_debug_shell(env, starship_config)
             return  # Only debug one demo at a time
 
-        record_all_themes(env, tape_path, output_gifs, REPO_ROOT, vhs_binary=vhs_binary, size=demo_size)
+        replacements = build_tape_replacements(env, REPO_ROOT)
+
+        if args.text:
+            output_txt = OUT_DIR / f"{output_name}.txt"
+            record_text(env, tape_path, output_txt, replacements)
+            print(f"Text saved to {output_txt}")
+        else:
+            # Build output GIF paths based on themes
+            output_gifs = {"light": OUT_DIR / f"{output_name}.gif"}
+            if "dark" in themes:
+                output_gifs["dark"] = OUT_DIR / f"{output_name}-dark.gif"
+
+            record_all_themes(env, tape_path, output_gifs, REPO_ROOT, vhs_binary=vhs_binary, size=demo_size)
 
 
 if __name__ == "__main__":

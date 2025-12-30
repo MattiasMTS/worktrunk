@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -686,6 +687,111 @@ def setup_demo_output(out_dir: Path) -> Path:
     return starship_config
 
 
+def is_interactive_tape(tape_path: Path) -> bool:
+    """Check if a tape contains interactive elements (TUI, Zellij, etc).
+
+    Interactive tapes have VHS commands like Down, Up, Ctrl+... that can't
+    be translated to shell commands for text output.
+    """
+    content = tape_path.read_text()
+    # Look for interactive VHS commands at start of line
+    # Also check for keystroke overlay which indicates visual TUI demo
+    interactive_pattern = re.compile(
+        r"^(Down|Up|Left|Right|Ctrl\+|Tab\s|Backspace|Escape|Set KeyStrokes)",
+        re.MULTILINE
+    )
+    return bool(interactive_pattern.search(content))
+
+
+def record_text(
+    demo_env: DemoEnv,
+    tape_path: Path,
+    output_txt: Path,
+    replacements: dict = None,
+    vhs_binary: str = "vhs",
+) -> None:
+    """Record text output by rendering tape via VHS.
+
+    Uses VHS with .txt output to capture authentic shell session including
+    real prompts and command output. The output contains frame-by-frame
+    terminal snapshots separated by 80-char lines of dashes.
+
+    Note: VHS text output is fixed at 80 characters wide regardless of
+    Set Width. Content wider than 80 chars will be truncated.
+
+    Args:
+        demo_env: Demo environment
+        tape_path: Path to VHS tape file
+        output_txt: Path to write text output
+        replacements: Template variable replacements (e.g., {{DEMO_REPO}} -> path)
+        vhs_binary: VHS binary to use
+
+    Raises:
+        ValueError: If tape is interactive (caller should check first)
+        subprocess.CalledProcessError: If VHS fails
+        RuntimeError: If VHS succeeds but output file not created
+    """
+    if is_interactive_tape(tape_path):
+        raise ValueError(f"Cannot record text for interactive tape: {tape_path}")
+
+    # Create a text-output tape by modifying the template
+    tape_content = tape_path.read_text()
+
+    # Apply template replacements first
+    if replacements:
+        for key, value in replacements.items():
+            tape_content = tape_content.replace(f"{{{{{key}}}}}", str(value))
+
+    # Replace Output directive to use .txt (must be absolute path)
+    temp_txt = (demo_env.out_dir / ".text-output.txt").resolve()
+    tape_content = re.sub(
+        r'^Output\s+"[^"]+"',
+        f'Output "{temp_txt}"',
+        tape_content,
+        flags=re.MULTILINE,
+    )
+
+    # VHS text output requires minimum 120x120 dimensions
+    tape_content = re.sub(
+        r'^Set Width .*$',
+        'Set Width 120',
+        tape_content,
+        flags=re.MULTILINE,
+    )
+    tape_content = re.sub(
+        r'^Set Height .*$',
+        'Set Height 120',
+        tape_content,
+        flags=re.MULTILINE,
+    )
+    # Remove visual settings not meaningful for text output
+    # Padding especially breaks text capture (reduces effective terminal width)
+    for setting in ["FontSize", "Theme", "Padding"]:
+        tape_content = re.sub(
+            rf'^Set {setting} .*$\n?',
+            '',
+            tape_content,
+            flags=re.MULTILINE,
+        )
+
+    # Write rendered tape (resolve for consistent VHS execution)
+    tape_rendered = (demo_env.out_dir / ".text-rendered.tape").resolve()
+    tape_rendered.write_text(tape_content)
+
+    # Run VHS (let CalledProcessError propagate)
+    try:
+        run([vhs_binary, str(tape_rendered)], check=True)
+    finally:
+        tape_rendered.unlink(missing_ok=True)
+
+    # Copy output to final location
+    if not temp_txt.exists():
+        raise RuntimeError(f"VHS succeeded but output file not created: {temp_txt}")
+
+    shutil.copy(temp_txt, output_txt)
+    temp_txt.unlink()
+
+
 @dataclass
 class DemoSize:
     """Canvas and font size for demo recording."""
@@ -697,6 +803,23 @@ class DemoSize:
 # Predefined sizes for different contexts
 SIZE_TWITTER = DemoSize(width=1200, height=700, fontsize=26)  # Big text for mobile
 SIZE_DOCS = DemoSize(width=1600, height=900, fontsize=24)     # More content for docs
+
+
+def build_tape_replacements(demo_env: DemoEnv, repo_root: Path) -> dict:
+    """Build base template variable replacements for tape rendering.
+
+    Used by both GIF recording and text recording to ensure consistency.
+    All paths are resolved to absolute paths for VHS compatibility.
+    """
+    starship_config = (demo_env.out_dir / "starship.toml").resolve()
+    return {
+        "DEMO_REPO": demo_env.repo.resolve(),
+        "DEMO_HOME": demo_env.home.resolve(),
+        "REAL_HOME": REAL_HOME,
+        "STARSHIP_CONFIG": starship_config,
+        "TARGET_DEBUG": (repo_root / "target" / "debug").resolve(),
+        "ANTHROPIC_API_KEY": os.environ.get("ANTHROPIC_API_KEY", ""),
+    }
 
 
 def record_all_themes(
@@ -721,19 +844,14 @@ def record_all_themes(
         size = SIZE_DOCS
 
     tape_rendered = demo_env.out_dir / ".rendered.tape"
-    starship_config = demo_env.out_dir / "starship.toml"
+    base_replacements = build_tape_replacements(demo_env, repo_root)
 
     for theme_name, output_gif in output_gifs.items():
         theme = THEMES[theme_name]
         replacements = {
-            "DEMO_REPO": demo_env.repo,
-            "DEMO_HOME": demo_env.home,
-            "REAL_HOME": REAL_HOME,
-            "STARSHIP_CONFIG": starship_config,
+            **base_replacements,
             "OUTPUT_GIF": output_gif,
-            "TARGET_DEBUG": repo_root / "target" / "debug",
             "THEME": format_theme_for_vhs(theme),
-            "ANTHROPIC_API_KEY": os.environ.get("ANTHROPIC_API_KEY", ""),
             "WIDTH": size.width,
             "HEIGHT": size.height,
             "FONTSIZE": size.fontsize,
