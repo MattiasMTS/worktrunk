@@ -3,6 +3,33 @@
 <html lang="en">
 
 <head>
+    <script>
+    // 1Password extension bug workaround: MUST be first script in document.
+    // 1Password injects Prism.js targeting [class*="language-"], stripping our
+    // syntect spans. Fix: rename language-* to lang-* before 1Password sees them.
+    // https://1password.community/discussion/165597
+    (function() {
+        function fix(el) {
+            if (el.className && el.className.replace) {
+                el.className = el.className.replace(/\blanguage-\S*/g, '');
+            }
+            if (el.dataset && el.dataset.lang) el.removeAttribute('data-lang');
+        }
+        new MutationObserver(function(mutations) {
+            for (var i = 0; i < mutations.length; i++) {
+                var nodes = mutations[i].addedNodes;
+                for (var j = 0; j < nodes.length; j++) {
+                    var n = nodes[j];
+                    if (n.nodeType === 1) {
+                        if (n.className && n.className.includes && n.className.includes('language-')) fix(n);
+                        var els = n.querySelectorAll ? n.querySelectorAll('[class*="language-"]') : [];
+                        for (var k = 0; k < els.length; k++) fix(els[k]);
+                    }
+                }
+            }
+        }).observe(document.documentElement, { childList: true, subtree: true });
+    })();
+    </script>
     <meta charset="UTF-8">
     <title>{% block title %}{{ config.title }}{% endblock title %}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -85,26 +112,6 @@
     <script src="/code-copy.js" defer></script>
     <script src="/mobile-menu.js" defer></script>
     <script src="//instant.page/5.2.0" type="module" integrity="sha384-jnZyxPjiipYXnSU0ygqeac2q7CVYMbh84q0uHVRRxEtvFPiQYbXWUorga2aqZJ0z"></script>
-    <script>
-    // 1Password extension bug workaround: it strips syntax highlighting spans from
-    // code blocks with language-* classes. Adding data-1p-ignore prevents this.
-    // https://1password.community/discussion/165597
-    (function() {
-        var mark = function(el) { el.setAttribute('data-1p-ignore', ''); };
-        new MutationObserver(function(mutations) {
-            mutations.forEach(function(m) {
-                m.addedNodes.forEach(function(n) {
-                    if (n.nodeType === 1) {
-                        if (n.matches && n.matches('code[class*="language-"]')) mark(n);
-                        if (n.querySelectorAll) {
-                            n.querySelectorAll('code[class*="language-"]').forEach(mark);
-                        }
-                    }
-                });
-            });
-        }).observe(document.documentElement, { childList: true, subtree: true });
-    })();
-    </script>
 </head>
 
 <body>

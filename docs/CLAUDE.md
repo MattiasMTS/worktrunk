@@ -12,6 +12,12 @@ cd docs && zola serve -p $((10000 + RANDOM))
 
 Check the output for "Web server is available at http://127.0.0.1:<port>" before proceeding.
 
+For static builds with local URLs (e.g., testing with a simple HTTP server):
+
+```bash
+zola build --base-url "http://127.0.0.1:PORT"
+```
+
 ### Verifying changes
 
 **Text-only changes** (prose edits, content rewrites): Run pre-commit and provide the dev server link. Playwright verification is not required.
