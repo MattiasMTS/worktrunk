@@ -588,7 +588,8 @@ pub fn configure_git_cmd(cmd: &mut Command, git_config_path: &Path) {
 
 /// Shared interface for test repository fixtures.
 ///
-/// Provides `configure_git_cmd()` and `git_command()` with consistent environment isolation.
+/// Provides `configure_git_cmd()`, `git_command()`, and `run_git_in()` with consistent
+/// environment isolation.
 pub trait TestRepoBase {
     /// Path to the git config file for this test.
     fn git_config_path(&self) -> &Path;
@@ -604,6 +605,34 @@ pub trait TestRepoBase {
         cmd.current_dir(dir);
         self.configure_git_cmd(&mut cmd);
         cmd
+    }
+
+    /// Run a git command in a specific directory, panicking on failure.
+    fn run_git_in(&self, dir: &Path, args: &[&str]) {
+        let output = self.git_command(dir).args(args).output().unwrap();
+        check_git_status(&output, &args.join(" "));
+    }
+
+    /// Create a commit in the specified directory.
+    ///
+    /// Creates or overwrites `file.txt` with the message content, stages it, and commits.
+    fn commit_in(&self, dir: &Path, message: &str) {
+        std::fs::write(dir.join("file.txt"), message).unwrap();
+        self.run_git_in(dir, &["add", "file.txt"]);
+
+        let output = self
+            .git_command(dir)
+            .args(["commit", "-m", message])
+            .output()
+            .unwrap();
+
+        if !output.status.success() {
+            panic!(
+                "Failed to commit:\nstdout: {}\nstderr: {}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
     }
 }
 
@@ -1140,15 +1169,10 @@ impl TestRepo {
         self.git_command().args(["add", "."]).output().unwrap();
 
         // Create commit with custom timestamp
-        let mut cmd = Command::new("git");
-        cmd.env("GIT_CONFIG_GLOBAL", &self.git_config_path);
-        cmd.env("GIT_CONFIG_SYSTEM", NULL_DEVICE);
-        cmd.env("GIT_AUTHOR_DATE", &timestamp);
-        cmd.env("GIT_COMMITTER_DATE", &timestamp);
-        cmd.env("LC_ALL", "C");
-        cmd.env("LANG", "C");
-        cmd.args(["commit", "-m", message])
-            .current_dir(&self.root)
+        self.git_command()
+            .env("GIT_AUTHOR_DATE", &timestamp)
+            .env("GIT_COMMITTER_DATE", &timestamp)
+            .args(["commit", "-m", message])
             .output()
             .unwrap();
     }
@@ -1169,14 +1193,10 @@ impl TestRepo {
         let commit_time = TEST_EPOCH as i64 - age_seconds;
         let timestamp = unix_to_iso8601(commit_time);
 
-        let mut cmd = Command::new("git");
-        cmd.env("GIT_CONFIG_GLOBAL", &self.git_config_path);
-        cmd.env("GIT_CONFIG_SYSTEM", NULL_DEVICE);
-        cmd.env("GIT_AUTHOR_DATE", &timestamp);
-        cmd.env("GIT_COMMITTER_DATE", &timestamp);
-        cmd.env("LC_ALL", "C");
-        cmd.env("LANG", "C");
-        cmd.args(["commit", "-m", message])
+        self.git_command()
+            .env("GIT_AUTHOR_DATE", &timestamp)
+            .env("GIT_COMMITTER_DATE", &timestamp)
+            .args(["commit", "-m", message])
             .current_dir(dir)
             .output()
             .unwrap();
@@ -1388,14 +1408,12 @@ impl TestRepo {
 
     /// Check if origin/HEAD is set
     pub fn has_origin_head(&self) -> bool {
-        let mut cmd = Command::new("git");
-        self.configure_git_cmd(&mut cmd);
-        let output = cmd
+        self.git_command()
             .args(["rev-parse", "--abbrev-ref", "origin/HEAD"])
-            .current_dir(&self.root)
             .output()
-            .unwrap();
-        output.status.success()
+            .unwrap()
+            .status
+            .success()
     }
 
     /// Switch the primary worktree to a different branch
@@ -1734,6 +1752,137 @@ exit 1
 }
 
 impl TestRepoBase for TestRepo {
+    fn git_config_path(&self) -> &Path {
+        &self.git_config_path
+    }
+}
+
+/// Helper to create a bare repository test setup.
+///
+/// Bare repositories are useful for testing scenarios where you need worktrees
+/// for the default branch (which isn't possible with normal repos since the
+/// main worktree already has it checked out).
+pub struct BareRepoTest {
+    temp_dir: tempfile::TempDir,
+    bare_repo_path: PathBuf,
+    test_config_path: PathBuf,
+    git_config_path: PathBuf,
+}
+
+impl BareRepoTest {
+    /// Create a new bare repository test setup.
+    ///
+    /// The bare repo is created at `temp_dir/repo` with worktrees configured
+    /// to be created as subdirectories (e.g., `repo/main`, `repo/feature`).
+    pub fn new() -> Self {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        // Bare repo without .git suffix - worktrees go inside as subdirectories
+        let bare_repo_path = temp_dir.path().join("repo");
+        let test_config_path = temp_dir.path().join("test-config.toml");
+        let git_config_path = temp_dir.path().join("test-gitconfig");
+
+        // Write git config with user settings
+        std::fs::write(
+            &git_config_path,
+            "[user]\n\tname = Test User\n\temail = test@example.com\n\
+             [advice]\n\tmergeConflict = false\n\tresolveConflict = false\n\
+             [init]\n\tdefaultBranch = main\n",
+        )
+        .unwrap();
+
+        let mut test = Self {
+            temp_dir,
+            bare_repo_path,
+            test_config_path,
+            git_config_path,
+        };
+
+        // Create bare repository
+        let mut cmd = Command::new("git");
+        cmd.args(["init", "--bare", "--initial-branch", "main"])
+            .arg(&test.bare_repo_path);
+        test.configure_git_cmd(&mut cmd);
+        let output = cmd.output().unwrap();
+
+        if !output.status.success() {
+            panic!(
+                "Failed to init bare repo:\nstdout: {}\nstderr: {}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+
+        // Canonicalize path (using dunce to avoid \\?\ prefix on Windows)
+        test.bare_repo_path = canonicalize(&test.bare_repo_path).unwrap();
+
+        // Write config with template for worktrees inside bare repo
+        // Template {{ branch }} creates worktrees as subdirectories: repo/main, repo/feature
+        std::fs::write(&test.test_config_path, "worktree-path = \"{{ branch }}\"\n").unwrap();
+
+        test
+    }
+
+    /// Get the path to the bare repository.
+    pub fn bare_repo_path(&self) -> &Path {
+        &self.bare_repo_path
+    }
+
+    /// Get the path to the test config file.
+    pub fn config_path(&self) -> &Path {
+        &self.test_config_path
+    }
+
+    /// Get the temp directory path.
+    pub fn temp_path(&self) -> &Path {
+        self.temp_dir.path()
+    }
+
+    /// Create a worktree from the bare repository.
+    ///
+    /// Worktrees are created inside the bare repo directory: repo/main, repo/feature
+    pub fn create_worktree(&self, branch: &str, worktree_name: &str) -> PathBuf {
+        let worktree_path = self.bare_repo_path.join(worktree_name);
+
+        let output = self
+            .git_command(&self.bare_repo_path)
+            .args([
+                "worktree",
+                "add",
+                "-b",
+                branch,
+                worktree_path.to_str().unwrap(),
+            ])
+            .output()
+            .unwrap();
+
+        if !output.status.success() {
+            panic!(
+                "Failed to create worktree:\nstdout: {}\nstderr: {}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+
+        canonicalize(&worktree_path).unwrap()
+    }
+
+    /// Configure a wt command with test environment.
+    pub fn configure_wt_cmd(&self, cmd: &mut Command) {
+        self.configure_git_cmd(cmd);
+        cmd.env("WORKTRUNK_CONFIG_PATH", &self.test_config_path)
+            .env_remove("NO_COLOR")
+            .env_remove("CLICOLOR_FORCE");
+    }
+
+    /// Create a pre-configured wt command.
+    pub fn wt_command(&self) -> Command {
+        let mut cmd = wt_command();
+        self.configure_wt_cmd(&mut cmd);
+        cmd
+    }
+}
+
+impl TestRepoBase for BareRepoTest {
     fn git_config_path(&self) -> &Path {
         &self.git_config_path
     }

@@ -1,6 +1,6 @@
 use crate::common::{
-    TestRepo, TestRepoBase, canonicalize, configure_directive_file, directive_file, repo,
-    setup_temp_snapshot_settings, wait_for_file, wt_command,
+    BareRepoTest, TestRepo, TestRepoBase, canonicalize, configure_directive_file, directive_file,
+    repo, setup_temp_snapshot_settings, wait_for_file, wt_command,
 };
 use insta_cmd::assert_cmd_snapshot;
 use rstest::rstest;
@@ -9,155 +9,6 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
-/// Helper to create a bare repository test setup
-struct BareRepoTest {
-    temp_dir: tempfile::TempDir,
-    bare_repo_path: PathBuf,
-    test_config_path: PathBuf,
-    git_config_path: PathBuf,
-}
-
-impl BareRepoTest {
-    fn new() -> Self {
-        let temp_dir = tempfile::TempDir::new().unwrap();
-        // Bare repo without .git suffix - worktrees go inside as subdirectories
-        let bare_repo_path = temp_dir.path().join("repo");
-        let test_config_path = temp_dir.path().join("test-config.toml");
-        let git_config_path = temp_dir.path().join("test-gitconfig");
-
-        // Write git config with user settings
-        fs::write(
-            &git_config_path,
-            "[user]\n\tname = Test User\n\temail = test@example.com\n\
-             [advice]\n\tmergeConflict = false\n\tresolveConflict = false\n\
-             [init]\n\tdefaultBranch = main\n",
-        )
-        .unwrap();
-
-        let mut test = Self {
-            temp_dir,
-            bare_repo_path,
-            test_config_path,
-            git_config_path,
-        };
-
-        // Create bare repository
-        let mut cmd = Command::new("git");
-        cmd.args(["init", "--bare", "--initial-branch", "main"])
-            .arg(&test.bare_repo_path);
-        test.configure_git_cmd(&mut cmd);
-        let output = cmd.output().unwrap();
-
-        if !output.status.success() {
-            panic!(
-                "Failed to init bare repo:\nstdout: {}\nstderr: {}",
-                String::from_utf8_lossy(&output.stdout),
-                String::from_utf8_lossy(&output.stderr)
-            );
-        }
-
-        // Canonicalize path (using dunce to avoid \\?\ prefix on Windows)
-        test.bare_repo_path = canonicalize(&test.bare_repo_path).unwrap();
-
-        // Write config with template for worktrees inside bare repo
-        // Template {{ branch }} creates worktrees as subdirectories: repo/main, repo/feature
-        fs::write(&test.test_config_path, "worktree-path = \"{{ branch }}\"\n").unwrap();
-
-        test
-    }
-
-    fn bare_repo_path(&self) -> &PathBuf {
-        &self.bare_repo_path
-    }
-
-    fn config_path(&self) -> &PathBuf {
-        &self.test_config_path
-    }
-
-    /// Create a worktree from the bare repository
-    /// Worktrees are created inside the bare repo directory: repo/main, repo/feature
-    fn create_worktree(&self, branch: &str, worktree_name: &str) -> PathBuf {
-        let worktree_path = self.bare_repo_path.join(worktree_name);
-
-        let output = self
-            .git_command(&self.bare_repo_path)
-            .args([
-                "worktree",
-                "add",
-                "-b",
-                branch,
-                worktree_path.to_str().unwrap(),
-            ])
-            .output()
-            .unwrap();
-
-        if !output.status.success() {
-            panic!(
-                "Failed to create worktree:\nstdout: {}\nstderr: {}",
-                String::from_utf8_lossy(&output.stdout),
-                String::from_utf8_lossy(&output.stderr)
-            );
-        }
-
-        canonicalize(&worktree_path).unwrap()
-    }
-
-    /// Create a commit in the specified worktree
-    fn commit_in_worktree(&self, worktree_path: &Path, message: &str) {
-        // Create a file
-        let file_path = worktree_path.join("file.txt");
-        fs::write(&file_path, message).unwrap();
-
-        // Add file
-        let output = self
-            .git_command(worktree_path)
-            .args(["add", "file.txt"])
-            .output()
-            .unwrap();
-
-        if !output.status.success() {
-            panic!(
-                "Failed to add file:\nstdout: {}\nstderr: {}",
-                String::from_utf8_lossy(&output.stdout),
-                String::from_utf8_lossy(&output.stderr)
-            );
-        }
-
-        // Commit
-        let output = self
-            .git_command(worktree_path)
-            .args(["commit", "-m", message])
-            .output()
-            .unwrap();
-
-        if !output.status.success() {
-            panic!(
-                "Failed to commit:\nstdout: {}\nstderr: {}",
-                String::from_utf8_lossy(&output.stdout),
-                String::from_utf8_lossy(&output.stderr)
-            );
-        }
-    }
-
-    fn temp_path(&self) -> &Path {
-        self.temp_dir.path()
-    }
-
-    /// Configure a wt command with test environment
-    fn configure_wt_cmd(&self, cmd: &mut Command) {
-        self.configure_git_cmd(cmd);
-        cmd.env("WORKTRUNK_CONFIG_PATH", &self.test_config_path)
-            .env_remove("NO_COLOR")
-            .env_remove("CLICOLOR_FORCE");
-    }
-}
-
-impl TestRepoBase for BareRepoTest {
-    fn git_config_path(&self) -> &Path {
-        &self.git_config_path
-    }
-}
-
 #[test]
 fn test_bare_repo_list_worktrees() {
     let test = BareRepoTest::new();
@@ -165,10 +16,10 @@ fn test_bare_repo_list_worktrees() {
     // Create worktrees inside bare repo matching template: {{ branch }}
     // Worktrees are at repo/main and repo/feature
     let main_worktree = test.create_worktree("main", "main");
-    test.commit_in_worktree(&main_worktree, "Initial commit on main");
+    test.commit_in(&main_worktree, "Initial commit on main");
 
     let feature_worktree = test.create_worktree("feature", "feature");
-    test.commit_in_worktree(&feature_worktree, "Work on feature");
+    test.commit_in(&feature_worktree, "Work on feature");
 
     let settings = setup_temp_snapshot_settings(test.temp_path());
     settings.bind(|| {
@@ -187,7 +38,7 @@ fn test_bare_repo_list_shows_no_bare_entry() {
 
     // Create one worktree
     let main_worktree = test.create_worktree("main", "main");
-    test.commit_in_worktree(&main_worktree, "Initial commit");
+    test.commit_in(&main_worktree, "Initial commit");
 
     // Run wt list and verify bare repo is NOT shown (only main worktree appears)
     let settings = setup_temp_snapshot_settings(test.temp_path());
@@ -206,7 +57,7 @@ fn test_bare_repo_switch_creates_worktree() {
 
     // Create initial worktree
     let main_worktree = test.create_worktree("main", "main");
-    test.commit_in_worktree(&main_worktree, "Initial commit");
+    test.commit_in(&main_worktree, "Initial commit");
 
     // Run wt switch --create to create a new worktree
     // Config uses {{ branch }} template, so worktrees are created inside bare repo
@@ -254,7 +105,7 @@ fn test_bare_repo_switch_with_configured_naming() {
 
     // Create initial worktree
     let main_worktree = test.create_worktree("main", "main");
-    test.commit_in_worktree(&main_worktree, "Initial commit");
+    test.commit_in(&main_worktree, "Initial commit");
 
     // Config uses "{{ branch }}" template, so worktrees are created inside bare repo
     let (directive_path, _guard) = directive_file();
@@ -289,10 +140,10 @@ fn test_bare_repo_remove_worktree() {
 
     // Create two worktrees
     let main_worktree = test.create_worktree("main", "main");
-    test.commit_in_worktree(&main_worktree, "Initial commit");
+    test.commit_in(&main_worktree, "Initial commit");
 
     let feature_worktree = test.create_worktree("feature", "feature");
-    test.commit_in_worktree(&feature_worktree, "Feature work");
+    test.commit_in(&feature_worktree, "Feature work");
 
     // Remove feature worktree from main worktree
     let (directive_path, _guard) = directive_file();
@@ -328,7 +179,7 @@ fn test_bare_repo_identifies_primary_correctly() {
 
     // Create multiple worktrees
     let main_worktree = test.create_worktree("main", "main");
-    test.commit_in_worktree(&main_worktree, "Main commit");
+    test.commit_in(&main_worktree, "Main commit");
 
     let _feature1 = test.create_worktree("feature1", "feature1");
     let _feature2 = test.create_worktree("feature2", "feature2");
@@ -350,7 +201,7 @@ fn test_bare_repo_worktree_base_used_for_paths() {
 
     // Create initial worktree
     let main_worktree = test.create_worktree("main", "main");
-    test.commit_in_worktree(&main_worktree, "Initial commit");
+    test.commit_in(&main_worktree, "Initial commit");
 
     // Create new worktree - config uses {{ branch }} template
     // Worktrees are created inside the bare repo directory
@@ -388,7 +239,7 @@ fn test_bare_repo_equivalent_to_normal_repo(repo: TestRepo) {
     // Set up bare repo
     let bare_test = BareRepoTest::new();
     let bare_main = bare_test.create_worktree("main", "main");
-    bare_test.commit_in_worktree(&bare_main, "Commit in bare repo");
+    bare_test.commit_in(&bare_main, "Commit in bare repo");
 
     // Set up normal repo (using fixture)
     repo.commit("Commit in normal repo");
@@ -427,7 +278,7 @@ fn test_bare_repo_commands_from_bare_directory() {
 
     // Create a worktree so the repo has some content
     let main_worktree = test.create_worktree("main", "main");
-    test.commit_in_worktree(&main_worktree, "Initial commit");
+    test.commit_in(&main_worktree, "Initial commit");
 
     // Run wt list from the bare repo directory itself (not from a worktree)
     // Should list the worktree even when run from bare repo, not showing bare repo itself
@@ -452,7 +303,7 @@ fn test_bare_repo_merge_workflow() {
 
     // Create main worktree
     let main_worktree = test.create_worktree("main", "main");
-    test.commit_in_worktree(&main_worktree, "Initial commit on main");
+    test.commit_in(&main_worktree, "Initial commit on main");
 
     // Create feature branch worktree using wt switch
     // Config uses {{ branch }} template, so worktrees are inside bare repo
@@ -469,7 +320,7 @@ fn test_bare_repo_merge_workflow() {
     assert!(feature_worktree.exists(), "Feature worktree should exist");
 
     // Make a commit in feature worktree
-    test.commit_in_worktree(&feature_worktree, "Feature work");
+    test.commit_in(&feature_worktree, "Feature work");
 
     // Merge feature into main (explicitly specify target)
     let (directive_path, _guard) = directive_file();
@@ -531,11 +382,11 @@ fn test_bare_repo_background_logs_location() {
 
     // Create main worktree
     let main_worktree = test.create_worktree("main", "main");
-    test.commit_in_worktree(&main_worktree, "Initial commit");
+    test.commit_in(&main_worktree, "Initial commit");
 
     // Create feature worktree
     let feature_worktree = test.create_worktree("feature", "feature");
-    test.commit_in_worktree(&feature_worktree, "Feature work");
+    test.commit_in(&feature_worktree, "Feature work");
 
     // Run remove in background to test log file location
     let (directive_path, _guard) = directive_file();
@@ -582,7 +433,7 @@ fn test_bare_repo_slashed_branch_with_sanitize() {
 
     // Create main worktree
     let main_worktree = test.create_worktree("main", "main");
-    test.commit_in_worktree(&main_worktree, "Initial commit");
+    test.commit_in(&main_worktree, "Initial commit");
 
     // Create feature branch with slash using wt switch
     let (directive_path, _guard) = directive_file();
