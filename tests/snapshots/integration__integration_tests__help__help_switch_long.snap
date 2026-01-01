@@ -51,10 +51,10 @@ Usage: [1m[36mwt switch[0m [36m[OPTIONS][0m [36m<BRANCH>[0m [1m[36m[--
           Especially useful with shell aliases:
           
             [1m[1malias wsc='wt switch --create -x claude'
-            [1mwsc feature-branch -- 'implement the login flow'
+            [1mwsc feature-branch -- 'Fix GH #322'
           [0m
-          Then [1mwsc feature-branch[0m creates the worktree and launches Claude Code. Arguments after [1m--[0m are passed to the command, so [1mwsc feature --
-          'implement login'[0m works.
+          Then [1mwsc feature-branch[0m creates the worktree and launches Claude Code. Arguments after [1m--[0m are passed to the command, so [1mwsc feature -- 'Fix
+          GH #322'[0m works.
 
   [1m[36m-y[0m, [1m[36m--yes
           Skip approval prompts

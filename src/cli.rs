@@ -2233,12 +2233,12 @@ wt switch --create fix --base=@  # Branch from current HEAD
         ///
         /// ```sh
         /// alias wsc='wt switch --create -x claude'
-        /// wsc feature-branch -- 'implement the login flow'
+        /// wsc feature-branch -- 'Fix GH #322'
         /// ```
         ///
         /// Then `wsc feature-branch` creates the worktree and launches Claude
         /// Code. Arguments after `--` are passed to the command, so
-        /// `wsc feature -- 'implement login'` works.
+        /// `wsc feature -- 'Fix GH #322'` works.
         #[arg(short = 'x', long)]
         execute: Option<String>,
 
