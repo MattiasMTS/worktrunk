@@ -145,7 +145,7 @@ def prepare_switch(env: DemoEnv):
 
 def prepare_devserver(env: DemoEnv):
     """Setup for wt-devserver demo - shows URL column in wt list."""
-    dev_cmd = "npm run dev -- --port {{ branch | hash_port }} &"
+    dev_cmd = "npm run dev -- --port {{ branch | hash_port }}"
     hooks_config = f'''[post-start]
 dev = "{dev_cmd}"
 
@@ -174,7 +174,7 @@ fi
 def prepare_zellij_omnibus(env: DemoEnv):
     """Setup for wt-zellij-omnibus demo - comprehensive showcase."""
     hooks_config = '''[post-start]
-dev = "npm run dev -- --port {{ branch | hash_port }} &"
+dev = "npm run dev -- --port {{ branch | hash_port }}"
 
 [pre-merge]
 test = "cargo nextest run"
