@@ -12,7 +12,7 @@ Enter
 Sleep 5s
 Type "clear"
 Enter
-Sleep 500ms
+Sleep 1s
 Show
 Sleep 500ms
 

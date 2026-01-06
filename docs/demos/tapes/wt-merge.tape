@@ -10,7 +10,7 @@ Env NEXTEST_NO_FAIL_FAST "1"
 
 Type "clear"
 Enter
-Sleep 500ms
+Sleep 1s
 Show
 Sleep 500ms
 

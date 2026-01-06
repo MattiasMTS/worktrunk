@@ -46,11 +46,11 @@ Sleep 4s
 # Dismiss plugin permission dialog (zellij-tab-name asks for permissions on first run)
 Type "y"
 Sleep 1s
-Show
-Sleep 500ms
-# Clear any leftover characters from the permission dialog
+# Clear any leftover characters from the permission dialog (before recording starts)
 Type "clear"
 Enter
+Sleep 1s
+Show
 Sleep 500ms
 
 # ==== TAB 1: Overview and simple navigation ====

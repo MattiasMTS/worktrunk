@@ -6,7 +6,7 @@ Source docs/demos/tapes/shared-commands.tape
 
 Type "clear"
 Enter
-Sleep 500ms
+Sleep 1s
 Show
 Set KeyStrokes Show
 Sleep 500ms
