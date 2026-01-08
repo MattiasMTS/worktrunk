@@ -173,10 +173,10 @@ pub enum OutputFormat {
 #[command(after_long_help = "\
 Getting started
 
-  wt switch --create feature    Create worktree and branch
-  wt switch feature             Switch to worktree
-  wt list                       Show all worktrees
-  wt merge                      Squash, rebase, and merge to default branch
+  wt switch --create feature    # Create worktree and branch
+  wt switch feature             # Switch to worktree
+  wt list                       # Show all worktrees
+  wt remove                     # Remove worktree; delete branch if merged
 
 Run `wt config shell install` to set up directory switching.
 Run `wt config create` to customize worktree locations.
