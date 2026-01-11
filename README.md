@@ -17,7 +17,7 @@ Worktrunk's three core commands make worktrees as easy as branches. Plus, Worktr
 
 Scaling agents becomes trivial. A quick demo:
 
-![Worktrunk Demo](https://cdn.jsdelivr.net/gh/max-sixty/worktrunk-assets@main/demos/docs/light/wt-core.gif)
+![Worktrunk Demo](https://cdn.jsdelivr.net/gh/max-sixty/worktrunk-assets@main/assets/docs/light/wt-core.gif)
 
 > ### 📚 Full documentation at [worktrunk.dev](https://worktrunk.dev) 📚
 
@@ -89,7 +89,7 @@ git branch -d feat</pre></td>
 
 A demo with some advanced features:
 
-![Worktrunk omnibus demo: multiple Claude agents in Zellij tabs with hooks, LLM commits, and merge workflow](https://raw.githubusercontent.com/max-sixty/worktrunk-assets/main/demos/docs/light/wt-zellij-omnibus.gif)
+![Worktrunk omnibus demo: multiple Claude agents in Zellij tabs with hooks, LLM commits, and merge workflow](https://raw.githubusercontent.com/max-sixty/worktrunk-assets/main/assets/docs/light/wt-zellij-omnibus.gif)
 
 <!-- END AUTO-GENERATED -->
 
