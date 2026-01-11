@@ -54,17 +54,17 @@ jobs:
     - name: 💰 Cache
       uses: Swatinem/rust-cache@v2
 
-    - name: Install shells (zsh, fish) - Ubuntu
+    - name: Install shells (zsh, fish, nushell) - Ubuntu
       if: runner.os == 'Linux'
       uses: awalsh128/cache-apt-pkgs-action@latest
       with:
-        packages: zsh fish
+        packages: zsh fish nushell
         version: 1.0
 
-    - name: Install shells (bash, zsh, fish) - macOS
+    - name: Install shells (bash, zsh, fish, nushell) - macOS
       if: runner.os == 'macOS'
       run: |
-        brew install fish
+        brew install fish nushell
         # bash and zsh are pre-installed on macOS
 
     - name: Install shells - Windows
@@ -179,10 +179,10 @@ jobs:
     - name: 💰 Cache
       uses: Swatinem/rust-cache@v2
 
-    - name: Install shells (zsh, fish)
+    - name: Install shells (zsh, fish, nushell)
       uses: awalsh128/cache-apt-pkgs-action@latest
       with:
-        packages: zsh fish
+        packages: zsh fish nushell
         version: 1.0
 
     - name: 📊 Run benchmarks
@@ -207,10 +207,10 @@ jobs:
       with:
         save-if: ${{ github.ref == 'refs/heads/main' }}
 
-    - name: Install shells (zsh, fish)
+    - name: Install shells (zsh, fish, nushell)
       uses: awalsh128/cache-apt-pkgs-action@latest
       with:
-        packages: zsh fish
+        packages: zsh fish nushell
         version: 1.0
 
     # Ensure nothing remains from caching
